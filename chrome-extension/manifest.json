@@ -1,0 +1,58 @@
+{
+  "manifest_version": 3,
+  "name": "CRM Montaż Reklam 24",
+  "version": "1.0.0",
+  "description": "Szybkie tworzenie zleceń z Gmail - wyciąga dane kontaktowe, adresy i tworzy karty CRM",
+  "author": "Montaż Reklam 24",
+  
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  
+  "host_permissions": [
+    "https://mail.google.com/*",
+    "https://montazreklam24.pl/*",
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  
+  "web_accessible_resources": [
+    {
+      "resources": ["sidebar.html", "icons/*"],
+      "matches": ["https://mail.google.com/*"]
+    }
+  ]
+}
+

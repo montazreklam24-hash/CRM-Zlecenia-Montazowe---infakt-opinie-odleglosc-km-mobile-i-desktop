@@ -1,0 +1,36 @@
+# CRM Zlecenia Montażowe - API Routing
+# Wszystkie requesty przekieruj do index.php
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /api/
+    
+    # Nie przetwarzaj istniejących plików
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    
+    # Przekieruj wszystko do index.php
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Ustaw nagłówki bezpieczeństwa
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "DENY"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# Ukryj zawartość katalogu
+Options -Indexes
+
+# Ustaw domyślny charset
+AddDefaultCharset UTF-8
+
+# Zwiększ limity dla uploadów (PHP)
+<IfModule mod_php5.c>
+    php_value upload_max_filesize 20M
+    php_value post_max_size 25M
+    php_value max_execution_time 60
+    php_value memory_limit 128M
+</IfModule>
+

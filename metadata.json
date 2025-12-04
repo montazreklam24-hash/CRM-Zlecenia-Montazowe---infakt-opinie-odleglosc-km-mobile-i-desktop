@@ -1,0 +1,7 @@
+{
+  "name": "MontazReklam24 - Zlecenie montażowe",
+  "description": "Aplikacja do automatycznego generowania kart zleceń montażowych z wątków Gmail przy użyciu Gemini AI. Tworzy przejrzyste instrukcje dla pracowników terenowych.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

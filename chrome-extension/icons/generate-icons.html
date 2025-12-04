@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>CRM Icon Generator</title>
+  <style>
+    body {
+      font-family: system-ui;
+      padding: 40px;
+      background: #f0f0f0;
+    }
+    h1 { margin-bottom: 20px; }
+    .icons {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .icon-box {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+    }
+    .icon-box p {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #666;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      border-radius: 8px;
+    }
+    button {
+      margin-top: 10px;
+      padding: 8px 16px;
+      border: none;
+      background: #6366f1;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #4f46e5;
+    }
+    .instructions {
+      margin-top: 40px;
+      padding: 20px;
+      background: white;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎨 CRM Icon Generator</h1>
+  <p>Kliknij "Pobierz" aby zapisać ikony do folderu icons/</p>
+  
+  <div class="icons" id="icons"></div>
+  
+  <div class="instructions">
+    <h3>Instrukcja:</h3>
+    <ol>
+      <li>Otwórz ten plik w przeglądarce</li>
+      <li>Kliknij "Pobierz" przy każdej ikonie</li>
+      <li>Zapisz pliki jako: icon16.png, icon32.png, icon48.png, icon128.png</li>
+      <li>Przenieś je do folderu chrome-extension/icons/</li>
+    </ol>
+  </div>
+  
+  <script>
+    const sizes = [16, 32, 48, 128];
+    const container = document.getElementById('icons');
+    
+    sizes.forEach(size => {
+      const box = document.createElement('div');
+      box.className = 'icon-box';
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      canvas.id = `icon${size}`;
+      
+      const ctx = canvas.getContext('2d');
+      drawIcon(ctx, size);
+      
+      const p = document.createElement('p');
+      p.textContent = `${size}x${size}px`;
+      
+      const btn = document.createElement('button');
+      btn.textContent = 'Pobierz';
+      btn.onclick = () => downloadIcon(canvas, `icon${size}.png`);
+      
+      box.appendChild(canvas);
+      box.appendChild(p);
+      box.appendChild(btn);
+      container.appendChild(box);
+    });
+    
+    function drawIcon(ctx, size) {
+      const s = size;
+      const padding = s * 0.1;
+      const radius = s * 0.15;
+      
+      // Background gradient
+      const gradient = ctx.createLinearGradient(0, 0, s, s);
+      gradient.addColorStop(0, '#6366f1');
+      gradient.addColorStop(1, '#4f46e5');
+      
+      // Rounded rect background
+      ctx.beginPath();
+      ctx.moveTo(padding + radius, padding);
+      ctx.lineTo(s - padding - radius, padding);
+      ctx.quadraticCurveTo(s - padding, padding, s - padding, padding + radius);
+      ctx.lineTo(s - padding, s - padding - radius);
+      ctx.quadraticCurveTo(s - padding, s - padding, s - padding - radius, s - padding);
+      ctx.lineTo(padding + radius, s - padding);
+      ctx.quadraticCurveTo(padding, s - padding, padding, s - padding - radius);
+      ctx.lineTo(padding, padding + radius);
+      ctx.quadraticCurveTo(padding, padding, padding + radius, padding);
+      ctx.closePath();
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      
+      // Icon - Kanban board
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = Math.max(1, s * 0.06);
+      ctx.lineCap = 'round';
+      
+      const innerPad = s * 0.25;
+      const boxSize = s - innerPad * 2;
+      const boxRadius = s * 0.08;
+      
+      // Outer box
+      ctx.beginPath();
+      ctx.moveTo(innerPad + boxRadius, innerPad);
+      ctx.lineTo(innerPad + boxSize - boxRadius, innerPad);
+      ctx.quadraticCurveTo(innerPad + boxSize, innerPad, innerPad + boxSize, innerPad + boxRadius);
+      ctx.lineTo(innerPad + boxSize, innerPad + boxSize - boxRadius);
+      ctx.quadraticCurveTo(innerPad + boxSize, innerPad + boxSize, innerPad + boxSize - boxRadius, innerPad + boxSize);
+      ctx.lineTo(innerPad + boxRadius, innerPad + boxSize);
+      ctx.quadraticCurveTo(innerPad, innerPad + boxSize, innerPad, innerPad + boxSize - boxRadius);
+      ctx.lineTo(innerPad, innerPad + boxRadius);
+      ctx.quadraticCurveTo(innerPad, innerPad, innerPad + boxRadius, innerPad);
+      ctx.stroke();
+      
+      // Horizontal line (header)
+      const headerY = innerPad + boxSize * 0.3;
+      ctx.beginPath();
+      ctx.moveTo(innerPad, headerY);
+      ctx.lineTo(innerPad + boxSize, headerY);
+      ctx.stroke();
+      
+      // Vertical line (column divider)
+      const colX = innerPad + boxSize * 0.4;
+      ctx.beginPath();
+      ctx.moveTo(colX, headerY);
+      ctx.lineTo(colX, innerPad + boxSize);
+      ctx.stroke();
+    }
+    
+    function downloadIcon(canvas, filename) {
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+  </script>
+</body>
+</html>
+
