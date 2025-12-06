@@ -1,7 +1,7 @@
 import { Job, JobOrderData, ChecklistItem, JobColumnId, User, JobStatus, PaymentType } from '../types';
 
 // TRYB DEMO - bez backendu
-const DEMO_MODE = true;
+const DEMO_MODE = false;
 
 // Konfiguracja API
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
