@@ -68,14 +68,18 @@ WYTYCZNE DLA PDF I OBRAZÓW:
 - Jeśli widzisz rysunek techniczny, opisz wymiary i materiały w polu 'scopeWorkImages'.
 
 WYTYCZNE DANYCH:
-- Tytuł (suggestedTitle): \"[Klient] - [Ulica] - [Dystans] - [Czynność]\"
-- Telefon: Szukaj wszędzie, również w stopkach.
-- Adres: Baza to ul. Poprawna 39R, Warszawa. Licz dystans od bazy.
+- Telefon: Szukaj dokładnie w całym tekście, również w stopkach i podpisach. OBOWIĄZKOWE!
+- Email: Znajdź adres email klienta jeśli jest dostępny.
+- NIP: Znajdź numer NIP firmy jeśli jest dostępny (10 cyfr).
+- Adres: Główny adres montażu. Baza to ul. Poprawna 39R, Warszawa - licz dystans od bazy.
+- Tytuł zlecenia (suggestedTitle): Generuj TYLKO gdy użytkownik NIE podał tytułu. Format: \"[Ulica] [Numer] [Miasto] [Telefon] [Klient]\" (np. \"Zajęcza 9 Warszawa 123456789 Jan Kowalski\")
 
 WYMAGANY FORMAT ODPOWIEDZI (JSON):
 {
-    \"suggestedTitle\": \"Nazwa Klienta - Ulica - Dystans - Krótki opis\",
+    \"suggestedTitle\": \"Ulica Numer Miasto Telefon Nazwa_Klienta (TYLKO gdy brak tytułu od użytkownika!)\",
     \"clientName\": \"Imię i nazwisko lub nazwa firmy\",
+    \"email\": \"email@klienta.pl\",
+    \"nip\": \"1234567890\",
     \"companyName\": \"Nazwa firmy (opcjonalnie)\",
     \"contactPerson\": \"Osoba kontaktowa\",
     \"phoneNumber\": \"Numer telefonu\",
