@@ -1,7 +1,8 @@
 # 📋 Plan: Rozszerzenie Chrome - Gmail do CRM
 
-**Data utworzenia:** 2024-12-06
-**Status:** W trakcie realizacji
+**Data utworzenia:** 2024-12-06  
+**Status:** ✅ Zaimplementowane (czeka na testy)  
+**Commit:** d07be4d
 
 ---
 
@@ -60,8 +61,8 @@ Sprawdzenie endpointu `POST /api/jobs` w `api/jobs.php` czy obsługuje wszystkie
 
 ## ✅ TODO
 
-- [ ] Wygenerować ikony PNG (16, 32, 48, 128px) dla rozszerzenia
-- [ ] Uprościć panel boczny - 2 przyciski: Zaczytaj / Wyślij do CRM
+- [x] Wygenerować ikony PNG (16, 32, 48, 128px) dla rozszerzenia (generator gotowy)
+- [x] Uprościć panel boczny - 2 przyciski: Zaczytaj / Wyślij do CRM
 - [ ] Przetestować rozszerzenie w Chrome na prawdziwym mailu
 
 ---

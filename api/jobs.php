@@ -290,13 +290,19 @@ function updateJob($id) {
     
     // Obsługa współrzędnych
     if (isset($data['coordinates'])) {
-        if (isset($data['coordinates']['lat'])) {
-            $updates[] = 'coordinates_lat = ?';
-            $params[] = $data['coordinates']['lat'];
-        }
-        if (isset($data['coordinates']['lng'])) {
-            $updates[] = 'coordinates_lng = ?';
-            $params[] = $data['coordinates']['lng'];
+        if ($data['coordinates'] === null || (is_array($data['coordinates']) && empty($data['coordinates']))) {
+            // Wyczyść współrzędne jeśli adres został zmieniony
+            $updates[] = 'coordinates_lat = NULL';
+            $updates[] = 'coordinates_lng = NULL';
+        } else {
+            if (isset($data['coordinates']['lat'])) {
+                $updates[] = 'coordinates_lat = ?';
+                $params[] = $data['coordinates']['lat'];
+            }
+            if (isset($data['coordinates']['lng'])) {
+                $updates[] = 'coordinates_lng = ?';
+                $params[] = $data['coordinates']['lng'];
+            }
         }
     }
     

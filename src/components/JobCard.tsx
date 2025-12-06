@@ -47,6 +47,8 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [addressSuggestion, setAddressSuggestion] = useState({ city: 'Warszawa', postCode: '' });
   
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -101,7 +103,52 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
   };
 
   // Save
+  const validateAndPrepareAddress = (address: string): boolean => {
+    if (!address || address.trim().length < 3) return true;
+    
+    const lower = address.toLowerCase();
+    const hasCity = /warszawa|kraków|gdańsk|poznań|wrocław|łódź|katowice/i.test(address);
+    const hasPostCode = /\d{2}-\d{3}/.test(address);
+    
+    // Jeśli brak miasta i kodu pocztowego -> pytaj użytkownika
+    if (!hasCity && !hasPostCode) {
+      setAddressSuggestion({ city: 'Warszawa', postCode: '' });
+      setShowAddressModal(true);
+      return false;
+    }
+    
+    return true;
+  };
+
+  const confirmAddressAndSave = () => {
+    const { city, postCode } = addressSuggestion;
+    let fullAddress = editedData.address.trim();
+    
+    if (city && !fullAddress.toLowerCase().includes(city.toLowerCase())) {
+      fullAddress += `, ${city}`;
+    }
+    
+    if (postCode && !fullAddress.includes(postCode)) {
+      fullAddress += ` ${postCode}`;
+    }
+    
+    setEditedData(prev => ({ ...prev, address: fullAddress, coordinates: undefined }));
+    setShowAddressModal(false);
+    
+    // Teraz zapisz
+    setTimeout(() => handleSaveConfirmed(), 100);
+  };
+
   const handleSave = async () => {
+    // Waliduj adres przed zapisem
+    if (!validateAndPrepareAddress(editedData.address)) {
+      return; // Modal się otworzy
+    }
+    
+    await handleSaveConfirmed();
+  };
+
+  const handleSaveConfirmed = async () => {
     setIsProcessing(true);
     try {
       if (job) {
@@ -733,6 +780,66 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
           </div>
         )}
       </div>
+
+      {/* Modal: Potwierdzenie adresu */}
+      {showAddressModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Navigation className="w-6 h-6 text-blue-600" />
+              <h3 className="text-xl font-bold text-slate-800">Potwierdź lokalizację</h3>
+            </div>
+            
+            <p className="text-slate-600 mb-4">
+              Podany adres: <strong>{editedData.address}</strong>
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Miasto (domyślnie Warszawa)
+                </label>
+                <input
+                  type="text"
+                  value={addressSuggestion.city}
+                  onChange={(e) => setAddressSuggestion(prev => ({ ...prev, city: e.target.value }))}
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-400 outline-none"
+                  placeholder="Warszawa"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Kod pocztowy (opcjonalnie)
+                </label>
+                <input
+                  type="text"
+                  value={addressSuggestion.postCode}
+                  onChange={(e) => setAddressSuggestion(prev => ({ ...prev, postCode: e.target.value }))}
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-400 outline-none"
+                  placeholder="00-000"
+                  maxLength={6}
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowAddressModal(false)}
+                className="flex-1 py-3 border-2 border-slate-200 text-slate-700 font-semibold rounded-xl hover:bg-slate-50"
+              >
+                Anuluj
+              </button>
+              <button
+                onClick={confirmAddressAndSave}
+                className="flex-1 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700"
+              >
+                Potwierdź i zapisz
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
