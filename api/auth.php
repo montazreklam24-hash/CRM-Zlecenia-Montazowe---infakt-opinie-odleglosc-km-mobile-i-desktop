@@ -149,3 +149,5 @@ function handleChangePassword() {
     jsonResponse(array('success' => true, 'message' => 'Hasło zmienione'));
 }
 
+
+

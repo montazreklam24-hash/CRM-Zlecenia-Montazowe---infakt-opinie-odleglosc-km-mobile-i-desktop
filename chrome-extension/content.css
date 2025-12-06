@@ -1,45 +1,42 @@
 /**
  * CRM Gmail Extension - Styles
+ * Panel boczny i przycisk w Gmail
  */
 
 /* =========================================================================
-   CRM BUTTON IN GMAIL TOOLBAR
+   PRZYCISK CRM W TOOLBARZE GMAIL
    ========================================================================= */
 
 .crm-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
+  padding: 8px 14px;
   margin-left: 8px;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   color: white;
   border: none;
   border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
+  transition: all 0.2s;
+  font-family: 'Google Sans', 'Segoe UI', system-ui, sans-serif;
 }
 
 .crm-btn:hover {
-  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(99, 102, 241, 0.4);
-}
-
-.crm-btn:active {
-  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
 }
 
 .crm-btn svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
 /* =========================================================================
-   SIDEBAR
+   SIDEBAR - PANEL BOCZNY
    ========================================================================= */
 
 .crm-sidebar {
@@ -48,13 +45,13 @@
   right: -420px;
   width: 400px;
   height: 100vh;
-  background: #ffffff;
-  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
-  z-index: 99999;
+  background: #f8fafc;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  transition: right 0.3s ease;
   display: flex;
   flex-direction: column;
-  transition: right 0.3s ease;
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: 'Google Sans', 'Segoe UI', system-ui, sans-serif;
 }
 
 .crm-sidebar.open {
@@ -67,8 +64,9 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   color: white;
+  flex-shrink: 0;
 }
 
 .crm-sidebar-title {
@@ -79,15 +77,23 @@
   font-weight: 600;
 }
 
+.crm-sidebar-title svg {
+  width: 24px;
+  height: 24px;
+}
+
 .crm-sidebar-close {
   background: rgba(255, 255, 255, 0.2);
   border: none;
   color: white;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 18px;
   cursor: pointer;
-  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background 0.2s;
 }
 
@@ -103,7 +109,152 @@
 }
 
 /* =========================================================================
-   LOADING STATE
+   FORMULARZ
+   ========================================================================= */
+
+.crm-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.crm-section {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.crm-section h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.crm-field {
+  margin-bottom: 12px;
+}
+
+.crm-field:last-child {
+  margin-bottom: 0;
+}
+
+.crm-field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.crm-field input,
+.crm-field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.2s;
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+
+.crm-field input:focus,
+.crm-field textarea:focus {
+  outline: none;
+  border-color: #f97316;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.crm-field textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* =========================================================================
+   PRZYCISKI
+   ========================================================================= */
+
+.crm-main-actions {
+  text-align: center;
+}
+
+.crm-btn-primary,
+.crm-btn-success,
+.crm-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 24px;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.crm-btn-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+}
+
+.crm-btn-primary:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.crm-btn-success {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: white;
+}
+
+.crm-btn-success:hover {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+.crm-btn-secondary {
+  background: white;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.crm-btn-secondary:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.crm-full-width {
+  width: 100%;
+}
+
+.crm-hint {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 8px;
+}
+
+.crm-divider {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 8px 0;
+}
+
+/* =========================================================================
+   STANY: LOADING, SUCCESS, ERROR
    ========================================================================= */
 
 .crm-loading {
@@ -112,16 +263,17 @@
   align-items: center;
   justify-content: center;
   padding: 60px 20px;
-  color: #6366f1;
+  text-align: center;
 }
 
 .crm-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid #e0e7ff;
-  border-top-color: #6366f1;
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e2e8f0;
+  border-top-color: #f97316;
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
 }
 
 @keyframes spin {
@@ -129,48 +281,16 @@
 }
 
 .crm-loading p {
-  margin-top: 16px;
-  color: #64748b;
   font-size: 14px;
-}
-
-.crm-loading-small {
   color: #64748b;
-  font-size: 13px;
-  padding: 10px;
 }
-
-/* =========================================================================
-   ERROR STATE
-   ========================================================================= */
-
-.crm-error {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 40px 20px;
-  text-align: center;
-}
-
-.crm-error-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-.crm-error p {
-  color: #ef4444;
-  margin-bottom: 20px;
-}
-
-/* =========================================================================
-   SUCCESS STATE
-   ========================================================================= */
 
 .crm-success {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 40px 20px;
+  justify-content: center;
+  padding: 60px 20px;
   text-align: center;
 }
 
@@ -180,342 +300,34 @@
 }
 
 .crm-success h3 {
-  color: #10b981;
-  margin-bottom: 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #16a34a;
+  margin: 0 0 8px 0;
 }
 
 .crm-success p {
+  font-size: 14px;
   color: #64748b;
-  margin-bottom: 8px;
+  margin: 0 0 24px 0;
 }
 
-/* =========================================================================
-   ANALYSIS RESULTS
-   ========================================================================= */
-
-.crm-analysis {
-  /* Container */
-}
-
-.crm-confidence {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-.crm-confidence-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.crm-confidence-badge.high {
-  background: #d1fae5;
-  color: #059669;
-}
-
-.crm-confidence-badge.medium {
-  background: #fef3c7;
-  color: #d97706;
-}
-
-.crm-confidence-badge.low {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.crm-urgent-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  background: #fee2e2;
-  color: #dc2626;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-/* Sections */
-.crm-section {
-  margin-bottom: 24px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.crm-section:last-child {
-  border-bottom: none;
-}
-
-.crm-section h4 {
-  font-size: 13px;
-  font-weight: 600;
-  color: #475569;
-  margin-bottom: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-/* Form fields */
-.crm-field-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.crm-field-row label {
-  width: 80px;
-  flex-shrink: 0;
-  font-size: 13px;
-  color: #64748b;
-}
-
-.crm-field-row.half {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.crm-field-row.half > div {
+.crm-error {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-
-.crm-field-row.half label {
-  width: auto;
-  font-size: 12px;
-}
-
-.crm-input {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 13px;
-  transition: border-color 0.2s;
-}
-
-.crm-input:focus {
-  outline: none;
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-}
-
-.crm-textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 13px;
-  resize: vertical;
-  font-family: inherit;
-}
-
-.crm-textarea:focus {
-  outline: none;
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-}
-
-/* Address preview */
-.crm-address-preview {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  background: #f1f5f9;
-  border-radius: 6px;
-  margin-bottom: 12px;
-  font-size: 13px;
-  color: #334155;
-}
-
-/* Action buttons */
-.crm-action-btn {
-  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: #f1f5f9;
-  border-radius: 6px;
-  text-decoration: none;
-  font-size: 16px;
-  transition: background 0.2s;
+  padding: 60px 20px;
+  text-align: center;
 }
 
-.crm-action-btn:hover {
-  background: #e2e8f0;
+.crm-error-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
 }
 
-/* Client lookup */
-.crm-client-results {
-  margin-top: 12px;
-}
-
-.crm-client-item {
-  padding: 10px 12px;
-  background: #f8fafc;
-  border-radius: 6px;
-  margin-bottom: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.crm-client-item:hover {
-  background: #e2e8f0;
-}
-
-.crm-client-item strong {
-  display: block;
-  margin-bottom: 4px;
-  color: #1e293b;
-}
-
-.crm-client-selected {
-  padding: 10px 12px;
-  background: #d1fae5;
-  color: #059669;
-  border-radius: 6px;
-  font-weight: 500;
-}
-
-/* Muted text */
-.crm-muted {
-  color: #94a3b8;
-  font-size: 12px;
-}
-
-/* =========================================================================
-   BUTTONS
-   ========================================================================= */
-
-.crm-actions {
-  margin-top: 24px;
-}
-
-.crm-actions-secondary {
-  display: flex;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.crm-btn-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 20px;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-  color: white;
-  border: none;
-  border-radius: 8px;
+.crm-error p {
   font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  color: #ef4444;
+  margin: 0 0 24px 0;
 }
-
-.crm-btn-primary:hover {
-  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
-  transform: translateY(-1px);
-}
-
-.crm-btn-secondary {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 16px;
-  background: #f1f5f9;
-  color: #475569;
-  border: none;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.crm-btn-secondary:hover {
-  background: #e2e8f0;
-}
-
-.crm-full-width {
-  width: 100%;
-}
-
-/* =========================================================================
-   DARK MODE (Gmail dark theme)
-   ========================================================================= */
-
-@media (prefers-color-scheme: dark) {
-  .crm-sidebar {
-    background: #1e293b;
-    color: #f1f5f9;
-  }
-  
-  .crm-section h4 {
-    color: #94a3b8;
-  }
-  
-  .crm-field-row label {
-    color: #94a3b8;
-  }
-  
-  .crm-input,
-  .crm-textarea {
-    background: #334155;
-    border-color: #475569;
-    color: #f1f5f9;
-  }
-  
-  .crm-input:focus,
-  .crm-textarea:focus {
-    border-color: #818cf8;
-  }
-  
-  .crm-address-preview {
-    background: #334155;
-    color: #f1f5f9;
-  }
-  
-  .crm-client-item {
-    background: #334155;
-  }
-  
-  .crm-client-item:hover {
-    background: #475569;
-  }
-  
-  .crm-client-item strong {
-    color: #f1f5f9;
-  }
-  
-  .crm-btn-secondary {
-    background: #334155;
-    color: #f1f5f9;
-  }
-  
-  .crm-btn-secondary:hover {
-    background: #475569;
-  }
-  
-  .crm-action-btn {
-    background: #334155;
-  }
-  
-  .crm-action-btn:hover {
-    background: #475569;
-  }
-  
-  .crm-section {
-    border-color: #334155;
-  }
-}
-

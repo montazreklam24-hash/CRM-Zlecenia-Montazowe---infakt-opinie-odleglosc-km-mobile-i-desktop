@@ -64,3 +64,5 @@ function updateSettings() {
     jsonResponse(array('success' => true, 'message' => 'Ustawienia zapisane'));
 }
 
+
+

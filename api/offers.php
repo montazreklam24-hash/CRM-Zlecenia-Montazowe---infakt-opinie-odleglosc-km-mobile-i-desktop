@@ -481,3 +481,5 @@ function mapOfferToFrontend($offer) {
     );
 }
 
+
+

@@ -3,9 +3,10 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import InputForm from './components/InputForm';
 import JobCard from './components/JobCard';
+import ThemeSwitcher from './components/ThemeSwitcher';
 import { geminiService, authService, settingsService } from './services/apiService';
 import { User, UserRole, Job, JobOrderData } from './types';
-import { AlertCircle, LogOut, Layout, Loader2 } from 'lucide-react';
+import { AlertCircle, LogOut, Loader2 } from 'lucide-react';
 
 interface AppState {
   currentView: 'LOGIN' | 'DASHBOARD' | 'CREATE' | 'VIEW_JOB';
@@ -138,55 +139,66 @@ const App: React.FC = () => {
   const userRole = state.user.role as UserRole;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-white text-slate-900 pb-10">
+    <div className="min-h-screen pb-10 transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
       
       {/* Top Bar */}
-      <div className="bg-white/80 backdrop-blur-xl border-b border-slate-200/50 sticky top-0 z-50 px-4 py-3 shadow-sm">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={goToDashboard}>
+      <div className="theme-header sticky top-0 z-50 px-2 sm:px-4 py-2 sm:py-3">
+        <div className="max-w-6xl mx-auto flex justify-between items-center gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 cursor-pointer flex-shrink-0" onClick={goToDashboard}>
             {appLogo ? (
-              <img src={appLogo} alt="Logo" className="h-10 w-auto object-contain" />
+              <img src={appLogo} alt="Logo" className="h-8 sm:h-10 w-auto object-contain" />
             ) : (
-              <div className="p-2 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg shadow-orange-500/20">
-                <span className="text-lg font-black text-white">M24</span>
+              <div className="p-1.5 sm:p-2 shadow-lg" style={{ background: 'var(--accent-orange)', borderRadius: 'var(--radius-md)' }}>
+                <span className="text-sm sm:text-lg font-black text-white">M24</span>
               </div>
             )}
-            <div className="flex flex-col">
-              <span className="font-bold text-lg text-slate-800 hidden md:inline tracking-tight leading-none">
+            <div className="flex flex-col hidden sm:flex">
+              <span className="font-bold text-lg hidden md:inline tracking-tight leading-none" style={{ color: 'var(--text-primary)' }}>
                 Montaż Reklam 24
               </span>
-              <span className="text-[10px] text-orange-600 font-bold uppercase tracking-wider hidden md:block">
+              <span className="text-[10px] font-bold uppercase tracking-wider hidden md:block" style={{ color: 'var(--accent-orange)' }}>
                 CRM v2.0
               </span>
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Theme Switcher */}
+            <ThemeSwitcher />
+            
             <div className="text-right hidden md:block">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Zalogowano jako</div>
-              <div className="text-sm font-bold text-slate-700">
+              <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Zalogowano jako</div>
+              <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                 {state.user.name}
-                <span className={`ml-2 text-[10px] px-2 py-0.5 rounded-full ${
-                  userRole === UserRole.ADMIN 
-                    ? 'bg-blue-100 text-blue-700' 
-                    : 'bg-orange-100 text-orange-700'
-                }`}>
+                <span 
+                  className="ml-2 text-[10px] px-2 py-0.5"
+                  style={{ 
+                    background: userRole === UserRole.ADMIN ? 'var(--accent-primary)' : 'var(--accent-orange)',
+                    color: 'var(--text-inverse)',
+                    borderRadius: 'var(--radius-sm)'
+                  }}
+                >
                   {userRole === UserRole.ADMIN ? 'Admin' : 'Pracownik'}
                 </span>
               </div>
             </div>
             <button 
               onClick={handleLogout} 
-              className="p-2.5 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors text-slate-600"
+              className="p-2 sm:p-2.5 transition-colors"
+              style={{ 
+                background: 'var(--bg-surface)', 
+                color: 'var(--text-secondary)',
+                borderRadius: 'var(--radius-md)'
+              }}
               title="Wyloguj"
             >
-              <LogOut className="w-5 h-5" />
+              <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-6">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
         
         {/* Error Banner */}
         {state.error && (

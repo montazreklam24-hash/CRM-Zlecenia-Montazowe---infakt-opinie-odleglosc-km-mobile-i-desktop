@@ -364,11 +364,38 @@ export const jobsService = {
     return response.job;
   },
   
-  async updateJobColumn(id: string, columnId: JobColumnId): Promise<void> {
+  async updateJobColumn(id: string, columnId: JobColumnId, orderIndex?: number): Promise<void> {
     if (DEMO_MODE) {
       const job = DEMO_JOBS.find(j => j.id === id);
       if (job) {
         job.columnId = columnId;
+        if (orderIndex !== undefined) {
+          job.order = orderIndex;
+        }
+        if (columnId === 'COMPLETED') {
+          job.status = JobStatus.COMPLETED;
+        }
+      }
+      return;
+    }
+    
+    const body: any = { columnId };
+    if (orderIndex !== undefined) {
+      body.order = orderIndex;
+    }
+    
+    await apiRequest(`/jobs/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+  },
+
+  async updateJobPosition(id: string, columnId: JobColumnId, order: number): Promise<void> {
+    if (DEMO_MODE) {
+      const job = DEMO_JOBS.find(j => j.id === id);
+      if (job) {
+        job.columnId = columnId;
+        job.order = order;
         if (columnId === 'COMPLETED') {
           job.status = JobStatus.COMPLETED;
         }
@@ -378,7 +405,7 @@ export const jobsService = {
     
     await apiRequest(`/jobs/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ columnId }),
+      body: JSON.stringify({ columnId, order }),
     });
   },
   
@@ -444,6 +471,7 @@ export const geminiService = {
       
       return {
         suggestedTitle: 'Nowe zlecenie - ' + new Date().toLocaleDateString('pl-PL'),
+        jobTitle: 'Nowe zlecenie - ' + new Date().toLocaleDateString('pl-PL'),
         clientName: 'Klient z maila',
         contactPerson: '',
         phoneNumber: phoneMatch ? phoneMatch[1].trim() : '',

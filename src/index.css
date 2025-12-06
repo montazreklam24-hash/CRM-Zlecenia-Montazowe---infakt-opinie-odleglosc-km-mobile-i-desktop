@@ -1,24 +1,335 @@
 /* Custom fonts - must be first */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
+/* ============================================
+   THEME SYSTEM - 3 MOTYWY
+   ============================================ */
+
+/* MOTYW 1: Glass Minimal (domyślny) - styl Notion/Linear */
+:root, [data-theme="glass"] {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-display: 'Space Grotesk', var(--font-sans);
+  
+  /* Tła - ZDJĘCIE MIASTA Z BILLBOARDAMI */
+  --bg-page: url('https://images.unsplash.com/photo-1534430480872-3498386e7856?w=1920&q=80') center/cover fixed;
+  --bg-card: rgba(255, 255, 255, 0.55);
+  --bg-card-hover: rgba(255, 255, 255, 0.7);
+  --bg-surface: rgba(255, 255, 255, 0.25);
+  --bg-input: rgba(255, 255, 255, 0.8);
+  --bg-header: rgba(255, 255, 255, 0.6);
+  
+  /* Kolory tekstu */
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --text-inverse: #ffffff;
+  
+  /* Akcenty */
+  --accent-primary: #6366f1;
+  --accent-primary-hover: #4f46e5;
+  --accent-success: #10b981;
+  --accent-warning: #f59e0b;
+  --accent-danger: #ef4444;
+  --accent-orange: #f97316;
+  
+  /* Bordery */
+  --border-light: rgba(0, 0, 0, 0.06);
+  --border-medium: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.15);
+  
+  /* Cienie */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.12);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.06);
+  
+  /* Zaokrąglenia - minimalne */
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 3px;
+  --radius-xl: 4px;
+  
+  /* Blur - mocny efekt szkła */
+  --blur: blur(20px);
+  
+  /* Glass border */
+  --glass-border: 1px solid rgba(255, 255, 255, 0.3);
+  
+  /* Scrollbar */
+  --scrollbar-bg: #f1f5f9;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+  
+  /* Kanban kolumny */
+  --column-prepare: #475569;
+  --column-mon: #e11d48;
+  --column-tue: #059669;
+  --column-wed: #7c3aed;
+  --column-thu: #d97706;
+  --column-fri: #2563eb;
+  --column-sat: #ea580c;
+  --column-sun: #b45309;
+  --column-done: #16a34a;
 }
+
+/* MOTYW 2: Dark Pro - styl GitHub/Discord */
+[data-theme="dark"] {
+  --bg-page: #0d1117;
+  --bg-card: #161b22;
+  --bg-card-hover: #1c2128;
+  --bg-surface: #21262d;
+  --bg-input: #0d1117;
+  --bg-header: #161b22;
+  --glass-border: 1px solid #30363d;
+  
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+  --text-inverse: #0d1117;
+  
+  --accent-primary: #58a6ff;
+  --accent-primary-hover: #79b8ff;
+  --accent-success: #3fb950;
+  --accent-warning: #d29922;
+  --accent-danger: #f85149;
+  --accent-orange: #db6d28;
+  
+  --border-light: #21262d;
+  --border-medium: #30363d;
+  --border-strong: #484f58;
+  
+  --shadow-sm: 0 0 0 1px rgba(0,0,0,0.3);
+  --shadow-md: 0 3px 6px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.3);
+  
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  
+  --blur: none;
+  
+  --scrollbar-bg: #161b22;
+  --scrollbar-thumb: #30363d;
+  --scrollbar-thumb-hover: #484f58;
+  
+  --column-prepare: #8b949e;
+  --column-mon: #f85149;
+  --column-tue: #3fb950;
+  --column-wed: #a371f7;
+  --column-thu: #d29922;
+  --column-fri: #58a6ff;
+  --column-sat: #db6d28;
+  --column-sun: #bf8700;
+  --column-done: #238636;
+}
+
+/* MOTYW 3: Trello Classic - styl Trello/Asana */
+[data-theme="trello"] {
+  --bg-page: linear-gradient(180deg, #0079bf 0%, #026aa7 100%);
+  --bg-card: #ffffff;
+  --bg-card-hover: #f4f5f7;
+  --bg-surface: rgba(235, 236, 240, 0.95);
+  --bg-input: #ffffff;
+  --bg-header: rgba(0, 0, 0, 0.15);
+  --glass-border: none;
+  
+  --text-primary: #172b4d;
+  --text-secondary: #5e6c84;
+  --text-muted: #a5adba;
+  --text-inverse: #ffffff;
+  
+  --accent-primary: #0079bf;
+  --accent-primary-hover: #026aa7;
+  --accent-success: #61bd4f;
+  --accent-warning: #f2d600;
+  --accent-danger: #eb5a46;
+  --accent-orange: #ff9f1a;
+  
+  --border-light: rgba(9, 30, 66, 0.08);
+  --border-medium: rgba(9, 30, 66, 0.13);
+  --border-strong: rgba(9, 30, 66, 0.2);
+  
+  --shadow-sm: 0 1px 0 rgba(9,30,66,0.13);
+  --shadow-md: 0 1px 0 rgba(9,30,66,0.25);
+  --shadow-lg: 0 8px 16px -4px rgba(9,30,66,0.25);
+  --shadow-card: 0 1px 0 rgba(9,30,66,0.25);
+  
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+  
+  --blur: none;
+  
+  --scrollbar-bg: rgba(9,30,66,0.08);
+  --scrollbar-thumb: rgba(9,30,66,0.2);
+  --scrollbar-thumb-hover: rgba(9,30,66,0.35);
+  
+  --column-prepare: #5e6c84;
+  --column-mon: #eb5a46;
+  --column-tue: #61bd4f;
+  --column-wed: #c377e0;
+  --column-thu: #f2d600;
+  --column-fri: #0079bf;
+  --column-sat: #ff9f1a;
+  --column-sun: #ffab4a;
+  --column-done: #61bd4f;
+}
+
+/* ============================================
+   GLOBAL STYLES
+   ============================================ */
 
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
+  background: var(--bg-page);
+  color: var(--text-primary);
   min-height: 100vh;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
-/* Animations */
+/* Glass theme - Warszawa Pałac Kultury i Nauki */
+:root body,
+[data-theme="glass"] body,
+body[data-theme="glass"] {
+  background: url('https://images.unsplash.com/photo-1574958269340-fa927503f3dd?w=1920&q=80') center/cover fixed;
+  position: relative;
+}
+
+/* Przyciemnienie dla czytelności - delikatne 10-15% */
+:root body::before,
+[data-theme="glass"] body::before,
+body[data-theme="glass"]::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.1) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+:root body > *,
+[data-theme="glass"] body > *,
+body[data-theme="glass"] > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Dark theme needs fixed background */
+[data-theme="dark"] body,
+body[data-theme="dark"] {
+  background: #0d1117;
+}
+
+[data-theme="dark"] body::before,
+body[data-theme="dark"]::before {
+  display: none;
+}
+
+/* Trello theme needs fixed background */
+[data-theme="trello"] body,
+body[data-theme="trello"] {
+  background: linear-gradient(180deg, #0079bf 0%, #026aa7 100%);
+  background-attachment: fixed;
+}
+
+[data-theme="trello"] body::before,
+body[data-theme="trello"]::before {
+  display: none;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+/* Card styles */
+.theme-card {
+  background: var(--bg-card);
+  border: var(--glass-border, 1px solid var(--border-light));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card), 0 0 40px rgba(0,0,0,0.03);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  transition: all 0.2s ease;
+}
+
+.theme-card:hover {
+  background: var(--bg-card-hover);
+  box-shadow: var(--shadow-md), 0 8px 32px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+}
+
+/* Surface (columns, panels) */
+.theme-surface {
+  background: var(--bg-surface);
+  border: var(--glass-border, 1px solid var(--border-light));
+  border-radius: var(--radius-lg);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+}
+
+/* Header */
+.theme-header {
+  background: var(--bg-header);
+  border-bottom: var(--glass-border, 1px solid var(--border-light));
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+}
+
+/* Input fields */
+.theme-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.theme-input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  outline: none;
+}
+
+/* Buttons */
+.theme-btn-primary {
+  background: var(--accent-primary);
+  color: var(--text-inverse);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.theme-btn-primary:hover {
+  background: var(--accent-primary-hover);
+}
+
+/* Text colors */
+.theme-text {
+  color: var(--text-primary);
+}
+
+.theme-text-secondary {
+  color: var(--text-secondary);
+}
+
+.theme-text-muted {
+  color: var(--text-muted);
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -52,27 +363,33 @@ body {
   animation: spin 1s linear infinite;
 }
 
-/* Scrollbar styling */
+/* ============================================
+   SCROLLBAR
+   ============================================ */
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--scrollbar-bg);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--scrollbar-thumb-hover);
 }
 
-/* Line clamp utility */
+/* ============================================
+   MISC
+   ============================================ */
+
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -86,46 +403,44 @@ body {
 }
 
 .leaflet-popup-content-wrapper {
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
   padding: 0;
+  background: var(--bg-card);
 }
 
 .leaflet-popup-content {
   margin: 12px 16px;
+  color: var(--text-primary);
 }
 
 .leaflet-popup-tip {
   box-shadow: none;
+  background: var(--bg-card);
 }
 
-/* Custom icon for map markers */
 .custom-icon {
   background: none !important;
   border: none !important;
 }
 
-/* Selection color */
 ::selection {
-  background: #f97316;
-  color: white;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
 }
 
-/* Focus styles */
 *:focus-visible {
-  outline: 2px solid #f97316;
+  outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
 }
 
-/* Smooth scroll */
 html {
   scroll-behavior: smooth;
 }
 
-/* Glass effect utility */
+/* Legacy glass class (for backwards compatibility) */
 .glass {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: var(--bg-card);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
 }
-

@@ -201,6 +201,7 @@ export interface Job {
   createdAt: number;
   status: JobStatus;
   columnId?: JobColumnId;
+  order?: number; // kolejność w kolumnie
   data: JobOrderData;
   projectImages: string[];
   customLogo?: string;

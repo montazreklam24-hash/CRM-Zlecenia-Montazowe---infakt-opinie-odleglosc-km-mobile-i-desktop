@@ -203,3 +203,5 @@ DANE WEJŚCIOWE:
     return $result;
 }
 
+
+

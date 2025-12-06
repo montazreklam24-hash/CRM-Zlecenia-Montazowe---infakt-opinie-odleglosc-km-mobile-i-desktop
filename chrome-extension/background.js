@@ -206,8 +206,10 @@ async function createJobInCRM(jobData) {
       companyName: jobData.companyName,
       contactPerson: jobData.contactPerson,
       phoneNumber: jobData.phone,
+      email: jobData.email,
       address: jobData.fullAddress,
       scopeWorkText: jobData.scopeOfWork,
+      nip: jobData.nip,
       clientId: jobData.clientId || null,
       gmailThreadId: jobData.threadId || null,
       // Ustaw status na "DO PRZYGOTOWANIA"
@@ -296,4 +298,6 @@ chrome.runtime.onInstalled.addListener((details) => {
     chrome.action.openPopup();
   }
 });
+
+
 
