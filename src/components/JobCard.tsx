@@ -48,7 +48,19 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
   const [isProcessing, setIsProcessing] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
-  const [addressSuggestion, setAddressSuggestion] = useState({ city: 'Warszawa', postCode: '' });
+  const [addressOptions, setAddressOptions] = useState<Array<{
+    display: string;
+    lat: number;
+    lng: number;
+    details: string;
+  }>>([]);
+  const [showManualAddress, setShowManualAddress] = useState(false);
+  const [manualAddressForm, setManualAddressForm] = useState({
+    street: '',
+    buildingNo: '',
+    city: 'Warszawa',
+    postCode: ''
+  });
   
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -103,45 +115,122 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
   };
 
   // Save
-  const validateAndPrepareAddress = (address: string): boolean => {
-    if (!address || address.trim().length < 3) return true;
+  const geocodeAddress = async (address: string): Promise<Array<{
+    display: string;
+    lat: number;
+    lng: number;
+    details: string;
+  }>> => {
+    if (!address || address.trim().length < 3) return [];
     
-    const lower = address.toLowerCase();
-    const hasCity = /warszawa|kraków|gdańsk|poznań|wrocław|łódź|katowice/i.test(address);
-    const hasPostCode = /\d{2}-\d{3}/.test(address);
-    
-    // Jeśli brak miasta i kodu pocztowego -> pytaj użytkownika
-    if (!hasCity && !hasPostCode) {
-      setAddressSuggestion({ city: 'Warszawa', postCode: '' });
-      setShowAddressModal(true);
+    try {
+      let queryAddress = address.trim();
+      // Dodaj ", Polska" jeśli nie ma
+      if (!queryAddress.toLowerCase().includes('polska') && !queryAddress.toLowerCase().includes('poland')) {
+        queryAddress += ', Polska';
+      }
+
+      const params = new URLSearchParams({
+        format: 'json',
+        limit: '5',
+        addressdetails: '1',
+        q: queryAddress
+      });
+
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
+        headers: { 'Accept-Language': 'pl' }
+      });
+      
+      const results = await response.json();
+      
+      return results.map((r: any) => ({
+        display: r.display_name,
+        lat: parseFloat(r.lat),
+        lng: parseFloat(r.lon),
+        details: `${r.address?.road || ''} ${r.address?.house_number || ''}, ${r.address?.postcode || ''} ${r.address?.city || r.address?.town || r.address?.village || ''}`
+      }));
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      return [];
+    }
+  };
+
+  const validateAndPrepareAddress = async (address: string): Promise<boolean> => {
+    if (!address || address.trim().length < 3) {
+      alert('Podaj adres montażu');
       return false;
     }
     
-    return true;
+    setIsProcessing(true);
+    const results = await geocodeAddress(address);
+    setIsProcessing(false);
+    
+    if (results.length === 0) {
+      // Brak wyników - pokaż formularz ręczny
+      setShowManualAddress(true);
+      setShowAddressModal(true);
+      return false;
+    } else if (results.length === 1) {
+      // Dokładnie 1 wynik - automatycznie użyj
+      setEditedData(prev => ({
+        ...prev,
+        address: results[0].display,
+        coordinates: { lat: results[0].lat, lng: results[0].lng }
+      }));
+      return true;
+    } else {
+      // Wiele wyników - pokaż listę do wyboru
+      setAddressOptions(results);
+      setShowManualAddress(false);
+      setShowAddressModal(true);
+      return false;
+    }
   };
 
-  const confirmAddressAndSave = () => {
-    const { city, postCode } = addressSuggestion;
-    let fullAddress = editedData.address.trim();
-    
-    if (city && !fullAddress.toLowerCase().includes(city.toLowerCase())) {
-      fullAddress += `, ${city}`;
-    }
-    
-    if (postCode && !fullAddress.includes(postCode)) {
-      fullAddress += ` ${postCode}`;
-    }
-    
-    setEditedData(prev => ({ ...prev, address: fullAddress, coordinates: undefined }));
+  const selectAddressOption = (option: { display: string; lat: number; lng: number }) => {
+    setEditedData(prev => ({
+      ...prev,
+      address: option.display,
+      coordinates: { lat: option.lat, lng: option.lng }
+    }));
     setShowAddressModal(false);
+    setAddressOptions([]);
+    
+    // Teraz zapisz
+    setTimeout(() => handleSaveConfirmed(), 100);
+  };
+
+  const confirmManualAddress = () => {
+    const { street, buildingNo, city, postCode } = manualAddressForm;
+    
+    if (!street || !city) {
+      alert('Podaj przynajmniej ulicę i miasto');
+      return;
+    }
+    
+    const fullAddress = `${street} ${buildingNo}, ${postCode} ${city}, Polska`.trim();
+    
+    setEditedData(prev => ({ 
+      ...prev, 
+      address: fullAddress,
+      coordinates: undefined // Geokodowanie z MapBoard później
+    }));
+    
+    setShowAddressModal(false);
+    setShowManualAddress(false);
+    
+    // Resetuj formularz
+    setManualAddressForm({ street: '', buildingNo: '', city: 'Warszawa', postCode: '' });
     
     // Teraz zapisz
     setTimeout(() => handleSaveConfirmed(), 100);
   };
 
   const handleSave = async () => {
-    // Waliduj adres przed zapisem
-    if (!validateAndPrepareAddress(editedData.address)) {
+    // Waliduj i geokoduj adres przed zapisem
+    const isValid = await validateAndPrepareAddress(editedData.address);
+    
+    if (!isValid) {
       return; // Modal się otworzy
     }
     
@@ -781,62 +870,145 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
         )}
       </div>
 
-      {/* Modal: Potwierdzenie adresu */}
+      {/* Modal: Wybór adresu / ręczne wprowadzanie */}
       {showAddressModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <Navigation className="w-6 h-6 text-blue-600" />
-              <h3 className="text-xl font-bold text-slate-800">Potwierdź lokalizację</h3>
-            </div>
-            
-            <p className="text-slate-600 mb-4">
-              Podany adres: <strong>{editedData.address}</strong>
-            </p>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Miasto (domyślnie Warszawa)
-                </label>
-                <input
-                  type="text"
-                  value={addressSuggestion.city}
-                  onChange={(e) => setAddressSuggestion(prev => ({ ...prev, city: e.target.value }))}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-400 outline-none"
-                  placeholder="Warszawa"
-                />
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-slate-200 p-6 rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <Navigation className="w-6 h-6 text-blue-600" />
+                <h3 className="text-xl font-bold text-slate-800">
+                  {showManualAddress ? 'Wprowadź adres ręcznie' : 'Wybierz lokalizację'}
+                </h3>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Kod pocztowy (opcjonalnie)
-                </label>
-                <input
-                  type="text"
-                  value={addressSuggestion.postCode}
-                  onChange={(e) => setAddressSuggestion(prev => ({ ...prev, postCode: e.target.value }))}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-400 outline-none"
-                  placeholder="00-000"
-                  maxLength={6}
-                />
+              <p className="text-sm text-slate-500 mt-2">
+                Szukano: <strong>{editedData.address}</strong>
+              </p>
+            </div>
+
+            <div className="p-6">
+              {!showManualAddress && addressOptions.length > 0 && (
+                <>
+                  <p className="text-sm text-slate-600 mb-4">
+                    Znaleziono {addressOptions.length} {addressOptions.length === 1 ? 'adres' : 'adresy'}. Wybierz właściwy:
+                  </p>
+                  
+                  <div className="space-y-2 mb-4">
+                    {addressOptions.map((option, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => selectAddressOption(option)}
+                        className="w-full text-left p-4 border-2 border-slate-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                      >
+                        <div className="font-semibold text-slate-800">{option.details}</div>
+                        <div className="text-xs text-slate-500 mt-1">{option.display}</div>
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <div className="border-t pt-4">
+                    <button
+                      onClick={() => setShowManualAddress(true)}
+                      className="w-full py-3 text-blue-600 font-medium hover:bg-blue-50 rounded-xl transition-colors"
+                    >
+                      🖊️ Żaden się nie zgadza - wprowadzę ręcznie
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {showManualAddress && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Ulica <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={manualAddressForm.street}
+                        onChange={(e) => setManualAddressForm(prev => ({ ...prev, street: e.target.value }))}
+                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-400 outline-none"
+                        placeholder="np. Zajęcza"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Numer budynku
+                      </label>
+                      <input
+                        type="text"
+                        value={manualAddressForm.buildingNo}
+                        onChange={(e) => setManualAddressForm(prev => ({ ...prev, buildingNo: e.target.value }))}
+                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-400 outline-none"
+                        placeholder="9"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Kod pocztowy
+                      </label>
+                      <input
+                        type="text"
+                        value={manualAddressForm.postCode}
+                        onChange={(e) => setManualAddressForm(prev => ({ ...prev, postCode: e.target.value }))}
+                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-400 outline-none"
+                        placeholder="00-000"
+                        maxLength={6}
+                      />
+                    </div>
+                    
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Miasto <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={manualAddressForm.city}
+                        onChange={(e) => setManualAddressForm(prev => ({ ...prev, city: e.target.value }))}
+                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-400 outline-none"
+                        placeholder="Warszawa"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      onClick={() => {
+                        setShowAddressModal(false);
+                        setShowManualAddress(false);
+                        setAddressOptions([]);
+                      }}
+                      className="flex-1 py-3 border-2 border-slate-200 text-slate-700 font-semibold rounded-xl hover:bg-slate-50"
+                    >
+                      Anuluj
+                    </button>
+                    <button
+                      onClick={confirmManualAddress}
+                      className="flex-1 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700"
+                    >
+                      Zapisz
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {!showManualAddress && addressOptions.length > 0 && (
+              <div className="border-t p-4">
+                <button
+                  onClick={() => {
+                    setShowAddressModal(false);
+                    setAddressOptions([]);
+                  }}
+                  className="w-full py-2 text-slate-500 hover:text-slate-700"
+                >
+                  Anuluj
+                </button>
               </div>
-            </div>
-            
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setShowAddressModal(false)}
-                className="flex-1 py-3 border-2 border-slate-200 text-slate-700 font-semibold rounded-xl hover:bg-slate-50"
-              >
-                Anuluj
-              </button>
-              <button
-                onClick={confirmAddressAndSave}
-                className="flex-1 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700"
-              >
-                Potwierdź i zapisz
-              </button>
-            </div>
+            )}
           </div>
         </div>
       )}
