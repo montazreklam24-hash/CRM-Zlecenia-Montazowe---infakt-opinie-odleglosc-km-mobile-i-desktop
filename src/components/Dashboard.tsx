@@ -4,9 +4,10 @@ import { jobsService } from '../services/apiService';
 import { 
   Plus, MapPin, CheckCircle2, Trash2, Box, Kanban, 
   Download, Copy, RefreshCw, Search, StretchHorizontal, ExternalLink,
-  ChevronUp, ChevronDown
+  ChevronUp, ChevronDown, Map as MapIcon, Layers
 } from 'lucide-react';
-import MapBoard from './MapBoard';
+import MapBoardGoogle from './MapBoardGoogle';
+import MapBoardOSM from './MapBoardOSM';
 import PaymentStatusBadge, { PaymentStatusBar, PaymentStatusIcon } from './PaymentStatusBadge';
 
 import {
@@ -58,6 +59,7 @@ interface DashboardProps {
   role: UserRole;
   onSelectJob: (job: Job) => void;
   onCreateNew: () => void;
+  onCreateNewSimple?: () => void;
 }
 
 // 7 kolumn: PRZYGOTOWANIE, PN-PT, WYKONANE (bez weekendu)
@@ -486,49 +488,49 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
         </div>
 
         {/* Content - compact, fixed height */}
-        <div className="p-2 flex flex-col" style={{ minHeight: '90px' }}>
-          <h4 className="font-bold text-[10px] leading-tight mb-1 line-clamp-3" style={{ color: 'var(--text-primary)' }}>
+        <div className="p-3 flex flex-col" style={{ minHeight: '100px' }}>
+          <h4 className="font-bold text-xs leading-snug mb-2 line-clamp-3" style={{ color: 'var(--text-primary)' }}>
             {job.data.jobTitle}
           </h4>
           
           {/* Address - one line */}
-          <div className="text-[8px] truncate mb-1" style={{ color: 'var(--text-secondary)' }}>
-            📍 {job.data.address?.split(',')[0] || 'Brak'}
+          <div className="text-[10px] truncate mb-1 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
+            <span className="flex-shrink-0">📍</span> {job.data.address?.split(',')[0] || 'Brak'}
           </div>
           
           {/* Phone */}
           {job.data.phoneNumber && (
-            <div className="text-[9px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+            <div className="text-[10px] font-bold truncate mb-2" style={{ color: 'var(--text-primary)' }}>
               📞 {job.data.phoneNumber}
             </div>
           )}
 
           {/* Bottom row: Amount + Actions */}
-          <div className="flex justify-between items-center mt-auto pt-1">
+          <div className="flex justify-between items-center mt-auto pt-2 border-t border-slate-100">
             {job.totalGross && job.totalGross > 0 ? (
-              <span className="text-[9px] font-bold" style={{ color: 'var(--accent-primary)' }}>
+              <span className="text-[10px] font-bold" style={{ color: 'var(--accent-primary)' }}>
                 {job.totalGross.toFixed(0)} zł
               </span>
             ) : <span />}
             
             {/* Delete/Duplicate buttons */}
             {isAdmin && (
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button 
                   onClick={(e) => { e.stopPropagation(); onDuplicate(job.id, e); }} 
-                  className="p-0.5"
+                  className="p-1 rounded hover:bg-slate-100"
                   style={{ color: 'var(--accent-primary)' }}
                   title="Duplikuj"
                 >
-                  <Copy className="w-3 h-3" />
+                  <Copy className="w-3.5 h-3.5" />
                 </button>
                 <button 
                   onClick={(e) => { e.stopPropagation(); onDelete(job.id, e); }} 
-                  className="p-0.5 hover:text-red-500"
+                  className="p-1 rounded hover:bg-slate-100 hover:text-red-500"
                   style={{ color: 'var(--text-muted)' }}
                   title="Usuń"
                 >
-                  <Trash2 className="w-3 h-3" />
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             )}
@@ -540,14 +542,73 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
   );
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew }) => {
+const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, onCreateNewSimple }) => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'ACTIVE' | 'ARCHIVED'>('ACTIVE');
-  const [viewMode, setViewMode] = useState<'BOARD' | 'KANBAN' | 'MAP'>('KANBAN'); // KANBAN domyślny
+  const [viewMode, setViewMode] = useState<'BOARD' | 'KANBAN'>('KANBAN');
+  const [mapProvider, setMapProvider] = useState<'GOOGLE' | 'OSM'>('GOOGLE'); // Wybór mapy
   const [searchQuery, setSearchQuery] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const [showTypeModal, setShowTypeModal] = useState(false);
+
+  // Auto-Heal: Sprawdź zlecenia z adresem ale bez współrzędnych
+  useEffect(() => {
+    const healJobs = async () => {
+      // Filtruj zlecenia, które mają adres (>3 znaki) ale nie mają współrzędnych
+      const jobsToHeal = jobs.filter(j => 
+        j.data.address && 
+        j.data.address.length > 3 && 
+        !j.data.coordinates
+      );
+
+      if (jobsToHeal.length === 0) return;
+
+      console.log(`🩹 Auto-Heal: Znaleziono ${jobsToHeal.length} zleceń do naprawy geolokalizacji.`);
+
+      for (const job of jobsToHeal) {
+        try {
+          const response = await fetch('/api/geocode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ address: job.data.address })
+          });
+          
+          const data = await response.json();
+          if (data.success && data.results && data.results.length > 0) {
+            const bestMatch = data.results[0];
+            
+            // Aktualizuj w bazie
+            await jobsService.updateJob(job.id, {
+              data: {
+                ...job.data,
+                address: bestMatch.formattedAddress, // Ujednolicamy adres
+                coordinates: bestMatch.coordinates
+              }
+            });
+            
+            console.log(`✅ Auto-Heal: Naprawiono ${job.friendlyId} (${bestMatch.formattedAddress})`);
+          }
+        } catch (e) {
+          console.error(`❌ Auto-Heal błąd dla ${job.friendlyId}:`, e);
+        }
+        // Małe opóźnienie żeby nie zajechać API
+        await new Promise(r => setTimeout(r, 500));
+      }
+      
+      // Po zakończeniu odśwież listę
+      if (jobsToHeal.length > 0) {
+        loadJobs();
+      }
+    };
+
+    // Uruchom po 3 sekundach od załadowania, żeby nie blokować startu
+    if (!loading && jobs.length > 0) {
+      const timer = setTimeout(healJobs, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, jobs.length]); // Zależność od długości, ale healJobs ma guard na jobsToHeal
 
   // Sensors for both mouse and touch
   const sensors = useSensors(
@@ -969,7 +1030,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew })
           
           {isAdmin && (
             <button 
-              onClick={onCreateNew} 
+              onClick={() => setShowTypeModal(true)} 
               className="px-3 sm:px-5 py-2.5 font-bold flex items-center gap-2 transition-all active:scale-95 flex-shrink-0"
               style={{ 
                 background: 'var(--accent-orange)', 
@@ -1048,107 +1109,32 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew })
           </div>
           
           {/* Open map in new window */}
-          <button 
-            onClick={() => {
-              const mapWindow = window.open('', 'CRM_Map', 'width=1200,height=800');
-              if (mapWindow) {
-                const columnColors: Record<string, string> = {
-                  PREPARE: '#475569', MON: '#f43f5e', TUE: '#10b981', 
-                  WED: '#8b5cf6', THU: '#f59e0b', FRI: '#3b82f6', COMPLETED: '#22c55e'
-                };
-                const columnNames: Record<string, string> = {
-                  PREPARE: 'PRZYGOTOWANIE', MON: 'PONIEDZIAŁEK', TUE: 'WTOREK',
-                  WED: 'ŚRODA', THU: 'CZWARTEK', FRI: 'PIĄTEK', COMPLETED: 'WYKONANE'
-                };
-                mapWindow.document.write(`
-                  <!DOCTYPE html>
-                  <html>
-                  <head>
-                    <title>Mapa Zleceń - Montaż Reklam 24</title>
-                    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-                    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
-                    <style>
-                      body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #1a1a2e; }
-                      #map { height: 100vh; width: 100vw; }
-                      .custom-popup { min-width: 200px; }
-                      .custom-popup img { width: 100%; height: 120px; object-fit: cover; border-radius: 4px; margin-bottom: 8px; }
-                      .custom-popup h3 { margin: 0 0 4px 0; font-size: 13px; font-weight: 700; }
-                      .custom-popup .address { font-size: 11px; color: #666; margin-bottom: 8px; }
-                      .custom-popup .badge { display: inline-block; font-size: 10px; font-weight: 700; color: white; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px; }
-                      .custom-popup .phone { font-size: 12px; font-weight: 700; }
-                      .custom-popup .buttons { display: flex; gap: 8px; margin-top: 8px; }
-                      .custom-popup .btn { flex: 1; padding: 6px 10px; font-size: 11px; font-weight: 600; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; text-align: center; color: white; }
-                      .custom-popup .btn-nav { background: #3b82f6; }
-                      .custom-popup .btn-call { background: #22c55e; }
-                      .leaflet-popup-content-wrapper { border-radius: 8px; }
-                    </style>
-                  </head>
-                  <body>
-                    <div id="map"></div>
-                    <script>
-                      const jobs = ${JSON.stringify(filteredJobs.filter(j => j.data.coordinates))};
-                      const columnColors = ${JSON.stringify(columnColors)};
-                      const columnNames = ${JSON.stringify(columnNames)};
-                      const map = L.map('map', { scrollWheelZoom: true }).setView([52.0693, 19.4803], 6);
-                      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: '© OpenStreetMap'
-                      }).addTo(map);
-                      const bounds = [];
-                      
-                      jobs.forEach(job => {
-                        if (!job.data.coordinates) return;
-                        const color = columnColors[job.columnId || 'PREPARE'] || '#475569';
-                        const colName = columnNames[job.columnId || 'PREPARE'] || 'NIEZNANY';
-                        
-                        // Custom colored marker
-                        const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="' + color + '" stroke="white" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>';
-                        const icon = L.divIcon({
-                          className: '',
-                          html: '<div style="width:32px;height:32px;">' + svg + '</div>',
-                          iconSize: [32, 32],
-                          iconAnchor: [16, 32],
-                          popupAnchor: [0, -32]
-                        });
-                        
-                        // Popup content
-                        const imgHtml = job.projectImages && job.projectImages[0] 
-                          ? '<img src="' + job.projectImages[0] + '" alt="">' 
-                          : '<div style="height:80px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#94a3b8;border-radius:4px;margin-bottom:8px;">Brak zdjęcia</div>';
-                        
-                        const popupContent = '<div class="custom-popup">' +
-                          imgHtml +
-                          '<h3>' + (job.data.jobTitle || 'Bez nazwy') + '</h3>' +
-                          '<div class="address">📍 ' + (job.data.address || 'Brak adresu') + '</div>' +
-                          '<span class="badge" style="background:' + color + '">' + colName + '</span>' +
-                          (job.data.phoneNumber ? '<div class="phone">📞 ' + job.data.phoneNumber + '</div>' : '') +
-                          '<div class="buttons">' +
-                            (job.data.address ? '<a class="btn btn-nav" href="https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(job.data.address) + '" target="_blank">🧭 Nawiguj</a>' : '') +
-                            (job.data.phoneNumber ? '<a class="btn btn-call" href="tel:' + job.data.phoneNumber + '">📞 Zadzwoń</a>' : '') +
-                          '</div>' +
-                        '</div>';
-                        
-                        L.marker([job.data.coordinates.lat, job.data.coordinates.lng], { icon })
-                          .addTo(map)
-                          .bindPopup(popupContent, { maxWidth: 250 });
-                        
-                        bounds.push([job.data.coordinates.lat, job.data.coordinates.lng]);
-                      });
-                      
-                      if (bounds.length > 0) {
-                        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
-                      }
-                    <\/script>
-                  </body>
-                  </html>
-                `);
-              }
-            }}
-            className="theme-card p-2.5 transition-all"
-            style={{ borderRadius: 'var(--radius-lg)', color: 'var(--text-secondary)' }}
-            title="Otwórz mapę w nowym oknie"
-          >
-            <ExternalLink className="w-5 h-5" />
-          </button>
+          <div className="theme-surface flex p-1 flex-shrink-0" style={{ borderRadius: 'var(--radius-lg)' }}>
+            <button 
+              onClick={() => setMapProvider('GOOGLE')} 
+              className="p-2 transition-all flex items-center gap-1 text-xs font-bold"
+              style={{ 
+                borderRadius: 'var(--radius-md)',
+                background: mapProvider === 'GOOGLE' ? 'var(--bg-card)' : 'transparent',
+                color: mapProvider === 'GOOGLE' ? 'var(--accent-primary)' : 'var(--text-muted)'
+              }}
+              title="Google Maps"
+            >
+              <MapIcon className="w-4 h-4" /> GM
+            </button>
+            <button 
+              onClick={() => setMapProvider('OSM')} 
+              className="p-2 transition-all flex items-center gap-1 text-xs font-bold"
+              style={{ 
+                borderRadius: 'var(--radius-md)',
+                background: mapProvider === 'OSM' ? 'var(--bg-card)' : 'transparent',
+                color: mapProvider === 'OSM' ? 'var(--accent-primary)' : 'var(--text-muted)'
+              }}
+              title="OpenStreetMap"
+            >
+              <Layers className="w-4 h-4" /> OSM
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1238,29 +1224,30 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew })
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
-          <div className="grid grid-cols-7 gap-2">
+          <div className="flex overflow-x-auto pb-4 snap-x snap-mandatory sm:grid sm:grid-cols-7 sm:gap-2 sm:overflow-visible">
             {KANBAN_ROWS_CONFIG.map(row => {
               const rowJobs = getJobsForColumn(row.id);
               return (
                 <div 
                   key={row.id} 
-                  className="theme-surface flex flex-col"
+                  className="theme-surface flex flex-col min-w-[85vw] sm:min-w-0 sm:w-auto mr-3 sm:mr-0 snap-center border-r sm:border-r-0 border-slate-200/50 last:mr-0"
                   style={{ borderRadius: 'var(--radius-lg)' }}
                 >
                   {/* Column Header - compact */}
-                  <div className={`${row.headerBg} ${row.headerText} px-2 py-2 flex justify-between items-center flex-shrink-0`}>
-                    <h3 className="font-bold tracking-wide text-[10px] flex items-center gap-1">
-                      {row.id === 'COMPLETED' && <CheckCircle2 className="w-3 h-3" />}
-                      {row.shortTitle}
+                  <div className={`${row.headerBg} ${row.headerText} px-3 py-3 flex justify-between items-center flex-shrink-0 sticky top-0 z-10`}>
+                    <h3 className="font-bold tracking-wide text-xs sm:text-[10px] flex items-center gap-2">
+                      {row.id === 'COMPLETED' && <CheckCircle2 className="w-4 h-4 sm:w-3 sm:h-3" />}
+                      <span className="sm:hidden">{row.title}</span>
+                      <span className="hidden sm:inline">{row.shortTitle}</span>
                     </h3>
-                    <span className="bg-white/20 px-1.5 py-0.5 text-[9px] font-bold" style={{ borderRadius: 'var(--radius-sm)' }}>
+                    <span className="bg-white/20 px-2 py-0.5 text-xs font-bold" style={{ borderRadius: 'var(--radius-sm)' }}>
                       {rowJobs.length}
                     </span>
                   </div>
 
                   {/* Column Body - Droppable, stretches to bottom */}
                   <DroppableColumn id={row.id}>
-                    <div className="flex flex-col gap-4 w-full">
+                    <div className="flex flex-col gap-3 w-full p-1">
                       {rowJobs.map(job => {
                         const { canMoveUp, canMoveDown } = getJobMoveInfo(job.id);
                         return (
@@ -1313,16 +1300,80 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew })
 
       {/* MAPA pod kafelkami - zawsze widoczna */}
       <div className="mt-4">
-        <MapBoard 
-          jobs={filteredJobs} 
-          onSelectJob={onSelectJob} 
-          onJobsUpdated={loadJobs}
-          onChangeColumn={async (jobId, newColumnId) => {
-            setJobs(prev => prev.map(j => j.id === jobId ? { ...j, columnId: newColumnId } : j));
-            await jobsService.updateJobColumn(jobId, newColumnId);
-          }}
-        />
+        {mapProvider === 'GOOGLE' ? (
+          <MapBoardGoogle 
+            jobs={filteredJobs} 
+            onSelectJob={onSelectJob} 
+            onJobsUpdated={loadJobs}
+            onChangeColumn={async (jobId, newColumnId) => {
+              setJobs(prev => prev.map(j => j.id === jobId ? { ...j, columnId: newColumnId } : j));
+              await jobsService.updateJobColumn(jobId, newColumnId);
+            }}
+          />
+        ) : (
+          <MapBoardOSM 
+            jobs={filteredJobs} 
+            onSelectJob={onSelectJob} 
+          />
+        )}
       </div>
+      
+      {/* Modal wyboru typu zlecenia */}
+      {showTypeModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-fade-in">
+            <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white p-6 text-center">
+              <h2 className="text-2xl font-bold">Wybierz typ zlecenia</h2>
+              <p className="text-slate-300 mt-1">Jak chcesz dodać nowe zlecenie?</p>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              {/* Opcja: Proste zlecenie */}
+              <button
+                onClick={() => {
+                  setShowTypeModal(false);
+                  if (onCreateNewSimple) onCreateNewSimple();
+                }}
+                className="w-full p-5 border-2 border-green-200 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all group text-left"
+              >
+                <div className="flex items-center gap-4">
+                  <span className="text-4xl">📋</span>
+                  <div>
+                    <h3 className="text-xl font-bold text-green-700 group-hover:text-green-800">Proste zlecenie</h3>
+                    <p className="text-slate-600 text-sm mt-1">Ręczne wypełnianie pól - szybkie i proste</p>
+                  </div>
+                </div>
+              </button>
+              
+              {/* Opcja: AI zlecenie */}
+              <button
+                onClick={() => {
+                  setShowTypeModal(false);
+                  onCreateNew();
+                }}
+                className="w-full p-5 border-2 border-blue-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group text-left"
+              >
+                <div className="flex items-center gap-4">
+                  <span className="text-4xl">🤖</span>
+                  <div>
+                    <h3 className="text-xl font-bold text-blue-700 group-hover:text-blue-800">Zlecenie AI</h3>
+                    <p className="text-slate-600 text-sm mt-1">Wklej mail - Gemini wypełni dane automatycznie</p>
+                  </div>
+                </div>
+              </button>
+            </div>
+            
+            <div className="px-6 pb-6">
+              <button
+                onClick={() => setShowTypeModal(false)}
+                className="w-full py-3 text-slate-500 hover:text-slate-700 font-medium"
+              >
+                Anuluj
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

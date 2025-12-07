@@ -591,9 +591,16 @@ function updateJobPaymentStatus($jobId) {
         }
     }
     
-    // Zaktualizuj zlecenie
-    $stmt = $pdo->prepare('UPDATE jobs SET payment_status = ?, total_gross = ?, paid_amount = ? WHERE id = ?');
-    $stmt->execute(array($status, $totalGross, $paidAmount, $jobId));
+    // Zaktualizuj zlecenie (sprawdź w obu tabelach)
+    // Najpierw spróbuj jobs_ai
+    $stmt = $pdo->prepare('UPDATE jobs_ai SET payment_status = ?, value_gross = ? WHERE id = ?');
+    $stmt->execute(array($status, $totalGross, $jobId));
+    
+    // Jeśli nie znaleziono, spróbuj jobs_simple
+    if ($stmt->rowCount() === 0) {
+        $stmt = $pdo->prepare('UPDATE jobs_simple SET payment_status = ?, value_gross = ? WHERE id = ?');
+        $stmt->execute(array($status, $totalGross, $jobId));
+    }
 }
 
 function mapInvoiceToFrontend($invoice) {
@@ -630,6 +637,7 @@ function mapInvoiceToFrontend($invoice) {
         'jobTitle' => isset($invoice['job_title']) ? $invoice['job_title'] : null,
     );
 }
+
 
 
 

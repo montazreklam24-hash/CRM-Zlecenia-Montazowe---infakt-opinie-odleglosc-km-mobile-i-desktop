@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  base: './', // Relatywne ścieżki dla subdomeny
   build: {
     outDir: 'dist',
     sourcemap: false,
@@ -16,6 +17,7 @@ export default defineConfig({
     }
   },
   server: {
+    port: 3000,
     proxy: {
       '/api': {
         target: 'http://localhost/crm-api',

@@ -49,10 +49,9 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [addressOptions, setAddressOptions] = useState<Array<{
-    display: string;
-    lat: number;
-    lng: number;
-    details: string;
+    formattedAddress: string;
+    coordinates: { lat: number; lng: number };
+    placeId: string;
   }>>([]);
   const [showManualAddress, setShowManualAddress] = useState(false);
   const [manualAddressForm, setManualAddressForm] = useState({
@@ -61,8 +60,69 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
     city: 'Warszawa',
     postCode: ''
   });
+  const addressInputRef = useRef<HTMLTextAreaElement>(null);
   
   const cardRef = useRef<HTMLDivElement>(null);
+
+  // Google Places Autocomplete
+  useEffect(() => {
+    if (!addressInputRef.current || !window.google || !isEditing) return;
+
+    // Ponieważ używamy textarea, musimy stworzyć niewidoczny input dla Autocomplete
+    // lub po prostu podpiąć pod textarea (Google Maps JS API to obsługuje)
+    const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current as unknown as HTMLInputElement, {
+      types: ['geocode'],
+      componentRestrictions: { country: 'pl' },
+      fields: ['formatted_address', 'geometry']
+    });
+
+    // Preferencja dla Warszawy
+    const warsawBounds = new window.google.maps.LatLngBounds(
+      new window.google.maps.LatLng(52.1, 20.8),
+      new window.google.maps.LatLng(52.4, 21.3)
+    );
+    autocomplete.setBounds(warsawBounds);
+
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      if (place.formatted_address && place.geometry?.location) {
+        setEditedData(prev => ({
+          ...prev,
+          address: place.formatted_address || '',
+          coordinates: {
+            lat: place.geometry!.location!.lat(),
+            lng: place.geometry!.location!.lng()
+          }
+        }));
+      }
+    });
+  }, [isEditing]);
+
+  // Obsługa Ctrl+V dla zdjęć
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (!file) continue;
+          
+          const reader = new FileReader();
+          reader.onloadend = async () => {
+            const compressed = await compressImage(reader.result as string);
+            setProjectImages(prev => [...prev, compressed]);
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+    };
+    
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, []);
 
   useEffect(() => {
     if (job) {
@@ -114,90 +174,50 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
     setChecklist(prev => prev.filter(i => i.id !== id));
   };
 
-  // Save
+  // Backend Geocoding (Google Maps via PHP)
   const geocodeAddress = async (address: string): Promise<Array<{
-    display: string;
-    lat: number;
-    lng: number;
-    details: string;
+    formattedAddress: string;
+    coordinates: { lat: number; lng: number };
+    placeId: string;
   }>> => {
     if (!address || address.trim().length < 3) return [];
     
     try {
-      let queryAddress = address.trim();
-      // Dodaj ", Polska" jeśli nie ma
-      if (!queryAddress.toLowerCase().includes('polska') && !queryAddress.toLowerCase().includes('poland')) {
-        queryAddress += ', Polska';
+      const response = await fetch('/api/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.results) {
+        return data.results;
       }
-
-      const params = new URLSearchParams({
-        format: 'json',
-        limit: '5',
-        addressdetails: '1',
-        q: queryAddress
-      });
-
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
-        headers: { 'Accept-Language': 'pl' }
-      });
-      
-      const results = await response.json();
-      
-      return results.map((r: any) => ({
-        display: r.display_name,
-        lat: parseFloat(r.lat),
-        lng: parseFloat(r.lon),
-        details: `${r.address?.road || ''} ${r.address?.house_number || ''}, ${r.address?.postcode || ''} ${r.address?.city || r.address?.town || r.address?.village || ''}`
-      }));
+      return [];
     } catch (error) {
       console.error('Geocoding error:', error);
       return [];
     }
   };
 
-  const validateAndPrepareAddress = async (address: string): Promise<boolean> => {
-    if (!address || address.trim().length < 3) {
-      alert('Podaj adres montażu');
-      return false;
-    }
-    
-    setIsProcessing(true);
-    const results = await geocodeAddress(address);
-    setIsProcessing(false);
-    
-    if (results.length === 0) {
-      // Brak wyników - pokaż formularz ręczny
-      setShowManualAddress(true);
-      setShowAddressModal(true);
-      return false;
-    } else if (results.length === 1) {
-      // Dokładnie 1 wynik - automatycznie użyj
-      setEditedData(prev => ({
-        ...prev,
-        address: results[0].display,
-        coordinates: { lat: results[0].lat, lng: results[0].lng }
-      }));
-      return true;
-    } else {
-      // Wiele wyników - pokaż listę do wyboru
-      setAddressOptions(results);
-      setShowManualAddress(false);
-      setShowAddressModal(true);
-      return false;
-    }
-  };
-
-  const selectAddressOption = (option: { display: string; lat: number; lng: number }) => {
+  const selectAddressOption = (option: { formattedAddress: string; coordinates: { lat: number; lng: number } }) => {
     setEditedData(prev => ({
       ...prev,
-      address: option.display,
-      coordinates: { lat: option.lat, lng: option.lng }
+      address: option.formattedAddress,
+      coordinates: option.coordinates
     }));
     setShowAddressModal(false);
     setAddressOptions([]);
     
     // Teraz zapisz
-    setTimeout(() => handleSaveConfirmed(), 100);
+    const newData = {
+      ...editedData,
+      address: option.formattedAddress,
+      coordinates: option.coordinates
+    };
+    
+    setTimeout(() => handleSaveConfirmed(newData), 100);
   };
 
   const confirmManualAddress = () => {
@@ -210,11 +230,13 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
     
     const fullAddress = `${street} ${buildingNo}, ${postCode} ${city}, Polska`.trim();
     
-    setEditedData(prev => ({ 
-      ...prev, 
+    const newData = { 
+      ...editedData, 
       address: fullAddress,
-      coordinates: undefined // Geokodowanie z MapBoard później
-    }));
+      coordinates: undefined 
+    };
+    
+    setEditedData(newData);
     
     setShowAddressModal(false);
     setShowManualAddress(false);
@@ -223,26 +245,58 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
     setManualAddressForm({ street: '', buildingNo: '', city: 'Warszawa', postCode: '' });
     
     // Teraz zapisz
-    setTimeout(() => handleSaveConfirmed(), 100);
+    setTimeout(() => handleSaveConfirmed(newData), 100);
   };
 
   const handleSave = async () => {
-    // Waliduj i geokoduj adres przed zapisem
-    const isValid = await validateAndPrepareAddress(editedData.address);
-    
-    if (!isValid) {
-      return; // Modal się otworzy
+    // 1. Walidacja wstępna (tytuł)
+    if (!editedData.jobTitle) {
+      alert('Podaj nazwę zlecenia');
+      return;
     }
-    
-    await handleSaveConfirmed();
+
+    // 2. Przygotuj dane do zapisu
+    let dataToSave = { ...editedData };
+
+    // 3. "Cichy Geocoding" - jeśli jest adres, ale nie ma współrzędnych
+    if (dataToSave.address && dataToSave.address.trim().length > 3 && !dataToSave.coordinates) {
+      try {
+        // Nie pokazujemy spinnera "isProcessing" blokującego UI, 
+        // po prostu robimy to jako część procesu zapisu.
+        setIsProcessing(true); // Włączamy spinner zapisu
+        const results = await geocodeAddress(dataToSave.address);
+        
+        if (results.length > 0) {
+          // Bierzemy PIERWSZY wynik (najlepsze dopasowanie wg Google)
+          // To działa tak samo jak kliknięcie "Nawiguj" w Google Maps
+          const bestMatch = results[0];
+          dataToSave = {
+            ...dataToSave,
+            // Opcjonalnie: Możemy nadpisać adres sformatowanym (ładnym),
+            // ale bezpieczniej zostawić tekst użytkownika i tylko dodać koordynaty.
+            // Tutaj: Nadpisujemy, żeby było "ładnie" (np. z kodem pocztowym).
+            address: bestMatch.formattedAddress, 
+            coordinates: bestMatch.coordinates
+          };
+        }
+      } catch (e) {
+        console.error("Cichy geocoding nieudany:", e);
+        // Trudno, zapisujemy bez współrzędnych
+      }
+    }
+
+    // 4. Zapisz ostateczne dane
+    await handleSaveConfirmed(dataToSave);
   };
 
-  const handleSaveConfirmed = async () => {
+  // Zmodyfikowane handleSaveConfirmed żeby przyjmowało opcjonalne dane
+  const handleSaveConfirmed = async (dataToSave?: JobOrderData) => {
+    const data = dataToSave || editedData;
     setIsProcessing(true);
     try {
       if (job) {
         await jobsService.updateJob(job.id, { 
-          data: editedData, 
+          data: data, 
           adminNotes, 
           checklist, 
           projectImages 
@@ -250,13 +304,45 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
         alert('Zapisano!');
         setIsEditing(false);
       } else {
-        await jobsService.createJob(editedData, projectImages, adminNotes, checklist);
+        await jobsService.createJob(data, projectImages, adminNotes, checklist);
         if (onJobSaved) onJobSaved();
       }
     } catch (e) { 
       alert('Błąd zapisu'); 
     } finally { 
       setIsProcessing(false); 
+    }
+  };
+
+  // Funkcja wywoływana RĘCZNIE przyciskiem "Sprawdź na mapie"
+  const handleCheckAddress = async () => {
+    const address = editedData.address;
+    if (!address || address.trim().length < 3) {
+      alert('Wpisz najpierw adres');
+      return;
+    }
+    
+    setIsProcessing(true);
+    const results = await geocodeAddress(address);
+    setIsProcessing(false);
+    
+    if (results.length === 0) {
+      alert('Nie znaleziono takiego adresu na mapie.');
+      setShowManualAddress(true);
+      setShowAddressModal(true);
+    } else if (results.length === 1) {
+      // Znaleziono jeden - zaktualizuj i powiadom
+      setEditedData(prev => ({
+        ...prev,
+        address: results[0].formattedAddress,
+        coordinates: results[0].coordinates
+      }));
+      // alert(`Znaleziono: ${results[0].formattedAddress}`); // User nie chce spamu
+    } else {
+      // Wiele wyników - pokaż modal
+      setAddressOptions(results);
+      setShowManualAddress(false);
+      setShowAddressModal(true);
     }
   };
 
@@ -510,12 +596,21 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
               <Navigation className="w-4 h-4" /> ADRES MONTAŻU
             </p>
             {isEditing ? (
-              <textarea 
-                value={editedData.address || ''} 
-                onChange={(e) => handleDataChange('address', e.target.value)} 
-                className="w-full min-h-[60px] bg-slate-50 border border-slate-200 rounded-lg p-3 text-slate-800"
-                placeholder="Wpisz adres..."
-              />
+              <div className="flex flex-col gap-2">
+                <textarea 
+                  ref={addressInputRef}
+                  value={editedData.address || ''} 
+                  onChange={(e) => handleDataChange('address', e.target.value)} 
+                  className="w-full min-h-[60px] bg-slate-50 border border-slate-200 rounded-lg p-3 text-slate-800"
+                  placeholder="Wpisz adres..."
+                />
+                <button 
+                  onClick={handleCheckAddress}
+                  className="self-end text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 px-2 py-1 bg-blue-50 rounded-lg"
+                >
+                  <Navigation className="w-3 h-3" /> SPRAWDŹ NA MAPIE
+                </button>
+              </div>
             ) : (
               <div className="flex items-center justify-between">
                 <p className="text-lg font-semibold text-slate-800">{editedData.address || 'Brak adresu'}</p>
@@ -890,7 +985,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
               {!showManualAddress && addressOptions.length > 0 && (
                 <>
                   <p className="text-sm text-slate-600 mb-4">
-                    Znaleziono {addressOptions.length} {addressOptions.length === 1 ? 'adres' : 'adresy'}. Wybierz właściwy:
+                    Google znalazł kilka lokalizacji. Najbliższa Twojej firmy jest pierwsza. Wybierz właściwą:
                   </p>
                   
                   <div className="space-y-2 mb-4">
@@ -898,20 +993,46 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                       <button
                         key={idx}
                         onClick={() => selectAddressOption(option)}
-                        className="w-full text-left p-4 border-2 border-slate-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                        className={`w-full text-left p-4 border-2 rounded-xl transition-colors ${
+                          idx === 0 
+                            ? 'border-green-500 bg-green-50 hover:bg-green-100' 
+                            : 'border-slate-200 hover:border-blue-400 hover:bg-blue-50'
+                        }`}
                       >
-                        <div className="font-semibold text-slate-800">{option.details}</div>
-                        <div className="text-xs text-slate-500 mt-1">{option.display}</div>
+                        <div className="flex justify-between items-start">
+                          <div className="font-semibold text-slate-800">{option.formattedAddress}</div>
+                          {idx === 0 && <span className="text-[10px] font-bold bg-green-200 text-green-800 px-2 py-1 rounded ml-2">NAJBLIŻEJ</span>}
+                        </div>
+                        <div className="text-xs text-slate-500 mt-1 flex gap-2">
+                          <span>{option.coordinates.lat.toFixed(5)}, {option.coordinates.lng.toFixed(5)}</span>
+                          {(option as any).distance !== undefined && (
+                            <span className="font-bold text-slate-400">
+                              ({Math.round((option as any).distance)} km od bazy)
+                            </span>
+                          )}
+                        </div>
                       </button>
                     ))}
                   </div>
                   
-                  <div className="border-t pt-4">
+                  <div className="border-t pt-4 space-y-2">
                     <button
                       onClick={() => setShowManualAddress(true)}
                       className="w-full py-3 text-blue-600 font-medium hover:bg-blue-50 rounded-xl transition-colors"
                     >
                       🖊️ Żaden się nie zgadza - wprowadzę ręcznie
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Zapisz bez adresu/współrzędnych
+                        setEditedData(prev => ({ ...prev, coordinates: undefined }));
+                        setShowAddressModal(false);
+                        setAddressOptions([]);
+                        setTimeout(() => handleSaveConfirmed(), 100);
+                      }}
+                      className="w-full py-3 text-slate-500 font-medium hover:bg-slate-50 rounded-xl transition-colors"
+                    >
+                      ⏭️ Nie znam adresu - wprowadzę później
                     </button>
                   </div>
                 </>
@@ -974,22 +1095,36 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                     </div>
                   </div>
                   
-                  <div className="flex gap-3 pt-4">
+                  <div className="flex flex-col gap-2 pt-4">
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          setShowAddressModal(false);
+                          setShowManualAddress(false);
+                          setAddressOptions([]);
+                        }}
+                        className="flex-1 py-3 border-2 border-slate-200 text-slate-700 font-semibold rounded-xl hover:bg-slate-50"
+                      >
+                        Anuluj
+                      </button>
+                      <button
+                        onClick={confirmManualAddress}
+                        className="flex-1 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700"
+                      >
+                        Zapisz adres
+                      </button>
+                    </div>
                     <button
                       onClick={() => {
+                        // Zapisz bez zmiany adresu - użyj tego co jest w polu
                         setShowAddressModal(false);
                         setShowManualAddress(false);
                         setAddressOptions([]);
+                        setTimeout(() => handleSaveConfirmed(), 100);
                       }}
-                      className="flex-1 py-3 border-2 border-slate-200 text-slate-700 font-semibold rounded-xl hover:bg-slate-50"
+                      className="w-full py-3 text-white font-medium bg-orange-500 hover:bg-orange-600 rounded-xl transition-colors shadow-md flex items-center justify-center gap-2"
                     >
-                      Anuluj
-                    </button>
-                    <button
-                      onClick={confirmManualAddress}
-                      className="flex-1 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700"
-                    >
-                      Zapisz
+                      <span>⏭️</span> Pomiń - zapisz "{editedData.address}"
                     </button>
                   </div>
                 </div>

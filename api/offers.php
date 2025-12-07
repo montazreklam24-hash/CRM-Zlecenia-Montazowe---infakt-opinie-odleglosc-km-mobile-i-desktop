@@ -339,30 +339,28 @@ function convertOfferToJob($offerId) {
     $stmt->execute(array($offer['client_id']));
     $client = $stmt->fetch();
     
-    // Utwórz zlecenie
-    $friendlyId = generateFriendlyId();
+    // Utwórz zlecenie AI
+    $friendlyId = generateFriendlyId('ai');
     
     $stmt = $pdo->prepare('
-        INSERT INTO jobs (
-            friendly_id, client_id, offer_id, user_id,
-            job_title, client_name, company_name, contact_person, phone_number,
-            scope_work_text, column_id, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO jobs_ai (
+            friendly_id, client_id, title, client_name, phone,
+            description, column_id, status, created_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ');
+    
+    $clientName = $client ? ($client['company_name'] ?: trim(($client['first_name'] ?? '') . ' ' . ($client['last_name'] ?? ''))) : null;
     
     $stmt->execute(array(
         $friendlyId,
         $offer['client_id'],
-        $offerId,
-        $user['id'],
         $offer['title'] ?: 'Zlecenie z oferty ' . $offer['offer_number'],
-        $client ? ($client['type'] === 'company' ? $client['company_name'] : trim($client['first_name'] . ' ' . $client['last_name'])) : null,
-        $client ? $client['company_name'] : null,
-        $client ? trim($client['first_name'] . ' ' . $client['last_name']) : null,
+        $clientName,
         $client ? $client['phone'] : null,
         $offer['introduction'],
         'PREPARE',
-        'NEW'
+        'NEW',
+        $user['id']
     ));
     
     $jobId = $pdo->lastInsertId();
@@ -480,6 +478,7 @@ function mapOfferToFrontend($offer) {
         'clientPhone' => isset($offer['client_phone']) ? $offer['client_phone'] : null,
     );
 }
+
 
 
 

@@ -181,35 +181,53 @@ export interface JobOrderData {
   jobTitle: string;
   clientName: string;
   companyName?: string;
-  contactPerson: string;
+  contactPerson?: string;
   phoneNumber: string;
+  email?: string;
+  nip?: string;
   address: string;
-  locations: JobLocation[];
+  locations?: JobLocation[];
   coordinates?: { lat: number; lng: number };
-  scopeWorkText: string;
-  scopeWorkImages: string;
-  payment: {
-    type: PaymentType;
+  distanceKm?: number;
+  scopeWorkText?: string;
+  description?: string;
+  scopeWorkImages?: string;
+  scheduledDate?: string;
+  paymentStatus?: string;
+  payment?: {
+    type?: PaymentType;
     netAmount?: number;
     grossAmount?: number;
   };
 }
 
+export interface JobAttachment {
+  id?: number;
+  name: string;
+  type: string;
+  size: number;
+  data: string;
+  createdAt?: number;
+}
+
 export interface Job {
   id: string;
   friendlyId?: string;
+  type?: 'ai' | 'simple';
   createdAt: number;
   status: JobStatus;
   columnId?: JobColumnId;
+  columnOrder?: number;
   order?: number; // kolejność w kolumnie
   data: JobOrderData;
   projectImages: string[];
+  completionImages?: string[];
+  attachments?: JobAttachment[];
   customLogo?: string;
   adminNotes?: string;
   checklist?: ChecklistItem[];
   completedAt?: number;
   completionNotes?: string;
-  completionImages?: string[];
   // Nowe pola CRM v2
   clientId?: number;
   client?: Client;

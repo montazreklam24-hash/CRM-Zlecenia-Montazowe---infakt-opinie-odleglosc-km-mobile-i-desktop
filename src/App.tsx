@@ -3,13 +3,14 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import InputForm from './components/InputForm';
 import JobCard from './components/JobCard';
+import { SimpleJobCard } from './components/SimpleJobCard';
 import ThemeSwitcher from './components/ThemeSwitcher';
-import { geminiService, authService, settingsService } from './services/apiService';
+import { geminiService, authService, settingsService, jobsService } from './services/apiService';
 import { User, UserRole, Job, JobOrderData } from './types';
 import { AlertCircle, LogOut, Loader2 } from 'lucide-react';
 
 interface AppState {
-  currentView: 'LOGIN' | 'DASHBOARD' | 'CREATE' | 'VIEW_JOB';
+  currentView: 'LOGIN' | 'DASHBOARD' | 'CREATE' | 'VIEW_JOB' | 'CREATE_SIMPLE';
   user: User | null;
   selectedJob: Job | null;
   tempJobData: JobOrderData | null;
@@ -18,10 +19,21 @@ interface AppState {
   error: string | null;
 }
 
+// Automatyczny użytkownik - bez logowania
+const AUTO_USER: User = {
+  id: 1,
+  email: 'admin@montazreklam24.pl',
+  name: 'Administrator',
+  role: UserRole.ADMIN,
+  phone: null,
+  is_active: true,
+  last_login: null
+};
+
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
-    currentView: 'LOGIN',
-    user: null,
+    currentView: 'DASHBOARD', // Od razu Dashboard
+    user: AUTO_USER, // Automatycznie zalogowany
     selectedJob: null,
     tempJobData: null,
     selectedImages: [],
@@ -30,31 +42,7 @@ const App: React.FC = () => {
   });
 
   const [appLogo, setAppLogo] = useState<string | null>(null);
-  const [isInitializing, setIsInitializing] = useState(true);
-
-  // Check existing session on mount
-  useEffect(() => {
-    const initApp = async () => {
-      try {
-        const user = await authService.getCurrentUser();
-        if (user) {
-          setState(prev => ({ ...prev, user, currentView: 'DASHBOARD' }));
-        }
-        
-        // Load logo
-        try {
-          const logo = await settingsService.getDefaultLogo();
-          if (logo) setAppLogo(logo);
-        } catch {}
-      } catch {
-        authService.clearToken();
-      } finally {
-        setIsInitializing(false);
-      }
-    };
-    
-    initApp();
-  }, []);
+  const [isInitializing, setIsInitializing] = useState(false); // Start as false - no loading screen
 
   // Navigation helpers
   const goToDashboard = () => {
@@ -79,6 +67,34 @@ const App: React.FC = () => {
 
   const handleStartCreate = () => {
     setState(prev => ({ ...prev, currentView: 'CREATE' }));
+  };
+
+  const handleStartCreateSimple = () => {
+    setState(prev => ({ ...prev, currentView: 'CREATE_SIMPLE', selectedJob: null }));
+  };
+
+  const handleSaveSimpleJob = async (jobData: Partial<Job>) => {
+    try {
+      if (jobData.id) {
+        // Update existing
+        await fetch('/api/jobs-simple/' + jobData.id, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(jobData)
+        });
+      } else {
+        // Create new
+        await fetch('/api/jobs-simple', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(jobData)
+        });
+      }
+      goToDashboard();
+    } catch (error) {
+      console.error('Error saving simple job:', error);
+      alert('Błąd zapisu zlecenia');
+    }
   };
 
   const handleGenerate = async (title: string, text: string, images: string[]) => {
@@ -223,6 +239,7 @@ const App: React.FC = () => {
             role={userRole} 
             onSelectJob={handleSelectJob}
             onCreateNew={handleStartCreate}
+            onCreateNewSimple={handleStartCreateSimple}
           />
         )}
 
@@ -249,6 +266,14 @@ const App: React.FC = () => {
               onJobSaved={goToDashboard}
             />
           </div>
+        )}
+
+        {state.currentView === 'CREATE_SIMPLE' && (
+          <SimpleJobCard
+            job={state.selectedJob || undefined}
+            onClose={goToDashboard}
+            onSave={handleSaveSimpleJob}
+          />
         )}
       </div>
     </div>

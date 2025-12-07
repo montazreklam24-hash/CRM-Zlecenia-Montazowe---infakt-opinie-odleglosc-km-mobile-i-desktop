@@ -1,7 +1,7 @@
 import { Job, JobOrderData, ChecklistItem, JobColumnId, User, JobStatus, PaymentType } from '../types';
 
 // TRYB DEMO - bez backendu
-const DEMO_MODE = false;
+const DEMO_MODE = false; // Pełna funkcjonalność z API
 
 // Konfiguracja API
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -288,8 +288,9 @@ export const jobsService = {
     if (params?.search) queryParams.append('search', params.search);
     
     const query = queryParams.toString();
+    // Pobierz z obu tabel (jobs_ai + jobs_simple)
     const response = await apiRequest<{ success: boolean; jobs: Job[] }>(
-      `/jobs${query ? `?${query}` : ''}`
+      `/jobs-all${query ? `?${query}` : ''}`
     );
     
     return response.jobs;

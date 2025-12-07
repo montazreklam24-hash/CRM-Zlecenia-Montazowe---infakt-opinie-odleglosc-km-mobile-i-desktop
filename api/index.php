@@ -5,17 +5,23 @@
  */
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/auth.php'; // Ładuj auth.php zawsze, bo requireAuth() jest używane wszędzie
 
 // Handle CORS
 handleCORS();
 
 // Get request path
 $requestUri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
-$basePath = '/crm-api';
+
+// Dynamically detect base path
+$scriptName = isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : '';
+$basePath = dirname($scriptName);
 
 // Remove base path and query string
 $path = parse_url($requestUri, PHP_URL_PATH);
-$path = str_replace($basePath, '', $path);
+if ($basePath !== '/' && $basePath !== '') {
+    $path = preg_replace('#^' . preg_quote($basePath, '#') . '#', '', $path);
+}
 $path = trim($path, '/');
 
 // Get ID from path if present (e.g., jobs/123)
@@ -50,6 +56,21 @@ switch ($endpoint) {
     case 'jobs':
         require_once __DIR__ . '/jobs.php';
         handleJobs($method, $id);
+        break;
+        
+    case 'jobs-simple':
+        require_once __DIR__ . '/jobs_simple.php';
+        handleJobsSimple($method, $id);
+        break;
+        
+    case 'jobs-all':
+        require_once __DIR__ . '/jobs.php';
+        require_once __DIR__ . '/jobs_simple.php';
+        handleJobsAll();
+        break;
+        
+    case 'geocode':
+        require_once __DIR__ . '/geocode.php';
         break;
         
     case 'clients':

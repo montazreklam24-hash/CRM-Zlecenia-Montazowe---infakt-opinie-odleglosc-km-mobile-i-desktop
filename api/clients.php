@@ -69,16 +69,17 @@ function getClients() {
     
     $whereClause = implode(' AND ', $where);
     
-    // Pobierz klientów ze statystykami
+    // Pobierz klientów ze statystykami (z obu tabel zleceń)
     $sql = "
         SELECT 
             c.*,
-            (SELECT COUNT(*) FROM jobs WHERE client_id = c.id) as jobs_count,
+            (SELECT COUNT(*) FROM jobs_ai WHERE client_id = c.id) + 
+            (SELECT COUNT(*) FROM jobs_simple WHERE client_name = c.name OR client_name = c.company_name) as jobs_count,
             (SELECT COUNT(*) FROM invoices WHERE client_id = c.id) as invoices_count,
-            (SELECT COALESCE(SUM(total_gross), 0) FROM invoices WHERE client_id = c.id AND payment_status = 'paid') as total_paid
+            (SELECT COALESCE(SUM(amount_gross), 0) FROM invoices WHERE client_id = c.id AND status = 'paid') as total_paid
         FROM clients c
         WHERE {$whereClause}
-        ORDER BY c.company_name ASC, c.last_name ASC
+        ORDER BY c.company_name ASC, c.name ASC
         LIMIT ? OFFSET ?
     ";
     
@@ -131,15 +132,17 @@ function getClient($id) {
     $stmt->execute(array($id));
     $contacts = $stmt->fetchAll();
     
-    // Pobierz ostatnie zlecenia
-    $stmt = $pdo->prepare('
-        SELECT id, friendly_id, job_title, status, column_id, created_at 
-        FROM jobs 
-        WHERE client_id = ? 
+    // Pobierz ostatnie zlecenia (z obu tabel)
+    $stmt = $pdo->prepare("
+        (SELECT id, friendly_id, title, status, column_id, created_at, 'ai' as job_type 
+        FROM jobs_ai WHERE client_id = ?)
+        UNION ALL
+        (SELECT id, friendly_id, title, status, column_id, created_at, 'simple' as job_type 
+        FROM jobs_simple WHERE client_name = (SELECT name FROM clients WHERE id = ?))
         ORDER BY created_at DESC 
         LIMIT 10
-    ');
-    $stmt->execute(array($id));
+    ");
+    $stmt->execute(array($id, $id));
     $jobs = $stmt->fetchAll();
     
     // Pobierz ostatnie faktury
@@ -489,6 +492,7 @@ function handleGusLookup() {
         jsonResponse(array('error' => 'Nie znaleziono firmy'), 404);
     }
 }
+
 
 
 

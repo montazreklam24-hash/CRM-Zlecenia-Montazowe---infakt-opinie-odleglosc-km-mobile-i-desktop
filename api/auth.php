@@ -49,20 +49,22 @@ function handleLogin() {
     
     // Zapisz sesję
     $stmt = $pdo->prepare('
-        INSERT INTO sessions (user_id, token, ip_address, user_agent, expires_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (user_id, token, expires_at)
+        VALUES (?, ?, ?)
     ');
     $stmt->execute(array(
         $user['id'],
         $token,
-        isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : null,
-        isset($_SERVER['HTTP_USER_AGENT']) ? substr($_SERVER['HTTP_USER_AGENT'], 0, 255) : null,
         $expiresAt
     ));
     
-    // Aktualizuj last_login
-    $stmt = $pdo->prepare('UPDATE users SET last_login = NOW() WHERE id = ?');
-    $stmt->execute(array($user['id']));
+    // Aktualizuj last_login (jeśli kolumna istnieje)
+    try {
+        $stmt = $pdo->prepare('UPDATE users SET updated_at = NOW() WHERE id = ?');
+        $stmt->execute(array($user['id']));
+    } catch (Exception $e) {
+        // Ignoruj jeśli kolumna nie istnieje
+    }
     
     // Zwróć dane użytkownika (bez hasła)
     unset($user['password_hash']);
@@ -148,6 +150,7 @@ function handleChangePassword() {
     
     jsonResponse(array('success' => true, 'message' => 'Hasło zmienione'));
 }
+
 
 
 
