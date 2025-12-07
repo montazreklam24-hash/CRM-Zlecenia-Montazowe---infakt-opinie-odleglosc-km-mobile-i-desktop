@@ -415,7 +415,8 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
   // 1. WhatsApp tylko linki (szybkie)
   const handleShareLinks = () => {
     const shareText = generateShareText();
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+    // Używamy api.whatsapp.com dla lepszej kompatybilności desktop/mobile
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
     window.open(whatsappUrl, '_blank');
   };
 
@@ -910,7 +911,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                 ) : (
                   <Share2 className="w-5 h-5" />
                 )}
-                PNG
+                Udostępnij PNG
               </button>
 
               {/* 3. Kopiuj PNG */}
