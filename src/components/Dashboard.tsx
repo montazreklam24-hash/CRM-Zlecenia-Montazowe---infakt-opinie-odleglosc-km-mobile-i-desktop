@@ -5,7 +5,8 @@ import {
   Plus, MapPin, CheckCircle2, Trash2, Box, Kanban, 
   Download, Copy, RefreshCw, Search, StretchHorizontal, ExternalLink,
   ChevronUp, ChevronDown, Map as MapIcon, Layers, LayoutDashboard,
-  ChevronLeft, ChevronRight, Archive
+  ChevronLeft, ChevronRight, Archive, Calendar, Star, MessageSquare, 
+  CreditCard, Image as ImageIcon
 } from 'lucide-react';
 import MapBoardGoogle from './MapBoardGoogle';
 import MapBoardOSM from './MapBoardOSM';
@@ -283,7 +284,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
         </div>
       )}
       <div 
-        className="relative group"
+        className="relative group h-full"
         onMouseEnter={() => setShowArrows(true)}
         onMouseLeave={() => setShowArrows(false)}
       >
@@ -316,7 +317,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           {...attributes}
           onClick={handleCardClick}
           onDoubleClick={handleCardDoubleClick}
-          className={`theme-card min-w-[160px] w-40 cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group relative flex flex-col overflow-visible touch-none ${showDropIndicator ? 'ring-2 ring-blue-400' : ''}`}
+          className={`theme-card min-w-[160px] w-full min-h-[280px] h-full cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group relative flex flex-col overflow-visible touch-none ${showDropIndicator ? 'ring-2 ring-blue-400' : ''}`}
         >
           {/* Click hint tooltip */}
           {showClickHint && (
@@ -362,7 +363,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           </div>
         </div>
         
-        <div className="p-3 flex flex-col" style={{ minHeight: '110px' }}>
+        <div className="p-3 flex flex-col flex-1">
           {/* Title - max 3 linie */}
           <h4 className="font-bold text-xs leading-tight mb-1 line-clamp-3" style={{ color: 'var(--text-primary)' }}>
             {job.data.jobTitle}
@@ -479,19 +480,23 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
 interface DroppableColumnProps {
   id: JobColumnId;
   children: React.ReactNode;
+  activeId?: string | null;
 }
 
-// Drop zone placeholder - wykrywany jako cel upuszczenia dla kolumny
-const ColumnDropZone: React.FC<{ columnId: string }> = ({ columnId }) => {
+// Drop zone placeholder - wykrywany jako cel upuszczenia dla kolumny (tylko widoczny gdy przeciągamy)
+const ColumnDropZone: React.FC<{ columnId: string; isActivelyDragging?: boolean }> = ({ columnId, isActivelyDragging }) => {
   const { setNodeRef, isOver } = useDroppable({ id: columnId });
+  
+  // Nie renderuj w ogóle jeśli nie przeciągamy
+  if (!isActivelyDragging) return null;
   
   return (
     <div 
       ref={setNodeRef}
-      className={`w-full h-16 mt-2 rounded-lg border-2 border-dashed transition-all flex items-center justify-center ${
+      className={`w-full h-12 mt-2 rounded-lg border-2 border-dashed transition-all flex items-center justify-center ${
         isOver 
           ? 'border-blue-500 bg-blue-100/50 scale-105' 
-          : 'border-transparent hover:border-gray-300/50'
+          : 'border-gray-300/50 bg-gray-50/30'
       }`}
     >
       {isOver && <span className="text-xs text-blue-500 font-medium">Upuść tutaj</span>}
@@ -500,27 +505,35 @@ const ColumnDropZone: React.FC<{ columnId: string }> = ({ columnId }) => {
 };
 
 // Droppable for horizontal board (row layout)
-const DroppableRow: React.FC<DroppableColumnProps> = ({ id, children }) => {
+const DroppableRow: React.FC<DroppableColumnProps> = ({ id, children, activeId }) => {
   return (
     <div 
-      className="p-4 flex flex-wrap gap-3 min-h-[180px] items-start content-start transition-all"
+      className="p-5 transition-all overflow-visible"
       style={{ 
         background: 'var(--bg-surface)', 
         backdropFilter: 'var(--blur)', 
-        WebkitBackdropFilter: 'var(--blur)' 
+        WebkitBackdropFilter: 'var(--blur)'
       }}
     >
-      {children}
-      <ColumnDropZone columnId={id} />
+      <div 
+        className="grid gap-8 min-h-[180px] items-stretch overflow-visible px-4"
+        style={{ 
+          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+          gridAutoRows: 'minmax(280px, auto)' // Equal minimum height rows
+        }}
+      >
+        {children}
+      </div>
+      <ColumnDropZone columnId={id} isActivelyDragging={!!activeId} />
     </div>
   );
 };
 
 // Droppable for vertical kanban (column layout)
-const DroppableColumn: React.FC<DroppableColumnProps> = ({ id, children }) => {
+const DroppableColumn: React.FC<DroppableColumnProps> = ({ id, children, activeId }) => {
   return (
     <div 
-      className="p-2 min-h-[400px] flex-1 transition-all flex flex-col"
+      className="p-3 min-h-[400px] flex-1 transition-all flex flex-col"
       style={{ 
         background: 'var(--bg-surface)', 
         backdropFilter: 'var(--blur)', 
@@ -528,7 +541,7 @@ const DroppableColumn: React.FC<DroppableColumnProps> = ({ id, children }) => {
       }}
     >
       {children}
-      <ColumnDropZone columnId={id} />
+      <ColumnDropZone columnId={id} isActivelyDragging={!!activeId} />
     </div>
   );
 };
@@ -955,6 +968,73 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     };
   };
 
+  // Kolejność kolumn dla strzałek lewo/prawo
+  const COLUMN_ORDER: JobColumnId[] = ['PREPARE', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'COMPLETED'];
+
+  // Helper to check if job can move left/right
+  const getJobMoveLeftRightInfo = (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return { canMoveLeft: false, canMoveRight: false };
+    
+    const columnId = job.columnId || 'PREPARE';
+    const currentIndex = COLUMN_ORDER.indexOf(columnId);
+    
+    return {
+      canMoveLeft: currentIndex > 0,
+      canMoveRight: currentIndex < COLUMN_ORDER.length - 1
+    };
+  };
+
+  // Move job to the left column
+  const handleMoveLeft = async (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    
+    const columnId = job.columnId || 'PREPARE';
+    const currentIndex = COLUMN_ORDER.indexOf(columnId);
+    if (currentIndex <= 0) return; // Already at leftmost
+    
+    const newColumnId = COLUMN_ORDER[currentIndex - 1];
+    
+    // Optimistic update
+    setJobs(prevJobs => prevJobs.map(j => 
+      j.id === jobId ? { ...j, columnId: newColumnId } : j
+    ));
+    
+    // Save to backend
+    try {
+      await jobsService.updateJobColumn(jobId, newColumnId);
+    } catch (err) {
+      console.error('Failed to move left:', err);
+      loadJobs();
+    }
+  };
+
+  // Move job to the right column
+  const handleMoveRight = async (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    
+    const columnId = job.columnId || 'PREPARE';
+    const currentIndex = COLUMN_ORDER.indexOf(columnId);
+    if (currentIndex >= COLUMN_ORDER.length - 1) return; // Already at rightmost
+    
+    const newColumnId = COLUMN_ORDER[currentIndex + 1];
+    
+    // Optimistic update
+    setJobs(prevJobs => prevJobs.map(j => 
+      j.id === jobId ? { ...j, columnId: newColumnId } : j
+    ));
+    
+    // Save to backend
+    try {
+      await jobsService.updateJobColumn(jobId, newColumnId);
+    } catch (err) {
+      console.error('Failed to move right:', err);
+      loadJobs();
+    }
+  };
+
   // Zmiana statusu płatności bezpośrednio z kafelka
   const handlePaymentStatusChange = async (jobId: string, newStatus: PaymentStatus) => {
     // Optymistyczna aktualizacja UI
@@ -1362,8 +1442,113 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
         </div>
       </div>
 
+      {/* ARCHIVED LIST VIEW - Special view for archived jobs */}
+      {activeTab === 'ARCHIVED' && (
+        <div className="space-y-3">
+          {filteredJobs.length === 0 ? (
+            <div className="theme-card p-12 text-center" style={{ borderRadius: 'var(--radius-lg)' }}>
+              <Archive className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
+              <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Archiwum jest puste</h3>
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Zakończone zlecenia pojawią się tutaj</p>
+            </div>
+          ) : (
+            filteredJobs
+              .sort((a, b) => new Date(b.completedAt || b.createdAt).getTime() - new Date(a.completedAt || a.createdAt).getTime())
+              .map(job => {
+                const imgUrl = job.projectImages?.[0] || job.completionImages?.[0];
+                const completedDate = job.completedAt ? new Date(job.completedAt) : new Date(job.createdAt);
+                const hasReview = job.hasClientReview || false;
+                const isPaid = job.paymentStatus === PaymentStatus.PAID || job.paymentStatus === PaymentStatus.CASH;
+                
+                return (
+                  <div 
+                    key={job.id}
+                    onClick={() => onSelectJob(job, true)}
+                    className="theme-card flex gap-4 p-3 cursor-pointer hover:shadow-lg transition-all group"
+                    style={{ borderRadius: 'var(--radius-lg)' }}
+                  >
+                    {/* Thumbnail */}
+                    <div 
+                      className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden border"
+                      style={{ borderColor: 'var(--border-light)', background: 'var(--bg-surface)' }}
+                    >
+                      {imgUrl ? (
+                        <img src={imgUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ImageIcon className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      {/* Header row */}
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <h3 className="font-bold text-sm truncate group-hover:text-blue-600 transition-colors" style={{ color: 'var(--text-primary)' }}>
+                          {job.data.jobTitle || 'Bez nazwy'}
+                        </h3>
+                        <span className="text-xs font-medium flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                          {job.friendlyId}
+                        </span>
+                      </div>
+                      
+                      {/* Date */}
+                      <div className="flex items-center gap-1 text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>
+                        <Calendar className="w-3 h-3" />
+                        {completedDate.toLocaleDateString('pl-PL', { 
+                          day: 'numeric', 
+                          month: 'long', 
+                          year: 'numeric' 
+                        })}
+                      </div>
+                      
+                      {/* Description */}
+                      <p className="text-xs line-clamp-2 mb-2" style={{ color: 'var(--text-secondary)' }}>
+                        {job.data.scopeWorkText || job.data.address || 'Brak opisu'}
+                      </p>
+                      
+                      {/* Status badges */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Review status */}
+                        <span 
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full ${
+                            hasReview 
+                              ? 'bg-amber-100 text-amber-700' 
+                              : 'bg-slate-100 text-slate-500'
+                          }`}
+                        >
+                          <Star className={`w-3 h-3 ${hasReview ? 'fill-current' : ''}`} />
+                          {hasReview ? 'Opinia' : 'Brak opinii'}
+                        </span>
+                        
+                        {/* Payment status */}
+                        <span 
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full ${
+                            isPaid 
+                              ? 'bg-green-100 text-green-700' 
+                              : 'bg-red-100 text-red-600'
+                          }`}
+                        >
+                          <CreditCard className="w-3 h-3" />
+                          {isPaid ? 'Opłacone' : 'Nieopłacone'}
+                        </span>
+                        
+                        {/* Payment status badge from component */}
+                        {job.paymentStatus && job.paymentStatus !== PaymentStatus.NONE && (
+                          <PaymentStatusBadge status={job.paymentStatus} size="sm" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+          )}
+        </div>
+      )}
+
       {/* MIXED VIEW (New Layout) */}
-      {viewMode === 'MIXED' && (
+      {activeTab === 'ACTIVE' && viewMode === 'MIXED' && (
         <DndContext
           sensors={sensors}
           collisionDetection={cardFirstCollision}
@@ -1377,31 +1562,38 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             {ROWS_CONFIG.filter(r => r.id === 'PREPARE').map(row => {
                const rowJobs = getJobsForColumn(row.id);
                return (
-                <div key={row.id} className="theme-surface overflow-hidden transition-all" style={{ borderRadius: 'var(--radius-lg)', borderLeft: '4px solid', borderColor: row.dotColor.replace('text-', '') }}>
-                  <div className={`${row.headerBg} ${row.headerText} px-4 py-3 flex justify-between items-center`}>
+                <div key={row.id} className="theme-surface transition-all" style={{ borderRadius: 'var(--radius-lg)', borderLeft: '4px solid', borderColor: row.dotColor.replace('text-', ''), overflow: 'visible' }}>
+                  <div className={`${row.headerBg} ${row.headerText} px-4 py-3 flex justify-between items-center`} style={{ borderTopLeftRadius: 'var(--radius-lg)', borderTopRightRadius: 'var(--radius-lg)' }}>
                     <h3 className="font-bold tracking-wide text-sm flex items-center gap-2">
                        {row.title}
                     </h3>
                     <span className="bg-white/20 px-2.5 py-1 text-xs font-bold" style={{ borderRadius: 'var(--radius-md)' }}>{rowJobs.length}</span>
                   </div>
-                  <DroppableRow id={row.id}>
+                  <DroppableRow id={row.id} activeId={activeId}>
                     {rowJobs.length === 0 && !activeId ? (
                       <div className="text-xs font-medium italic w-full text-center p-6 border-2 border-dashed rounded-xl" style={{ color: 'var(--text-muted)', borderColor: 'var(--border-medium)', background: 'rgba(255,255,255,0.15)', backdropFilter: 'var(--blur)' }}>
                         Przeciągnij tutaj zlecenie
                       </div>
                     ) : (
-                      rowJobs.map(job => (
-                        <DraggableJobCard
-                          key={job.id}
-                          job={job}
-                          isAdmin={isAdmin}
-                          onSelectJob={onSelectJob}
-                          onDelete={handleDelete}
-                          onDuplicate={handleDuplicate}
-                          onPaymentStatusChange={handlePaymentStatusChange}
-                          onMoveToColumn={handleMoveToColumn}
-                        />
-                      ))
+                      rowJobs.map(job => {
+                        const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
+                        return (
+                          <DraggableJobCard
+                            key={job.id}
+                            job={job}
+                            isAdmin={isAdmin}
+                            onSelectJob={onSelectJob}
+                            onDelete={handleDelete}
+                            onDuplicate={handleDuplicate}
+                            onPaymentStatusChange={handlePaymentStatusChange}
+                            onMoveToColumn={handleMoveToColumn}
+                            onMoveLeft={handleMoveLeft}
+                            onMoveRight={handleMoveRight}
+                            canMoveLeft={canMoveLeft}
+                            canMoveRight={canMoveRight}
+                          />
+                        );
+                      })
                     )}
                   </DroppableRow>
                 </div>
@@ -1421,8 +1613,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                          </h3>
                          <span className="bg-white/20 px-2 py-0.5 text-xs font-bold" style={{ borderRadius: 'var(--radius-sm)' }}>{rowJobs.length}</span>
                       </div>
-                      <DroppableColumn id={row.id}>
-                         <div className="flex flex-col gap-3 w-full p-1">
+                      <DroppableColumn id={row.id} activeId={activeId}>
+                         <div className="flex flex-col gap-4 w-full p-2">
                             {rowJobs.map(job => {
                                const { canMoveUp, canMoveDown } = getJobMoveInfo(job.id);
                                return (
@@ -1505,27 +1697,34 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             {ROWS_CONFIG.filter(r => r.id === 'COMPLETED').map(row => {
                const rowJobs = getJobsForColumn(row.id);
                return (
-                <div key={row.id} className="theme-surface overflow-hidden transition-all" style={{ borderRadius: 'var(--radius-lg)', borderLeft: '4px solid', borderColor: row.dotColor.replace('text-', '') }}>
-                  <div className={`${row.headerBg} ${row.headerText} px-4 py-3 flex justify-between items-center`}>
+                <div key={row.id} className="theme-surface transition-all" style={{ borderRadius: 'var(--radius-lg)', borderLeft: '4px solid', borderColor: row.dotColor.replace('text-', ''), overflow: 'visible' }}>
+                  <div className={`${row.headerBg} ${row.headerText} px-4 py-3 flex justify-between items-center`} style={{ borderTopLeftRadius: 'var(--radius-lg)', borderTopRightRadius: 'var(--radius-lg)' }}>
                     <h3 className="font-bold tracking-wide text-sm flex items-center gap-2">
                        <CheckCircle2 className="w-4 h-4" />
                        {row.title}
                     </h3>
                     <span className="bg-white/20 px-2.5 py-1 text-xs font-bold" style={{ borderRadius: 'var(--radius-md)' }}>{rowJobs.length}</span>
                   </div>
-                  <DroppableRow id={row.id}>
-                    {rowJobs.map(job => (
-                      <DraggableJobCard
-                        key={job.id}
-                        job={job}
-                        isAdmin={isAdmin}
-                        onSelectJob={onSelectJob}
-                        onDelete={handleDelete}
-                        onDuplicate={handleDuplicate}
+                  <DroppableRow id={row.id} activeId={activeId}>
+                    {rowJobs.map(job => {
+                      const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
+                      return (
+                        <DraggableJobCard
+                          key={job.id}
+                          job={job}
+                          isAdmin={isAdmin}
+                          onSelectJob={onSelectJob}
+                          onDelete={handleDelete}
+                          onDuplicate={handleDuplicate}
                           onPaymentStatusChange={handlePaymentStatusChange}
                           onMoveToColumn={handleMoveToColumn}
-                      />
-                    ))}
+                          onMoveLeft={handleMoveLeft}
+                          onMoveRight={handleMoveRight}
+                          canMoveLeft={canMoveLeft}
+                          canMoveRight={canMoveRight}
+                        />
+                      );
+                    })}
                   </DroppableRow>
                 </div>
                );
@@ -1558,7 +1757,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       )}
 
       {/* KANBAN BOARD VIEW with DnD Kit */}
-      {viewMode === 'BOARD' && (
+      {activeTab === 'ACTIVE' && viewMode === 'BOARD' && (
         <>
         <DndContext
           sensors={sensors}
@@ -1573,10 +1772,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
               return (
                 <div 
                   key={row.id} 
-                  className="theme-surface overflow-hidden transition-all"
-                  style={{ borderRadius: 'var(--radius-lg)', borderLeft: '4px solid' }}
+                  className="theme-surface transition-all"
+                  style={{ borderRadius: 'var(--radius-lg)', borderLeft: '4px solid', overflow: 'visible' }}
                 >
-                  <div className={`${row.headerBg} ${row.headerText} px-4 py-3 flex justify-between items-center`}>
+                  <div className={`${row.headerBg} ${row.headerText} px-4 py-3 flex justify-between items-center`} style={{ borderTopLeftRadius: 'var(--radius-lg)', borderTopRightRadius: 'var(--radius-lg)' }}>
                     <h3 className="font-bold tracking-wide text-sm flex items-center gap-2">
                       {row.id === 'COMPLETED' && <CheckCircle2 className="w-4 h-4" />}
                       {row.title}
@@ -1584,24 +1783,31 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                     <span className="bg-white/20 px-2.5 py-1 text-xs font-bold" style={{ borderRadius: 'var(--radius-md)' }}>{rowJobs.length}</span>
                   </div>
 
-                  <DroppableRow id={row.id}>
+                  <DroppableRow id={row.id} activeId={activeId}>
                     {rowJobs.length === 0 && !activeId ? (
                       <div className="text-xs font-medium italic w-full text-center p-6 border-2 border-dashed rounded-xl" style={{ color: 'var(--text-muted)', borderColor: 'var(--border-medium)', background: 'rgba(255,255,255,0.15)', backdropFilter: 'var(--blur)' }}>
                         Przeciągnij tutaj zlecenie
                       </div>
                     ) : (
-                      rowJobs.map(job => (
-                        <DraggableJobCard
-                          key={job.id}
-                          job={job}
-                          isAdmin={isAdmin}
-                          onSelectJob={onSelectJob}
-                          onDelete={handleDelete}
-                          onDuplicate={handleDuplicate}
-                          onPaymentStatusChange={handlePaymentStatusChange}
-                          onMoveToColumn={handleMoveToColumn}
-                        />
-                      ))
+                      rowJobs.map(job => {
+                        const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
+                        return (
+                          <DraggableJobCard
+                            key={job.id}
+                            job={job}
+                            isAdmin={isAdmin}
+                            onSelectJob={onSelectJob}
+                            onDelete={handleDelete}
+                            onDuplicate={handleDuplicate}
+                            onPaymentStatusChange={handlePaymentStatusChange}
+                            onMoveToColumn={handleMoveToColumn}
+                            onMoveLeft={handleMoveLeft}
+                            onMoveRight={handleMoveRight}
+                            canMoveLeft={canMoveLeft}
+                            canMoveRight={canMoveRight}
+                          />
+                        );
+                      })
                     )}
                   </DroppableRow>
                 </div>
@@ -1691,7 +1897,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       )}
 
       {/* VERTICAL KANBAN VIEW (Trello style) - 7 columns */}
-      {viewMode === 'KANBAN' && (
+      {activeTab === 'ACTIVE' && viewMode === 'KANBAN' && (
         <>
         <DndContext
           sensors={sensors}
@@ -1722,8 +1928,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                   </div>
 
                   {/* Column Body - Droppable, stretches to bottom */}
-                  <DroppableColumn id={row.id}>
-                    <div className="flex flex-col gap-3 w-full p-1">
+                  <DroppableColumn id={row.id} activeId={activeId}>
+                    <div className="flex flex-col gap-4 w-full p-2">
                       {rowJobs.map(job => {
                         const { canMoveUp, canMoveDown } = getJobMoveInfo(job.id);
                         return (

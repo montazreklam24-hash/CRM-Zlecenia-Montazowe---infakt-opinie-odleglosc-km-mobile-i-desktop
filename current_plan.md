@@ -37,3 +37,8 @@ Aktualizowany na bieżąco o zgłoszenia użytkownika.
 3.  **Fix Mobile Card** (UI Mobile).
 4.  **Reszta...**
 
+
+
+
+
+

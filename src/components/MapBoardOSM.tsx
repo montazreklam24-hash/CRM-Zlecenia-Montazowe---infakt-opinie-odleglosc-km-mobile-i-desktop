@@ -38,15 +38,37 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob }) => {
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-    const map = L.map(mapContainerRef.current).setView([52.2297, 21.0122], 10);
+    const map = L.map(mapContainerRef.current, {
+      scrollWheelZoom: false // Disable by default
+    }).setView([52.2297, 21.0122], 10);
+    
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
     mapInstanceRef.current = map;
+    
+    // Enable scroll zoom only with Ctrl key
+    const container = mapContainerRef.current;
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        map.scrollWheelZoom.enable();
+      } else {
+        map.scrollWheelZoom.disable();
+      }
+    };
+    
+    const handleKeyUp = () => {
+      map.scrollWheelZoom.disable();
+    };
+    
+    container.addEventListener('wheel', handleWheel, { passive: true });
+    document.addEventListener('keyup', handleKeyUp);
     markersLayerRef.current = L.layerGroup().addTo(map);
 
     return () => {
+      container.removeEventListener('wheel', handleWheel);
+      document.removeEventListener('keyup', handleKeyUp);
       map.remove();
       mapInstanceRef.current = null;
     };
@@ -120,7 +142,15 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob }) => {
     }
   }, [jobs]);
 
-  return <div ref={mapContainerRef} className="w-full h-[500px] z-0 bg-slate-100" />;
+  return (
+    <div className="relative">
+      <div ref={mapContainerRef} className="w-full h-[500px] z-0 bg-slate-100" />
+      {/* Ctrl hint overlay */}
+      <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded-md pointer-events-none">
+        Ctrl + scroll = zoom
+      </div>
+    </div>
+  );
 };
 
 export default MapBoardOSM;

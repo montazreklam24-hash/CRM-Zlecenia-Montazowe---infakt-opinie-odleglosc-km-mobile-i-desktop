@@ -28,3 +28,8 @@ Na serwerze aplikacja szuka pliku `api/config_db.php`. Jeśli go nie znajdzie, u
 
 
 
+
+
+
+
+

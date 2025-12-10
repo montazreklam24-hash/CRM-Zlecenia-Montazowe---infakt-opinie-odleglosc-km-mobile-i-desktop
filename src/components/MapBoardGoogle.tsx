@@ -189,9 +189,20 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
         streetViewControl: false,
         fullscreenControl: true,
         clickableIcons: false,
+        scrollwheel: false, // Disabled by default, enabled only with Ctrl
+        gestureHandling: 'cooperative', // Shows message "Use Ctrl + scroll to zoom"
       };
 
       googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
+
+      // Ctrl + Scroll zoom
+      const mapDiv = mapRef.current;
+      mapDiv.addEventListener('wheel', (e: WheelEvent) => {
+        if (!e.ctrlKey) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }, { passive: false });
 
       // Inicjalizacja OverlayView do konwersji LatLng -> Pixel
       const Overlay = new window.google.maps.OverlayView();
@@ -318,6 +329,11 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
           <p className="text-slate-500">Ładowanie mapy Google...</p>
         </div>
       )}
+      
+      {/* Ctrl hint overlay */}
+      <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded-md pointer-events-none z-20">
+        Ctrl + scroll = zoom
+      </div>
     </div>
   );
 };
