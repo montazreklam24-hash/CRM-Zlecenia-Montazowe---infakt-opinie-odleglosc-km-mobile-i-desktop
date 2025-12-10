@@ -11,7 +11,6 @@ import {
 import MapBoardGoogle from './MapBoardGoogle';
 import MapBoardOSM from './MapBoardOSM';
 import PaymentStatusBadge, { PaymentStatusBar, PaymentStatusIcon } from './PaymentStatusBadge';
-import JobContextMenu from './JobContextMenu';
 
 import {
   DndContext,
@@ -110,7 +109,6 @@ interface DraggableJobCardProps {
   canMoveRight?: boolean;
   onPaymentStatusChange?: (jobId: string, status: PaymentStatus) => void;
   onMoveToColumn?: (jobId: string, columnId: JobColumnId) => void;
-  onContextMenu?: (e: React.MouseEvent, job: Job) => void;
 }
 
 const BASE_COORDS = { lat: 52.2297, lng: 21.0122 }; // ul. Poprawna 39R, Warszawa
@@ -213,8 +211,7 @@ const getPaymentStatusLabel = (status: PaymentStatus): string => {
 
 const DraggableJobCard: React.FC<DraggableJobCardProps> = ({ 
   job, isAdmin, onSelectJob, onDelete, onDuplicate, onArchive,
-  onMoveLeft, onMoveRight, canMoveLeft, canMoveRight, onPaymentStatusChange, onMoveToColumn,
-  onContextMenu
+  onMoveLeft, onMoveRight, canMoveLeft, canMoveRight, onPaymentStatusChange, onMoveToColumn
 }) => {
   // Draggable
   const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
@@ -318,7 +315,6 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           {...attributes}
           onClick={handleCardClick}
           onDoubleClick={handleCardDoubleClick}
-          onContextMenu={(e) => onContextMenu?.(e, job)}
           className={`theme-card min-w-[160px] w-full min-h-[280px] h-full cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group relative flex flex-col overflow-visible touch-none ${showDropIndicator ? 'ring-2 ring-blue-400' : ''}`}
         >
           {/* Click hint tooltip */}
@@ -337,8 +333,10 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           )}
         {/* Image with payment status bar on top */}
         <div className="aspect-square relative overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
-          {/* Payment Status Bar - prawy przycisk myszy żeby zmienić */}
-          <PaymentStatusBar status={job.paymentStatus || PaymentStatus.NONE} />
+          {/* Payment Status Bar - PPM otwiera menu kontekstowe */}
+          <div className="absolute top-0 left-0 right-0 z-10">
+            <PaymentStatusBar status={job.paymentStatus || PaymentStatus.NONE} />
+          </div>
           
           {job.projectImages?.[0] ? (
             <img src={job.projectImages[0]} className="w-full h-full object-cover pointer-events-none" alt="preview" loading="lazy" />
@@ -454,6 +452,10 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
             )}
           </div>
           
+          {/* PPM otwiera menu z opcją przenoszenia */}
+          <div className="w-full py-1 text-[9px] text-center text-slate-400 border-t" style={{ borderColor: 'var(--border-light)' }}>
+            PPM → opcje
+          </div>
         </div>
       </div>
     </div>
@@ -491,49 +493,34 @@ const ColumnDropZone: React.FC<{ columnId: string; isActivelyDragging?: boolean 
 
 // Droppable for horizontal board (row layout)
 const DroppableRow: React.FC<DroppableColumnProps> = ({ id, children, activeId }) => {
-  // Cały wiersz jest droppable
-  const { setNodeRef, isOver } = useDroppable({ id });
-  
   return (
     <div 
-      ref={setNodeRef}
-      className={`p-5 transition-all overflow-visible ${isOver && activeId ? 'ring-2 ring-blue-400 ring-inset bg-blue-50/30' : ''}`}
+      className="p-5 transition-all overflow-visible"
       style={{ 
         background: 'var(--bg-surface)', 
         backdropFilter: 'var(--blur)', 
-        WebkitBackdropFilter: 'var(--blur)',
-        minHeight: '200px'
+        WebkitBackdropFilter: 'var(--blur)'
       }}
     >
       <div 
         className="grid gap-8 min-h-[180px] items-stretch overflow-visible px-4"
         style={{ 
           gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-          gridAutoRows: '320px', // Stała wysokość - wszystkie kafelki wyrównane
-          alignItems: 'stretch'
+          gridAutoRows: 'minmax(280px, auto)' // Equal minimum height rows
         }}
       >
         {children}
       </div>
-      {/* Wizualny wskaźnik gdy przeciągamy */}
-      {isOver && activeId && (
-        <div className="text-center text-sm font-bold text-blue-500 mt-2 py-2 bg-blue-100 rounded-lg">
-          ↓ Upuść tutaj ↓
-        </div>
-      )}
+      <ColumnDropZone columnId={id} isActivelyDragging={!!activeId} />
     </div>
   );
 };
 
 // Droppable for vertical kanban (column layout)
 const DroppableColumn: React.FC<DroppableColumnProps> = ({ id, children, activeId }) => {
-  // Cała kolumna jest droppable
-  const { setNodeRef, isOver } = useDroppable({ id });
-  
   return (
     <div 
-      ref={setNodeRef}
-      className={`p-3 min-h-[400px] flex-1 transition-all flex flex-col ${isOver && activeId ? 'ring-2 ring-blue-400 ring-inset bg-blue-50/30' : ''}`}
+      className="p-3 min-h-[400px] flex-1 transition-all flex flex-col"
       style={{ 
         background: 'var(--bg-surface)', 
         backdropFilter: 'var(--blur)', 
@@ -541,12 +528,7 @@ const DroppableColumn: React.FC<DroppableColumnProps> = ({ id, children, activeI
       }}
     >
       {children}
-      {/* Wizualny wskaźnik gdy przeciągamy */}
-      {isOver && activeId && (
-        <div className="text-center text-xs font-bold text-blue-500 mt-auto py-2 bg-blue-100 rounded-lg">
-          ↓ Upuść tutaj ↓
-        </div>
-      )}
+      <ColumnDropZone columnId={id} isActivelyDragging={!!activeId} />
     </div>
   );
 };
@@ -554,9 +536,7 @@ const DroppableColumn: React.FC<DroppableColumnProps> = ({ id, children, activeI
 // Small Kanban Card (for narrow vertical columns)
 const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({ 
   job, isAdmin, onSelectJob, onDelete, onDuplicate, onArchive,
-  onMoveUp, onMoveDown, canMoveUp, canMoveDown,
-  onMoveLeft, onMoveRight, canMoveLeft, canMoveRight,
-  onPaymentStatusChange, onMoveToColumn, onContextMenu
+  onMoveUp, onMoveDown, canMoveUp, canMoveDown 
 }) => {
   // Draggable
   const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
@@ -638,28 +618,6 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
             <ChevronDown className="w-5 h-5" />
           </button>
         )}
-
-        {/* LEFT arrow - appears on hover at left */}
-        {showArrows && canMoveLeft && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onMoveLeft?.(job.id); }}
-            className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń do poprzedniej kolumny"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-        )}
-        
-        {/* RIGHT arrow - appears on hover at right */}
-        {showArrows && canMoveRight && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onMoveRight?.(job.id); }}
-            className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń do następnej kolumny"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        )}
         
         <div 
           ref={setNodeRef}
@@ -667,7 +625,6 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
           {...listeners}
           {...attributes}
           onDoubleClick={handleCardDoubleClick}
-          onContextMenu={(e) => onContextMenu?.(e, job)}
           className={`theme-card cursor-grab active:cursor-grabbing transition-all hover:shadow-md relative overflow-hidden touch-none ${showDropIndicator ? 'ring-2 ring-blue-400' : ''}`}
         >
         {/* Payment status bar on top */}
@@ -795,24 +752,6 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   const [overId, setOverId] = useState<string | null>(null);
   const [showTypeModal, setShowTypeModal] = useState(false);
   const healingDoneRef = useRef(false); // Zapobiega wielokrotnemu uruchamianiu healJobs
-  
-  // Context menu state - prawy przycisk myszy
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; job: Job } | null>(null);
-  
-  const handleContextMenu = (e: React.MouseEvent, job: Job) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setContextMenu({ x: e.clientX, y: e.clientY, job });
-  };
-  
-  const closeContextMenu = () => setContextMenu(null);
-  
-  const handleArchive = async (jobId: string) => {
-    if (window.confirm('Archiwizować zlecenie?')) {
-      await jobsService.updateJob(jobId, { status: JobStatus.ARCHIVED });
-      loadJobs();
-    }
-  };
 
   // Auto-Heal: Sprawdź zlecenia z adresem ale bez współrzędnych (tylko RAZ po załadowaniu)
   useEffect(() => {
@@ -1639,7 +1578,6 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             onMoveRight={handleMoveRight}
                             canMoveLeft={canMoveLeft}
                             canMoveRight={canMoveRight}
-                            onContextMenu={handleContextMenu}
                           />
                         );
                       })
@@ -1666,7 +1604,6 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                          <div className="flex flex-col gap-4 w-full p-2">
                             {rowJobs.map(job => {
                                const { canMoveUp, canMoveDown } = getJobMoveInfo(job.id);
-                               const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
                                return (
                                   <SmallKanbanCard
                                     key={job.id}
@@ -1675,24 +1612,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                                     onSelectJob={onSelectJob}
                                     onDelete={handleDelete}
                                     onDuplicate={handleDuplicate}
-                                    onArchive={async (id, e) => {
-                                      e?.stopPropagation();
-                                      if (window.confirm('Archiwizować zlecenie?')) {
-                                        await jobsService.updateJob(id, { status: JobStatus.ARCHIVED });
-                                        loadJobs();
-                                      }
-                                    }}
                                     onMoveUp={handleMoveUp}
                                     onMoveDown={handleMoveDown}
                                     canMoveUp={canMoveUp}
                                     canMoveDown={canMoveDown}
-                                    onMoveLeft={handleMoveLeft}
-                                    onMoveRight={handleMoveRight}
-                                    canMoveLeft={canMoveLeft}
-                                    canMoveRight={canMoveRight}
-                                    onPaymentStatusChange={handlePaymentStatusChange}
-                                    onMoveToColumn={handleMoveToColumn}
-                                    onContextMenu={handleContextMenu}
                                   />
                                );
                             })}
@@ -1786,7 +1709,6 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                           onMoveRight={handleMoveRight}
                           canMoveLeft={canMoveLeft}
                           canMoveRight={canMoveRight}
-                          onContextMenu={handleContextMenu}
                         />
                       );
                     })}
@@ -1796,12 +1718,12 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             })}
           </div>
 
-          <DragOverlay zIndex={99999} dropAnimation={{ duration: 200, easing: 'ease-out' }}>
+          <DragOverlay>
             {activeId ? (() => {
               const activeJob = jobs.find(j => j.id === activeId);
               if (!activeJob) return null;
               return (
-                <div className="theme-card shadow-2xl rotate-2 p-2 pointer-events-none" style={{ width: '140px', opacity: 0.95 }}>
+                <div className="theme-card shadow-2xl rotate-2 opacity-95 p-2" style={{ width: '120px' }}>
                   <div className="aspect-square rounded overflow-hidden mb-2" style={{ background: 'var(--bg-surface)' }}>
                     {activeJob.projectImages?.[0] ? (
                       <img src={activeJob.projectImages[0]} className="w-full h-full object-cover" alt="" loading="lazy" />
@@ -1870,7 +1792,6 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             onMoveRight={handleMoveRight}
                             canMoveLeft={canMoveLeft}
                             canMoveRight={canMoveRight}
-                            onContextMenu={handleContextMenu}
                           />
                         );
                       })
@@ -1882,12 +1803,12 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
           </div>
 
           {/* Drag Overlay - follows cursor */}
-          <DragOverlay zIndex={99999} dropAnimation={{ duration: 200, easing: 'ease-out' }}>
+          <DragOverlay>
             {activeId ? (() => {
               const activeJob = jobs.find(j => j.id === activeId);
               if (!activeJob) return null;
               return (
-                <div className="theme-card w-40 shadow-2xl rotate-2 pointer-events-none" style={{ opacity: 0.95 }}>
+                <div className="theme-card w-40 shadow-2xl rotate-2 opacity-95">
                   <div className="aspect-square relative overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
                     {activeJob.projectImages?.[0] ? (
                       <img src={activeJob.projectImages[0]} className="w-full h-full object-cover" alt="" loading="lazy" />
@@ -1998,7 +1919,6 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                     <div className="flex flex-col gap-4 w-full p-2">
                       {rowJobs.map(job => {
                         const { canMoveUp, canMoveDown } = getJobMoveInfo(job.id);
-                        const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
                         return (
                           <SmallKanbanCard
                             key={job.id}
@@ -2007,24 +1927,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             onSelectJob={onSelectJob}
                             onDelete={handleDelete}
                             onDuplicate={handleDuplicate}
-                            onArchive={async (id, e) => {
-                              e?.stopPropagation();
-                              if (window.confirm('Archiwizować zlecenie?')) {
-                                await jobsService.updateJob(id, { status: JobStatus.ARCHIVED });
-                                loadJobs();
-                              }
-                            }}
                             onMoveUp={handleMoveUp}
                             onMoveDown={handleMoveDown}
                             canMoveUp={canMoveUp}
                             canMoveDown={canMoveDown}
-                            onMoveLeft={handleMoveLeft}
-                            onMoveRight={handleMoveRight}
-                            canMoveLeft={canMoveLeft}
-                            canMoveRight={canMoveRight}
-                            onPaymentStatusChange={handlePaymentStatusChange}
-                            onMoveToColumn={handleMoveToColumn}
-                            onContextMenu={handleContextMenu}
                           />
                         );
                       })}
@@ -2036,12 +1942,12 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
           </div>
 
           {/* Drag Overlay - follows cursor */}
-          <DragOverlay zIndex={99999} dropAnimation={{ duration: 200, easing: 'ease-out' }}>
+          <DragOverlay>
             {activeId ? (() => {
               const activeJob = jobs.find(j => j.id === activeId);
               if (!activeJob) return null;
               return (
-                <div className="theme-card shadow-2xl rotate-2 p-2 pointer-events-none" style={{ width: '140px', opacity: 0.95 }}>
+                <div className="theme-card shadow-2xl rotate-2 opacity-95 p-2" style={{ width: '120px' }}>
                   <div className="aspect-square rounded overflow-hidden mb-2" style={{ background: 'var(--bg-surface)' }}>
                     {activeJob.projectImages?.[0] ? (
                       <img src={activeJob.projectImages[0]} className="w-full h-full object-cover" alt="" loading="lazy" />
@@ -2169,25 +2075,6 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             </div>
           </div>
         </div>
-      )}
-      
-      {/* Context Menu - prawy przycisk myszy na kafelku */}
-      {contextMenu && (
-        <JobContextMenu
-          job={contextMenu.job}
-          x={contextMenu.x}
-          y={contextMenu.y}
-          onClose={closeContextMenu}
-          onPaymentStatusChange={handlePaymentStatusChange}
-          onMoveToColumn={handleMoveToColumn}
-          onArchive={handleArchive}
-          onDelete={(id) => {
-            if (confirm('Czy na pewno chcesz usunąć to zlecenie?')) {
-              handleDelete(id, {} as React.MouseEvent);
-            }
-          }}
-          isAdmin={role === UserRole.ADMIN}
-        />
       )}
     </div>
   );
