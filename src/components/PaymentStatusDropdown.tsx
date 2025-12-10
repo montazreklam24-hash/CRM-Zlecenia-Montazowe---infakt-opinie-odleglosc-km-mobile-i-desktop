@@ -35,6 +35,7 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const currentConfig = getPaymentStatusConfig(currentStatus);
   
   // Size classes
@@ -55,12 +56,16 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
     }
   }, [isOpen]);
 
-  // Close on outside click
+  // Close on outside click - sprawdza zarówno button jak i dropdown
   useEffect(() => {
     if (!isOpen) return;
     
     const handleClick = (e: MouseEvent) => {
-      if (buttonRef.current && !buttonRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const isInsideButton = buttonRef.current?.contains(target);
+      const isInsideDropdown = dropdownRef.current?.contains(target);
+      
+      if (!isInsideButton && !isInsideDropdown) {
         setIsOpen(false);
       }
     };
@@ -69,9 +74,14 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
       if (e.key === 'Escape') setIsOpen(false);
     };
     
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleEscape);
+    // Użyj setTimeout żeby uniknąć natychmiastowego zamknięcia
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handleClick);
+      document.addEventListener('keydown', handleEscape);
+    }, 0);
+    
     return () => {
+      clearTimeout(timer);
       document.removeEventListener('mousedown', handleClick);
       document.removeEventListener('keydown', handleEscape);
     };
@@ -110,6 +120,7 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
 
       {isOpen && createPortal(
         <div
+          ref={dropdownRef}
           className="fixed z-[99999]"
           style={{
             top: position.top,
@@ -117,6 +128,7 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
             width: position.width,
           }}
           onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           <div 
             className="bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden"
