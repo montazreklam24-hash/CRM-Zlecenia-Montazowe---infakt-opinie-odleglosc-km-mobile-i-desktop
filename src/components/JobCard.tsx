@@ -694,6 +694,41 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
             </div>
           </div>
 
+          {/* Invoice Module - TOP POSITION for easy access */}
+          {isAdmin && job && (
+            <InvoiceModule
+              jobId={job.id}
+              clientId={job.clientId}
+              clientName={editedData.clientName || editedData.companyName}
+              clientEmail={editedData.email}
+              installAddress={editedData.address}
+              phone={editedData.phoneNumber}
+              nip={editedData.nip}
+              paymentStatus={job.paymentStatus || PaymentStatus.NONE}
+              totalGross={job.totalGross || 0}
+              paidAmount={job.paidAmount || 0}
+              invoices={job.invoices || []}
+              isAdmin={isAdmin}
+              onStatusChange={async (status) => {
+                try {
+                  await jobsService.updateJob(job.id, { paymentStatus: status });
+                  console.log('Payment status changed to:', status);
+                } catch (error) {
+                  console.error('Failed to update payment status:', error);
+                }
+              }}
+              onClientDataChange={(billingData) => {
+                setEditedData(prev => ({
+                  ...prev,
+                  companyName: billingData.companyName || prev.companyName,
+                  nip: billingData.nip || prev.nip,
+                  email: billingData.email || prev.email,
+                  phoneNumber: billingData.phone || prev.phoneNumber,
+                }));
+              }}
+            />
+          )}
+
           {/* Re-analysis AI Section - tylko w trybie edycji */}
           {isEditing && (
             <div className="bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl p-5 shadow-sm border border-violet-200">
@@ -1126,70 +1161,6 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
             </div>
           </div>
 
-          {/* Invoice Module - only for admin viewing existing job */}
-          {isAdmin && job && (
-            <InvoiceModule
-              jobId={job.id}
-              clientId={job.clientId}
-              clientName={editedData.clientName || editedData.companyName}
-              clientEmail={editedData.email}
-              installAddress={editedData.address}
-              phone={editedData.phoneNumber}
-              nip={editedData.nip}
-              paymentStatus={job.paymentStatus || PaymentStatus.NONE}
-              totalGross={job.totalGross || 0}
-              paidAmount={job.paidAmount || 0}
-              invoices={job.invoices || []}
-              isAdmin={isAdmin}
-              onStatusChange={async (status) => {
-                // Aktualizuj status płatności w bazie
-                try {
-                  await jobsService.updateJob(job.id, { paymentStatus: status });
-                  console.log('Payment status changed to:', status);
-                } catch (error) {
-                  console.error('Failed to update payment status:', error);
-                }
-              }}
-              onClientDataChange={(billingData) => {
-                // Aktualizuj dane ROZLICZENIOWE (do faktury) - NIE adres montażu!
-                // Adres montażu (editedData.address) zostaje bez zmian!
-                setEditedData(prev => ({
-                  ...prev,
-                  // Nazwa firmy z GUS (jeśli jest NIP)
-                  companyName: billingData.companyName || prev.companyName,
-                  nip: billingData.nip || prev.nip,
-                  // Email i telefon mogą być aktualizowane
-                  email: billingData.email || prev.email,
-                  phoneNumber: billingData.phone || prev.phoneNumber,
-                  // UWAGA: NIE nadpisujemy address - to jest adres MONTAŻU, nie adres firmy!
-                  // Adres siedziby firmy jest zapisywany tylko w InvoiceModule
-                }));
-              }}
-            />
-          )}
-
-          {/* Completion Section - for finishing jobs */}
-          {job && job.status !== JobStatus.ARCHIVED && (
-            <CompletionSection
-              job={job}
-              isAdmin={isAdmin}
-              onComplete={async (completionData) => {
-                try {
-                  await jobsService.completeJob(job.id, {
-                    completionImages: completionData.completionImages,
-                    completionNotes: completionData.completionNotes,
-                    clientEmail: completionData.clientEmail,
-                    sendEmail: completionData.sendEmail,
-                  });
-                  onJobSaved?.();
-                  onBack();
-                } catch (error) {
-                  console.error('Błąd zakończenia zlecenia:', error);
-                  throw error;
-                }
-              }}
-            />
-          )}
 
           {/* Images Gallery */}
           <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
@@ -1254,6 +1225,29 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
               </div>
             )}
           </div>
+
+          {/* Completion Section - AT THE BOTTOM for finishing jobs */}
+          {job && job.status !== JobStatus.ARCHIVED && (
+            <CompletionSection
+              job={job}
+              isAdmin={isAdmin}
+              onComplete={async (completionData) => {
+                try {
+                  await jobsService.completeJob(job.id, {
+                    completionImages: completionData.completionImages,
+                    completionNotes: completionData.completionNotes,
+                    clientEmail: completionData.clientEmail,
+                    sendEmail: completionData.sendEmail,
+                  });
+                  onJobSaved?.();
+                  onBack();
+                } catch (error) {
+                  console.error('Błąd zakończenia zlecenia:', error);
+                  throw error;
+                }
+              }}
+            />
+          )}
         </div>
       </div>
 
