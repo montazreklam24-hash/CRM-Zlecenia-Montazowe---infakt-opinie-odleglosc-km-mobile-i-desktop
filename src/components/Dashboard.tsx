@@ -11,8 +11,7 @@ import {
 import MapBoardGoogle from './MapBoardGoogle';
 import MapBoardOSM from './MapBoardOSM';
 import PaymentStatusBadge, { PaymentStatusBar, PaymentStatusIcon } from './PaymentStatusBadge';
-import PaymentStatusDropdown, { PAYMENT_OPTIONS } from './PaymentStatusDropdown';
-import MoveToDropdown, { COLUMN_OPTIONS } from './MoveToDropdown';
+import JobContextMenu from './JobContextMenu';
 
 import {
   DndContext,
@@ -111,6 +110,7 @@ interface DraggableJobCardProps {
   canMoveRight?: boolean;
   onPaymentStatusChange?: (jobId: string, status: PaymentStatus) => void;
   onMoveToColumn?: (jobId: string, columnId: JobColumnId) => void;
+  onContextMenu?: (e: React.MouseEvent, job: Job) => void;
 }
 
 const BASE_COORDS = { lat: 52.2297, lng: 21.0122 }; // ul. Poprawna 39R, Warszawa
@@ -213,7 +213,8 @@ const getPaymentStatusLabel = (status: PaymentStatus): string => {
 
 const DraggableJobCard: React.FC<DraggableJobCardProps> = ({ 
   job, isAdmin, onSelectJob, onDelete, onDuplicate, onArchive,
-  onMoveLeft, onMoveRight, canMoveLeft, canMoveRight, onPaymentStatusChange, onMoveToColumn
+  onMoveLeft, onMoveRight, canMoveLeft, canMoveRight, onPaymentStatusChange, onMoveToColumn,
+  onContextMenu
 }) => {
   // Draggable
   const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
@@ -317,6 +318,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           {...attributes}
           onClick={handleCardClick}
           onDoubleClick={handleCardDoubleClick}
+          onContextMenu={(e) => onContextMenu?.(e, job)}
           className={`theme-card min-w-[160px] w-full min-h-[280px] h-full cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group relative flex flex-col overflow-visible touch-none ${showDropIndicator ? 'ring-2 ring-blue-400' : ''}`}
         >
           {/* Click hint tooltip */}
@@ -335,16 +337,8 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           )}
         {/* Image with payment status bar on top */}
         <div className="aspect-square relative overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
-          {/* Payment Status Dropdown - kliknij żeby zmienić */}
-          <div className="absolute top-0 left-0 right-0 z-10">
-            <PaymentStatusDropdown
-              currentStatus={job.paymentStatus || PaymentStatus.NONE}
-              onStatusChange={(status) => onPaymentStatusChange?.(job.id, status)}
-              disabled={!isAdmin}
-              size="small"
-              showLabel={true}
-            />
-          </div>
+          {/* Payment Status Bar - prawy przycisk myszy żeby zmienić */}
+          <PaymentStatusBar status={job.paymentStatus || PaymentStatus.NONE} />
           
           {job.projectImages?.[0] ? (
             <img src={job.projectImages[0]} className="w-full h-full object-cover pointer-events-none" alt="preview" loading="lazy" />
@@ -460,15 +454,6 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
             )}
           </div>
           
-          {/* Przycisk "Przenieś do" */}
-          <MoveToDropdown
-            jobId={job.id}
-            currentColumnId={job.columnId || 'PREPARE'}
-            onMoveToColumn={(jid, colId) => {
-              if (onMoveToColumn) onMoveToColumn(jid, colId);
-            }}
-            className="w-full py-1.5 text-[9px] font-bold text-slate-500 hover:bg-slate-100 transition-all flex items-center justify-center gap-1 border-t"
-          />
         </div>
       </div>
     </div>
@@ -571,7 +556,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
   job, isAdmin, onSelectJob, onDelete, onDuplicate, onArchive,
   onMoveUp, onMoveDown, canMoveUp, canMoveDown,
   onMoveLeft, onMoveRight, canMoveLeft, canMoveRight,
-  onPaymentStatusChange, onMoveToColumn
+  onPaymentStatusChange, onMoveToColumn, onContextMenu
 }) => {
   // Draggable
   const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
@@ -682,6 +667,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
           {...listeners}
           {...attributes}
           onDoubleClick={handleCardDoubleClick}
+          onContextMenu={(e) => onContextMenu?.(e, job)}
           className={`theme-card cursor-grab active:cursor-grabbing transition-all hover:shadow-md relative overflow-hidden touch-none ${showDropIndicator ? 'ring-2 ring-blue-400' : ''}`}
         >
         {/* Payment status bar on top */}
@@ -809,6 +795,24 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   const [overId, setOverId] = useState<string | null>(null);
   const [showTypeModal, setShowTypeModal] = useState(false);
   const healingDoneRef = useRef(false); // Zapobiega wielokrotnemu uruchamianiu healJobs
+  
+  // Context menu state - prawy przycisk myszy
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; job: Job } | null>(null);
+  
+  const handleContextMenu = (e: React.MouseEvent, job: Job) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, job });
+  };
+  
+  const closeContextMenu = () => setContextMenu(null);
+  
+  const handleArchive = async (jobId: string) => {
+    if (window.confirm('Archiwizować zlecenie?')) {
+      await jobsService.updateJob(jobId, { status: JobStatus.ARCHIVED });
+      loadJobs();
+    }
+  };
 
   // Auto-Heal: Sprawdź zlecenia z adresem ale bez współrzędnych (tylko RAZ po załadowaniu)
   useEffect(() => {
@@ -1635,6 +1639,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             onMoveRight={handleMoveRight}
                             canMoveLeft={canMoveLeft}
                             canMoveRight={canMoveRight}
+                            onContextMenu={handleContextMenu}
                           />
                         );
                       })
@@ -1687,6 +1692,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                                     canMoveRight={canMoveRight}
                                     onPaymentStatusChange={handlePaymentStatusChange}
                                     onMoveToColumn={handleMoveToColumn}
+                                    onContextMenu={handleContextMenu}
                                   />
                                );
                             })}
@@ -1780,6 +1786,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                           onMoveRight={handleMoveRight}
                           canMoveLeft={canMoveLeft}
                           canMoveRight={canMoveRight}
+                          onContextMenu={handleContextMenu}
                         />
                       );
                     })}
@@ -1863,6 +1870,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             onMoveRight={handleMoveRight}
                             canMoveLeft={canMoveLeft}
                             canMoveRight={canMoveRight}
+                            onContextMenu={handleContextMenu}
                           />
                         );
                       })
@@ -2016,6 +2024,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             canMoveRight={canMoveRight}
                             onPaymentStatusChange={handlePaymentStatusChange}
                             onMoveToColumn={handleMoveToColumn}
+                            onContextMenu={handleContextMenu}
                           />
                         );
                       })}
@@ -2160,6 +2169,25 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             </div>
           </div>
         </div>
+      )}
+      
+      {/* Context Menu - prawy przycisk myszy na kafelku */}
+      {contextMenu && (
+        <JobContextMenu
+          job={contextMenu.job}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={closeContextMenu}
+          onPaymentStatusChange={handlePaymentStatusChange}
+          onMoveToColumn={handleMoveToColumn}
+          onArchive={handleArchive}
+          onDelete={(id) => {
+            if (confirm('Czy na pewno chcesz usunąć to zlecenie?')) {
+              handleDelete(id, {} as React.MouseEvent);
+            }
+          }}
+          isAdmin={role === UserRole.ADMIN}
+        />
       )}
     </div>
   );
