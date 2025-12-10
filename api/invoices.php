@@ -34,8 +34,7 @@ set_exception_handler(function($exception) {
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/InfaktClient.php';
 
-// Klucz API inFakt
-define('INFAKT_API_KEY', '4a21f1a475ec06c7613fa47ae1553fe4974a800e');
+// INFAKT_API_KEY jest zdefiniowany w config.php
 
 /**
  * Inicjalizuj klienta inFakt
