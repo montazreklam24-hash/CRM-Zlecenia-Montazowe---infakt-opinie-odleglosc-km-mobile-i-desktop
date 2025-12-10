@@ -231,6 +231,7 @@ export interface Job {
   completionNotes?: string;
   reviewRequestSentAt?: number; // Data wysłania prośby o opinię
   reviewRequestEmail?: string;  // Email na który wysłano prośbę
+  hasClientReview?: boolean;    // Czy klient zostawił opinię
   // Nowe pola CRM v2
   clientId?: number;
   client?: Client;
