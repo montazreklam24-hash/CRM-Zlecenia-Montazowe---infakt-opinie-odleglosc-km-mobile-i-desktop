@@ -52,10 +52,11 @@ const App: React.FC = () => {
   // Mobile detection
   const { isMobile, isTablet, isTouchDevice } = useDeviceType();
   
-  // Allow forcing mobile view via URL param ?mobile=1
+  // Allow forcing mobile/desktop view via URL param ?mobile=1 or ?desktop=1
   const urlParams = new URLSearchParams(window.location.search);
   const forceMobile = urlParams.get('mobile') === '1';
-  const showMobileView = forceMobile || isMobile || (isTablet && isTouchDevice);
+  const forceDesktop = urlParams.get('desktop') === '1';
+  const showMobileView = forceDesktop ? false : (forceMobile || isMobile || (isTablet && isTouchDevice));
 
   // Navigation helpers
   const goToDashboard = () => {
