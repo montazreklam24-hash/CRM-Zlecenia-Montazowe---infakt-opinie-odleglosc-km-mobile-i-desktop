@@ -10,6 +10,7 @@ import {
 import MapBoardGoogle from './MapBoardGoogle';
 import MapBoardOSM from './MapBoardOSM';
 import PaymentStatusBadge, { PaymentStatusBar, PaymentStatusIcon } from './PaymentStatusBadge';
+import PaymentStatusDropdown from './PaymentStatusDropdown';
 
 import {
   DndContext,
@@ -106,7 +107,45 @@ interface DraggableJobCardProps {
   canMoveDown?: boolean;
   canMoveLeft?: boolean;
   canMoveRight?: boolean;
+  onPaymentStatusChange?: (jobId: string, status: PaymentStatus) => void;
+  onMoveToColumn?: (jobId: string, columnId: JobColumnId) => void;
 }
+
+// Kolumny do wyboru w dropdown "Przenieś do..."
+const COLUMN_OPTIONS: { id: JobColumnId; title: string; color: string }[] = [
+  { id: 'PREPARE', title: 'Do przygotowania', color: '#64748b' },
+  { id: 'MON', title: 'Poniedziałek', color: '#3b82f6' },
+  { id: 'TUE', title: 'Wtorek', color: '#22c55e' },
+  { id: 'WED', title: 'Środa', color: '#f97316' },
+  { id: 'THU', title: 'Czwartek', color: '#a855f7' },
+  { id: 'FRI', title: 'Piątek', color: '#ef4444' },
+  { id: 'COMPLETED', title: 'Wykonane', color: '#22c55e' },
+];
+
+// Formatowanie numeru telefonu
+const formatPhone = (phone: string | undefined): string => {
+  if (!phone) return '';
+  // Usuń wszystko oprócz cyfr i +
+  const cleaned = phone.replace(/[^\d+]/g, '');
+  
+  // Polskie numery komórkowe (9 cyfr)
+  if (cleaned.length === 9 && /^[4-9]/.test(cleaned)) {
+    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  }
+  
+  // Z prefiksem +48
+  if (cleaned.startsWith('+48') && cleaned.length === 12) {
+    const num = cleaned.slice(3);
+    return `+48 ${num.slice(0, 3)}-${num.slice(3, 6)}-${num.slice(6)}`;
+  }
+  
+  // Numery stacjonarne (z kierunkowym)
+  if (cleaned.length === 9 && /^[1-3]/.test(cleaned)) {
+    return `${cleaned.slice(0, 2)} ${cleaned.slice(2, 5)}-${cleaned.slice(5, 7)}-${cleaned.slice(7)}`;
+  }
+  
+  return phone; // Zwróć oryginalny jeśli nie pasuje do wzorca
+};
 
 // Helper function for payment status color
 const getPaymentStatusColor = (status: PaymentStatus): string => {
@@ -133,7 +172,7 @@ const getPaymentStatusLabel = (status: PaymentStatus): string => {
 
 const DraggableJobCard: React.FC<DraggableJobCardProps> = ({ 
   job, isAdmin, onSelectJob, onDelete, onDuplicate, onArchive,
-  onMoveLeft, onMoveRight, canMoveLeft, canMoveRight
+  onMoveLeft, onMoveRight, canMoveLeft, canMoveRight, onPaymentStatusChange, onMoveToColumn
 }) => {
   // Draggable
   const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
@@ -172,6 +211,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
 
   const [showClickHint, setShowClickHint] = useState(false);
   const [showArrows, setShowArrows] = useState(false);
+  const [showMoveMenu, setShowMoveMenu] = useState(false);
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (isDragging) return;
@@ -249,23 +289,16 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           )}
         {/* Image with payment status bar on top */}
         <div className="aspect-square relative overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
-          {/* Payment Status Bar - 8% height at top */}
-          {job.paymentStatus && job.paymentStatus !== PaymentStatus.NONE && (
-            <div 
-              className="absolute top-0 left-0 right-0 z-10 flex items-center justify-center"
-              style={{ 
-                height: '8%', 
-                minHeight: '12px',
-                background: paymentColor,
-                color: 'white',
-                fontSize: '8px',
-                fontWeight: 700,
-                letterSpacing: '0.5px'
-              }}
-            >
-              {paymentLabel}
-            </div>
-          )}
+          {/* Payment Status Bar - klikalny dropdown */}
+          <div className="absolute top-0 left-0 right-0 z-10">
+            <PaymentStatusDropdown
+              currentStatus={job.paymentStatus || PaymentStatus.NONE}
+              onStatusChange={(status) => onPaymentStatusChange?.(job.id, status)}
+              disabled={!isAdmin}
+              size="small"
+              showLabel={true}
+            />
+          </div>
           
           {job.projectImages?.[0] ? (
             <img src={job.projectImages[0]} className="w-full h-full object-cover pointer-events-none" alt="preview" loading="lazy" />
@@ -290,18 +323,37 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
             {job.data.jobTitle}
           </h4>
           
-          {/* Full Address */}
-          <div className="flex items-start gap-1 text-[10px] mb-2" style={{ color: 'var(--text-secondary)' }}>
-            <MapPin className="w-3 h-3 mt-0.5 flex-shrink-0" style={{ color: 'var(--accent-orange)' }} />
-            <span className="truncate">{job.data.address || 'Brak adresu'}</span>
+          {/* Przyciski Nawiguj i Zadzwoń */}
+          <div className="flex gap-1 mb-2">
+            {/* Nawiguj */}
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.data.address || '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[9px] rounded transition-all"
+              title={job.data.address || 'Brak adresu'}
+            >
+              <MapPin className="w-3 h-3" />
+              NAWIGUJ
+            </a>
+            
+            {/* Zadzwoń */}
+            {job.data.phoneNumber ? (
+              <a
+                href={`tel:${job.data.phoneNumber}`}
+                onClick={(e) => e.stopPropagation()}
+                className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 font-bold text-[9px] rounded transition-all"
+                title={job.data.phoneNumber}
+              >
+                📞 {formatPhone(job.data.phoneNumber)}
+              </a>
+            ) : (
+              <div className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-slate-50 text-slate-400 text-[9px] rounded">
+                📞 Brak tel.
+              </div>
+            )}
           </div>
-          
-          {/* Phone Number - bold black */}
-          {job.data.phoneNumber && (
-            <div className="text-[11px] font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-              📞 {job.data.phoneNumber}
-            </div>
-          )}
           
           <div className="flex justify-between items-center pt-2 mt-auto" style={{ borderTop: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2">
@@ -346,7 +398,47 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
               </div>
             )}
           </div>
+          
+          {/* Przycisk "Przenieś do" - na dole karty */}
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowMoveMenu(!showMoveMenu); }}
+            className="w-full py-1.5 text-[9px] font-bold text-slate-500 hover:bg-slate-100 transition-all flex items-center justify-center gap-1 border-t"
+            style={{ borderColor: 'var(--border-light)' }}
+          >
+            📅 PRZENIEŚ DO...
+          </button>
         </div>
+        
+        {/* Dropdown "Przenieś do kolumny" */}
+        {showMoveMenu && (
+          <div 
+            className="absolute bottom-full left-0 right-0 mb-1 z-50 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-[9px] font-bold text-slate-400 uppercase px-2 py-1 bg-slate-50 border-b border-slate-100">
+              Przenieś do
+            </div>
+            {COLUMN_OPTIONS
+              .filter(col => col.id !== (job.columnId || 'PREPARE'))
+              .map(col => (
+                <button
+                  key={col.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMoveToColumn?.(job.id, col.id);
+                    setShowMoveMenu(false);
+                  }}
+                  className="w-full text-left px-2 py-1.5 hover:bg-slate-50 text-[10px] font-medium text-slate-700 flex items-center gap-2"
+                >
+                  <span 
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ background: col.color }}
+                  />
+                  {col.title}
+                </button>
+              ))}
+          </div>
+        )}
       </div>
     </div>
     </>
@@ -824,6 +916,38 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     };
   };
 
+  // Zmiana statusu płatności bezpośrednio z kafelka
+  const handlePaymentStatusChange = async (jobId: string, newStatus: PaymentStatus) => {
+    // Optymistyczna aktualizacja UI
+    setJobs(prevJobs => prevJobs.map(j => 
+      j.id === jobId ? { ...j, paymentStatus: newStatus } : j
+    ));
+    
+    // Zapisz do backendu
+    try {
+      await jobsService.updateJob(jobId, { paymentStatus: newStatus });
+    } catch (err) {
+      console.error('Failed to update payment status:', err);
+      loadJobs(); // Reload on error
+    }
+  };
+
+  // Przeniesienie zlecenia do innej kolumny (z dropdownu)
+  const handleMoveToColumn = async (jobId: string, targetColumnId: JobColumnId) => {
+    // Optymistyczna aktualizacja UI
+    setJobs(prevJobs => prevJobs.map(j => 
+      j.id === jobId ? { ...j, columnId: targetColumnId } : j
+    ));
+    
+    // Zapisz do backendu
+    try {
+      await jobsService.updateJobColumn(jobId, targetColumnId, 0);
+    } catch (err) {
+      console.error('Failed to move job to column:', err);
+      loadJobs(); // Reload on error
+    }
+  };
+
   const handleBackup = async () => {
     const data = await jobsService.getJobs();
     const json = JSON.stringify(data, null, 2);
@@ -1235,6 +1359,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                           onSelectJob={onSelectJob}
                           onDelete={handleDelete}
                           onDuplicate={handleDuplicate}
+                          onPaymentStatusChange={handlePaymentStatusChange}
+                          onMoveToColumn={handleMoveToColumn}
                         />
                       ))
                     )}
@@ -1357,6 +1483,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                         onSelectJob={onSelectJob}
                         onDelete={handleDelete}
                         onDuplicate={handleDuplicate}
+                          onPaymentStatusChange={handlePaymentStatusChange}
+                          onMoveToColumn={handleMoveToColumn}
                       />
                     ))}
                   </DroppableRow>
@@ -1431,6 +1559,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                           onSelectJob={onSelectJob}
                           onDelete={handleDelete}
                           onDuplicate={handleDuplicate}
+                          onPaymentStatusChange={handlePaymentStatusChange}
+                          onMoveToColumn={handleMoveToColumn}
                         />
                       ))
                     )}

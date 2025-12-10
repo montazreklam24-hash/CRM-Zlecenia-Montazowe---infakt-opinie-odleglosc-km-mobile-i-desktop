@@ -212,6 +212,26 @@ export const invoiceService = {
       method: 'GET',
     });
   },
+
+  /**
+   * Sprawdź status płatności faktury w inFakt
+   */
+  async checkInvoiceStatus(invoiceId: number): Promise<{
+    success: boolean;
+    invoiceId: number;
+    infaktNumber?: string;
+    paymentStatus: 'paid' | 'unpaid' | 'partially_paid' | 'unknown';
+    isPaid: boolean;
+    paidDate?: string;
+    totalGross: number;
+    clientName: string;
+    invoiceType: 'proforma' | 'vat';
+    error?: string;
+  }> {
+    return apiRequest<any>(`/invoices/check-status/${invoiceId}`, {
+      method: 'GET',
+    });
+  },
 };
 
 export default invoiceService;

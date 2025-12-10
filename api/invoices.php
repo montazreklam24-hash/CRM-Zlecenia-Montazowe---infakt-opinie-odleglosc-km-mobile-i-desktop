@@ -414,6 +414,49 @@ function saveInvoiceToDb($jobId, $invoiceData, $type, $clientId) {
 }
 
 /**
+ * GET /api/invoices/check-status/{invoiceId}
+ * Sprawdź status płatności faktury w inFakt
+ */
+function handleCheckStatus($invoiceId) {
+    $user = requireAuth();
+    
+    if (empty($invoiceId)) {
+        jsonResponse(array('error' => 'Brak ID faktury'), 400);
+    }
+    
+    $infakt = getInfaktClient();
+    
+    try {
+        $invoice = $infakt->getInvoice($invoiceId);
+        
+        if (!$invoice) {
+            jsonResponse(array('error' => 'Nie znaleziono faktury w inFakt'), 404);
+        }
+        
+        // inFakt zwraca payment_status: 'paid', 'unpaid', 'partially_paid'
+        $paymentStatus = isset($invoice['payment_status']) ? $invoice['payment_status'] : 'unknown';
+        $isPaid = ($paymentStatus === 'paid');
+        $paidDate = isset($invoice['paid_date']) ? $invoice['paid_date'] : null;
+        
+        // Zwróć status
+        jsonResponse(array(
+            'success' => true,
+            'invoiceId' => $invoiceId,
+            'infaktNumber' => isset($invoice['number']) ? $invoice['number'] : null,
+            'paymentStatus' => $paymentStatus,
+            'isPaid' => $isPaid,
+            'paidDate' => $paidDate,
+            'totalGross' => isset($invoice['gross_price']) ? floatval($invoice['gross_price']) : 0,
+            'clientName' => isset($invoice['client_name']) ? $invoice['client_name'] : '',
+            'invoiceType' => isset($invoice['kind']) ? $invoice['kind'] : 'vat' // 'proforma' lub 'vat'
+        ));
+        
+    } catch (Exception $e) {
+        jsonResponse(array('error' => 'Błąd sprawdzania statusu: ' . $e->getMessage()), 500);
+    }
+}
+
+/**
  * GET /api/invoices/job/{jobId}
  * Pobierz faktury dla zlecenia
  */
@@ -479,6 +522,8 @@ function handleInvoices($method, $id = null) {
             handleGetPdf($id);
         } elseif ($action === 'job' && $id) {
             handleGetJobInvoices($id);
+        } elseif ($action === 'check-status' && $id) {
+            handleCheckStatus($id);
         } elseif ($id && is_numeric($id)) {
             handleGetInvoice($id);
         } else {
@@ -526,6 +571,9 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'invoices.php') {
         } elseif (strpos($uri, 'job/') === 0 || strpos($uri, 'invoices/job/') === 0) {
             $jobId = end($parts);
             handleGetJobInvoices($jobId);
+        } elseif (strpos($uri, 'check-status/') === 0 || strpos($uri, 'invoices/check-status/') === 0) {
+            $id = end($parts);
+            handleCheckStatus($id);
         } elseif (!empty($parts[0]) && is_numeric(end($parts))) {
             $id = end($parts);
             handleGetInvoice($id);
