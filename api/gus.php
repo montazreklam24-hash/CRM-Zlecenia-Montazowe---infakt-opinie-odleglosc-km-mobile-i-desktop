@@ -376,8 +376,20 @@ function fetchFromMF($nip) {
     // Pobierz nazwę firmy
     $name = isset($subject['name']) ? $subject['name'] : '';
     
+    // Parsuj adres - MF zwraca w różnych polach:
+    // - workingAddress = adres prowadzenia działalności
+    // - residenceAddress = adres siedziby/zamieszkania
+    $addressSource = '';
+    if (!empty($subject['workingAddress'])) {
+        $addressSource = $subject['workingAddress'];
+    } elseif (!empty($subject['residenceAddress'])) {
+        $addressSource = $subject['residenceAddress'];
+    }
+    
+    error_log("[MF] Address source: '$addressSource'");
+    
     // Parsuj adres (format: "ul. Nazwa 1, 00-000 Miasto")
-    $addressParts = parseAddress(isset($subject['workingAddress']) ? $subject['workingAddress'] : '');
+    $addressParts = parseAddress($addressSource);
     
     error_log("[MF] Pobrano: nazwa='$name'");
     
