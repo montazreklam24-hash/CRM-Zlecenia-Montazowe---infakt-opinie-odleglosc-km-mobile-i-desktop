@@ -17,7 +17,9 @@ if (!defined('UPLOADS_URL')) {
  * Zapisuje base64 jako plik i zwraca ścieżkę
  */
 function saveImageToFile($base64Data, $jobId, $type, $order) {
-    if (strpos($base64Data, 'data:image') !== 0 && strpos($base64Data, '/api/uploads') !== false) {
+    // Jeśli to nie jest base64 tylko już istniejący URL - zwróć bez zmian
+    if (strpos($base64Data, 'data:image') !== 0 && 
+        (strpos($base64Data, '/uploads') !== false || strpos($base64Data, '/api/uploads') !== false)) {
         return $base64Data;
     }
     
