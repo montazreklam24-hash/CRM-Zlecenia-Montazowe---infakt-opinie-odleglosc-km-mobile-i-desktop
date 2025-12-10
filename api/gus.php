@@ -9,6 +9,8 @@
 
 require_once __DIR__ . '/config.php';
 
+handleCORS();
+
 /**
  * Pobierz dane firmy z zewnętrznego API
  * Używamy rejestr.io (darmowy, bez klucza do 100 zapytań/dzień)

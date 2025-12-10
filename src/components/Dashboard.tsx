@@ -1107,7 +1107,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
           
           {isAdmin && (
             <button 
-              onClick={() => setShowTypeModal(true)} 
+              onClick={onCreateNew}
               className="px-3 sm:px-5 py-2.5 font-bold flex items-center gap-2 transition-all active:scale-95 flex-shrink-0"
               style={{ 
                 background: 'var(--accent-orange)', 
