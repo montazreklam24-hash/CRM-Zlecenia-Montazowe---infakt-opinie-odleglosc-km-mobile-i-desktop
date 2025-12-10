@@ -519,7 +519,8 @@ const DroppableRow: React.FC<DroppableColumnProps> = ({ id, children, activeId }
         className="grid gap-8 min-h-[180px] items-stretch overflow-visible px-4"
         style={{ 
           gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-          gridAutoRows: 'minmax(280px, auto)' // Equal minimum height rows
+          gridAutoRows: '320px', // Stała wysokość - wszystkie kafelki wyrównane
+          alignItems: 'stretch'
         }}
       >
         {children}
