@@ -101,10 +101,16 @@ function fetchFromRejestrIoKRS($nip) {
     
     $company = $data[0];
     
+    // Pobierz nazwę spółki
+    $name = isset($company['nazwa']) ? $company['nazwa'] : '';
+    
+    // Debug log
+    error_log("[GUS KRS] NIP: $nip, Found name: '$name'");
+    
     return array(
         'success' => true,
         'company' => array(
-            'name' => isset($company['nazwa']) ? $company['nazwa'] : '',
+            'name' => $name,
             'nip' => $nip,
             'regon' => isset($company['regon']) ? $company['regon'] : '',
             'krs' => isset($company['krs']) ? $company['krs'] : '',
@@ -148,13 +154,29 @@ function fetchFromRejestrIoCEIDG($nip) {
     
     $company = $data[0];
     
-    // CEIDG ma inną strukturę niż KRS
+    // CEIDG - nazwa firmy (różne możliwe pola)
     $name = '';
-    if (isset($company['firma'])) {
-        $name = $company['firma'];
-    } elseif (isset($company['imie']) && isset($company['nazwisko'])) {
-        $name = $company['imie'] . ' ' . $company['nazwisko'];
+    
+    // Spróbuj różne pola dla nazwy firmy
+    $nameFields = array('firma', 'nazwaFirmy', 'nazwaPelna', 'nazwa', 'name');
+    foreach ($nameFields as $field) {
+        if (isset($company[$field]) && !empty($company[$field])) {
+            $name = $company[$field];
+            break;
+        }
     }
+    
+    // Fallback: imię + nazwisko (dla JDG bez nazwy handlowej)
+    if (empty($name)) {
+        $firstName = isset($company['imie']) ? $company['imie'] : '';
+        $lastName = isset($company['nazwisko']) ? $company['nazwisko'] : '';
+        if (!empty($firstName) || !empty($lastName)) {
+            $name = trim($firstName . ' ' . $lastName);
+        }
+    }
+    
+    // Debug log
+    error_log("[GUS CEIDG] NIP: $nip, Found name: '$name', Raw response keys: " . implode(', ', array_keys($company)));
     
     // Adres w CEIDG
     $street = '';
@@ -220,13 +242,19 @@ function fetchFromMF($nip) {
     
     $subject = $data['result']['subject'];
     
+    // Pobierz nazwę firmy
+    $name = isset($subject['name']) ? $subject['name'] : '';
+    
+    // Debug log
+    error_log("[GUS MF] NIP: $nip, Found name: '$name'");
+    
     // Parsuj adres (format: "ul. Nazwa 1, 00-000 Miasto")
     $addressParts = parseAddress(isset($subject['workingAddress']) ? $subject['workingAddress'] : '');
     
     return array(
         'success' => true,
         'company' => array(
-            'name' => isset($subject['name']) ? $subject['name'] : '',
+            'name' => $name,
             'nip' => $nip,
             'regon' => isset($subject['regon']) ? $subject['regon'] : '',
             'krs' => isset($subject['krs']) ? $subject['krs'] : '',

@@ -149,19 +149,29 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
       
       if (result.success && result.company) {
         // WAŻNE: Aktualizuj WSZYSTKIE dane rozliczeniowe z GUS razem!
-        // Nie mieszamy danych - jeśli GUS zwraca firmę, to bierzemy CAŁOŚĆ z GUS
+        const company = result.company!;
+        const source = (result as any).source || 'GUS'; // KRS, CEIDG lub MF
+        
+        // Sprawdź czy nazwa nie jest pusta
+        if (!company.name || company.name.trim() === '') {
+          setLookupError(`Znaleziono firmę w ${source}, ale brak nazwy. Sprawdź dane ręcznie.`);
+          return;
+        }
+        
         const gusData = {
-          companyName: result.company!.name || '',
-          street: result.company!.street || '',
-          city: result.company!.city || '',
-          postCode: result.company!.postCode || '',
-          nip: result.company!.nip || nip,
+          companyName: company.name.trim(),
+          street: company.street?.trim() || '',
+          city: company.city?.trim() || '',
+          postCode: company.postCode?.trim() || '',
+          nip: company.nip || nip,
         };
+        
+        console.log(`[GUS] Pobrano dane z ${source}:`, gusData);
         
         // Aktualizuj stan - wszystkie dane firmowe z GUS, zachowaj tylko email i telefon
         setClientData(prev => ({
           ...gusData,
-          email: prev.email,  // Email i telefon mogą być różne dla różnych osób w firmie
+          email: prev.email,
           phone: prev.phone,
         }));
         
@@ -173,6 +183,9 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
             phone: clientData.phone,
           });
         }
+        
+        // Pokaż info o źródle danych
+        console.log(`✅ Dane pobrane z: ${source}`);
       } else {
         setLookupError(result.error || 'Nie znaleziono firmy o podanym NIP');
       }
