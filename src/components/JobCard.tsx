@@ -53,6 +53,8 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [showReanalysis, setShowReanalysis] = useState(false);
+  const [reanalysisText, setReanalysisText] = useState('');
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [addressOptions, setAddressOptions] = useState<Array<{
     formattedAddress: string;
@@ -688,6 +690,89 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
               )}
             </div>
           </div>
+
+          {/* Re-analysis AI Section - tylko w trybie edycji */}
+          {isEditing && (
+            <div className="bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl p-5 shadow-sm border border-violet-200">
+              <button
+                onClick={() => setShowReanalysis(!showReanalysis)}
+                className="w-full flex justify-between items-center text-left"
+              >
+                <p className="text-xs font-bold text-violet-600 uppercase tracking-wide flex items-center gap-2">
+                  <RotateCw className="w-4 h-4" /> RE-ANALIZA AI - WKLEJ NOWY MAIL / WĄTEK
+                </p>
+                <ChevronDown className={`w-5 h-5 text-violet-500 transition-transform ${showReanalysis ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {showReanalysis && (
+                <div className="mt-4 space-y-3">
+                  <p className="text-xs text-violet-600">
+                    Wklej poniżej nową treść maila lub zaktualizowany wątek, a AI ponownie przeanalizuje i wypełni wszystkie pola.
+                  </p>
+                  <textarea
+                    value={reanalysisText}
+                    onChange={(e) => setReanalysisText(e.target.value)}
+                    className="w-full min-h-[150px] bg-white border border-violet-300 rounded-lg p-3 text-sm text-slate-800 placeholder:text-slate-400"
+                    placeholder="Wklej tutaj treść maila, wątku konwersacji lub nowe informacje o zleceniu..."
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={async () => {
+                        if (!reanalysisText.trim()) {
+                          alert('Wklej treść do analizy');
+                          return;
+                        }
+                        if (!window.confirm('AI przeanalizuje wklejony tekst i NADPISZE obecne dane zlecenia (tytuł, adres, zakres prac itd.). Kontynuować?')) return;
+                        
+                        setIsProcessing(true);
+                        try {
+                          const result = await geminiService.parseEmail(reanalysisText, projectImages);
+                          if (result) {
+                            // Aktualizuj wszystkie pola z wyniku AI
+                            setEditedData(prev => ({
+                              ...prev,
+                              ...result,
+                              // Zachowaj pewne pola które nie powinny być nadpisane
+                              coordinates: prev.coordinates || result.coordinates,
+                            }));
+                            setReanalysisText('');
+                            setShowReanalysis(false);
+                            alert('✅ AI zaktualizowało dane zlecenia! Sprawdź i popraw jeśli trzeba.');
+                          }
+                        } catch (e) {
+                          console.error('Re-analysis error:', e);
+                          alert('❌ Błąd analizy AI. Spróbuj ponownie.');
+                        } finally {
+                          setIsProcessing(false);
+                        }
+                      }}
+                      disabled={isProcessing || !reanalysisText.trim()}
+                      className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 text-white px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all"
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" /> Analizuję...
+                        </>
+                      ) : (
+                        <>
+                          <RotateCw className="w-4 h-4" /> ANALIZUJ I NADPISZ DANE
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setReanalysisText('');
+                        setShowReanalysis(false);
+                      }}
+                      className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-sm font-bold transition-all"
+                    >
+                      Anuluj
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Address */}
           <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
