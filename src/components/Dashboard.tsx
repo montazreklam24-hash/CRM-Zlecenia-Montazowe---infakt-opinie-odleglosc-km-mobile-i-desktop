@@ -549,7 +549,9 @@ const DroppableColumn: React.FC<DroppableColumnProps> = ({ id, children, activeI
 // Small Kanban Card (for narrow vertical columns)
 const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({ 
   job, isAdmin, onSelectJob, onDelete, onDuplicate, onArchive,
-  onMoveUp, onMoveDown, canMoveUp, canMoveDown 
+  onMoveUp, onMoveDown, canMoveUp, canMoveDown,
+  onMoveLeft, onMoveRight, canMoveLeft, canMoveRight,
+  onPaymentStatusChange, onMoveToColumn
 }) => {
   // Draggable
   const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
@@ -629,6 +631,28 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
             title="Przesuń w dół"
           >
             <ChevronDown className="w-5 h-5" />
+          </button>
+        )}
+
+        {/* LEFT arrow - appears on hover at left */}
+        {showArrows && canMoveLeft && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onMoveLeft?.(job.id); }}
+            className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
+            title="Przesuń do poprzedniej kolumny"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        )}
+        
+        {/* RIGHT arrow - appears on hover at right */}
+        {showArrows && canMoveRight && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onMoveRight?.(job.id); }}
+            className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
+            title="Przesuń do następnej kolumny"
+          >
+            <ChevronRight className="w-5 h-5" />
           </button>
         )}
         
@@ -1617,6 +1641,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                          <div className="flex flex-col gap-4 w-full p-2">
                             {rowJobs.map(job => {
                                const { canMoveUp, canMoveDown } = getJobMoveInfo(job.id);
+                               const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
                                return (
                                   <SmallKanbanCard
                                     key={job.id}
@@ -1625,10 +1650,23 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                                     onSelectJob={onSelectJob}
                                     onDelete={handleDelete}
                                     onDuplicate={handleDuplicate}
+                                    onArchive={async (id, e) => {
+                                      e?.stopPropagation();
+                                      if (window.confirm('Archiwizować zlecenie?')) {
+                                        await jobsService.updateJob(id, { status: JobStatus.ARCHIVED });
+                                        loadJobs();
+                                      }
+                                    }}
                                     onMoveUp={handleMoveUp}
                                     onMoveDown={handleMoveDown}
                                     canMoveUp={canMoveUp}
                                     canMoveDown={canMoveDown}
+                                    onMoveLeft={handleMoveLeft}
+                                    onMoveRight={handleMoveRight}
+                                    canMoveLeft={canMoveLeft}
+                                    canMoveRight={canMoveRight}
+                                    onPaymentStatusChange={handlePaymentStatusChange}
+                                    onMoveToColumn={handleMoveToColumn}
                                   />
                                );
                             })}
@@ -1932,6 +1970,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                     <div className="flex flex-col gap-4 w-full p-2">
                       {rowJobs.map(job => {
                         const { canMoveUp, canMoveDown } = getJobMoveInfo(job.id);
+                        const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
                         return (
                           <SmallKanbanCard
                             key={job.id}
@@ -1940,10 +1979,23 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             onSelectJob={onSelectJob}
                             onDelete={handleDelete}
                             onDuplicate={handleDuplicate}
+                            onArchive={async (id, e) => {
+                              e?.stopPropagation();
+                              if (window.confirm('Archiwizować zlecenie?')) {
+                                await jobsService.updateJob(id, { status: JobStatus.ARCHIVED });
+                                loadJobs();
+                              }
+                            }}
                             onMoveUp={handleMoveUp}
                             onMoveDown={handleMoveDown}
                             canMoveUp={canMoveUp}
                             canMoveDown={canMoveDown}
+                            onMoveLeft={handleMoveLeft}
+                            onMoveRight={handleMoveRight}
+                            canMoveLeft={canMoveLeft}
+                            canMoveRight={canMoveRight}
+                            onPaymentStatusChange={handlePaymentStatusChange}
+                            onMoveToColumn={handleMoveToColumn}
                           />
                         );
                       })}
