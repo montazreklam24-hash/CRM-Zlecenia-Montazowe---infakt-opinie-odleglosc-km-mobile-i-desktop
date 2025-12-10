@@ -7,7 +7,7 @@ import { SimpleJobCard } from './components/SimpleJobCard';
 import ThemeSwitcher from './components/ThemeSwitcher';
 import { geminiService, authService, settingsService, jobsService } from './services/apiService';
 import { User, UserRole, Job, JobOrderData, JobStatus } from './types';
-import { AlertCircle, LogOut, Loader2 } from 'lucide-react';
+import { AlertCircle, LogOut, Loader2, Monitor, Smartphone } from 'lucide-react';
 import { useDeviceType } from './hooks/useDeviceType';
 
 // Lazy load MobileApp for better desktop performance
@@ -285,6 +285,38 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* PC/Mobile Switcher */}
+            <div className="flex gap-1 p-1 rounded-lg" style={{ background: 'var(--bg-surface)' }}>
+              <button
+                onClick={() => {
+                  window.location.href = window.location.pathname + '?desktop=1';
+                }}
+                className="p-2 rounded-md transition-all flex items-center gap-1"
+                style={{ 
+                  background: !showMobileView ? 'var(--accent-primary)' : 'transparent',
+                  color: !showMobileView ? 'white' : 'var(--text-muted)'
+                }}
+                title="Wersja PC"
+              >
+                <Monitor className="w-4 h-4" />
+                <span className="text-xs font-bold hidden sm:inline">PC</span>
+              </button>
+              <button
+                onClick={() => {
+                  window.location.href = window.location.pathname + '?mobile=1';
+                }}
+                className="p-2 rounded-md transition-all flex items-center gap-1"
+                style={{ 
+                  background: showMobileView ? 'var(--accent-primary)' : 'transparent',
+                  color: showMobileView ? 'white' : 'var(--text-muted)'
+                }}
+                title="Wersja Mobile"
+              >
+                <Smartphone className="w-4 h-4" />
+                <span className="text-xs font-bold hidden sm:inline">Mobile</span>
+              </button>
+            </div>
+            
             {/* Theme Switcher */}
             <ThemeSwitcher />
             

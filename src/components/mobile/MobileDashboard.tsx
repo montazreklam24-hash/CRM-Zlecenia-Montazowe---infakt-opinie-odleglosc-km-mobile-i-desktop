@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Job, JobColumnId, JobStatus, PaymentStatus } from '../../types';
 import { 
   Plus, ChevronUp, ChevronDown, Navigation, Phone,
-  MoreVertical, Trash2, Copy, Archive, Package, Map, Layers, Search
+  MoreVertical, Trash2, Copy, Archive, Package, Map, Layers, Search, Monitor
 } from 'lucide-react';
 import JobPlaceholder from '../JobPlaceholder';
 
@@ -307,6 +307,17 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({
             title="Mapa (styl OSM)"
           >
             <Layers className="w-4 h-4" />
+          </button>
+          
+          {/* Switch to PC version */}
+          <button
+            onClick={() => {
+              window.location.href = window.location.pathname + '?desktop=1';
+            }}
+            className="flex items-center gap-1 px-2 py-1.5 bg-slate-600 rounded-lg font-bold text-xs active:scale-95 transition-transform shadow"
+            title="Przełącz na wersję PC"
+          >
+            <Monitor className="w-4 h-4" />
           </button>
         </div>
 
