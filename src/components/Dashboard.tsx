@@ -424,13 +424,14 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           </button>
         </div>
         
-        {/* Dropdown "Przenieś do kolumny" */}
+        {/* Dropdown "Przenieś do kolumny" - w DÓŁ, z przewijaniem */}
         {showMoveMenu && (
           <div 
-            className="absolute bottom-full left-0 right-0 mb-1 z-50 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden"
+            className="absolute top-full left-0 right-0 mt-1 z-[100] bg-white rounded-lg shadow-2xl border border-slate-200"
+            style={{ maxHeight: '250px', overflowY: 'auto' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="text-[9px] font-bold text-slate-400 uppercase px-2 py-1 bg-slate-50 border-b border-slate-100">
+            <div className="text-[9px] font-bold text-slate-400 uppercase px-2 py-1.5 bg-slate-50 border-b border-slate-100 sticky top-0">
               Przenieś do
             </div>
             {COLUMN_OPTIONS
@@ -443,10 +444,10 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
                     onMoveToColumn?.(job.id, col.id);
                     setShowMoveMenu(false);
                   }}
-                  className="w-full text-left px-2 py-1.5 hover:bg-slate-50 text-[10px] font-medium text-slate-700 flex items-center gap-2"
+                  className="w-full text-left px-2 py-2 hover:bg-blue-50 text-[11px] font-medium text-slate-700 flex items-center gap-2 border-b border-slate-50 last:border-b-0"
                 >
                   <span 
-                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    className="w-3 h-3 rounded-full flex-shrink-0"
                     style={{ background: col.color }}
                   />
                   {col.title}
