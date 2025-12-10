@@ -1789,12 +1789,12 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             })}
           </div>
 
-          <DragOverlay>
+          <DragOverlay zIndex={99999} dropAnimation={{ duration: 200, easing: 'ease-out' }}>
             {activeId ? (() => {
               const activeJob = jobs.find(j => j.id === activeId);
               if (!activeJob) return null;
               return (
-                <div className="theme-card shadow-2xl rotate-2 opacity-95 p-2" style={{ width: '120px' }}>
+                <div className="theme-card shadow-2xl rotate-2 p-2 pointer-events-none" style={{ width: '140px', opacity: 0.95 }}>
                   <div className="aspect-square rounded overflow-hidden mb-2" style={{ background: 'var(--bg-surface)' }}>
                     {activeJob.projectImages?.[0] ? (
                       <img src={activeJob.projectImages[0]} className="w-full h-full object-cover" alt="" loading="lazy" />
@@ -1874,12 +1874,12 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
           </div>
 
           {/* Drag Overlay - follows cursor */}
-          <DragOverlay>
+          <DragOverlay zIndex={99999} dropAnimation={{ duration: 200, easing: 'ease-out' }}>
             {activeId ? (() => {
               const activeJob = jobs.find(j => j.id === activeId);
               if (!activeJob) return null;
               return (
-                <div className="theme-card w-40 shadow-2xl rotate-2 opacity-95">
+                <div className="theme-card w-40 shadow-2xl rotate-2 pointer-events-none" style={{ opacity: 0.95 }}>
                   <div className="aspect-square relative overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
                     {activeJob.projectImages?.[0] ? (
                       <img src={activeJob.projectImages[0]} className="w-full h-full object-cover" alt="" loading="lazy" />
@@ -2027,12 +2027,12 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
           </div>
 
           {/* Drag Overlay - follows cursor */}
-          <DragOverlay>
+          <DragOverlay zIndex={99999} dropAnimation={{ duration: 200, easing: 'ease-out' }}>
             {activeId ? (() => {
               const activeJob = jobs.find(j => j.id === activeId);
               if (!activeJob) return null;
               return (
-                <div className="theme-card shadow-2xl rotate-2 opacity-95 p-2" style={{ width: '120px' }}>
+                <div className="theme-card shadow-2xl rotate-2 p-2 pointer-events-none" style={{ width: '140px', opacity: 0.95 }}>
                   <div className="aspect-square rounded overflow-hidden mb-2" style={{ background: 'var(--bg-surface)' }}>
                     {activeJob.projectImages?.[0] ? (
                       <img src={activeJob.projectImages[0]} className="w-full h-full object-cover" alt="" loading="lazy" />
