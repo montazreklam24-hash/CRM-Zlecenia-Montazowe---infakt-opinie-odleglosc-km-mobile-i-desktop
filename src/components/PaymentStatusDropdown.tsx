@@ -55,11 +55,11 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
     setIsOpen(false);
   };
   
-  // Size classes
+  // Size classes - zwiększone rozmiary
   const sizeClasses = {
-    small: 'text-[8px] h-[12px] min-h-[12px]',
-    medium: 'text-[10px] h-[16px] min-h-[16px]',
-    large: 'text-xs h-[20px] min-h-[20px]'
+    small: 'text-[9px] h-[18px] min-h-[18px]',
+    medium: 'text-[10px] h-[22px] min-h-[22px]',
+    large: 'text-xs h-[26px] min-h-[26px]'
   };
   
   // Jeśli status to NONE i nie chcemy pokazywać - pokaż pusty

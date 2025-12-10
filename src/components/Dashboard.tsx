@@ -123,28 +123,46 @@ const COLUMN_OPTIONS: { id: JobColumnId; title: string; color: string }[] = [
 ];
 
 // Formatowanie numeru telefonu
-const formatPhone = (phone: string | undefined): string => {
+const formatPhoneNumber = (phone: string | undefined): string => {
   if (!phone) return '';
-  // Usuń wszystko oprócz cyfr i +
-  const cleaned = phone.replace(/[^\d+]/g, '');
+  // Remove all spaces and dashes
+  const cleaned = phone.replace(/[\s-]/g, '');
   
-  // Polskie numery komórkowe (9 cyfr)
-  if (cleaned.length === 9 && /^[4-9]/.test(cleaned)) {
-    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  // Check for +48 or just 9 digits
+  const match = cleaned.match(/^(\+48)?(\d{9})$/);
+  
+  if (match) {
+    const prefix = match[1] ? '+48 ' : '';
+    const num = match[2];
+    return `${prefix}${num.slice(0, 3)} ${num.slice(3, 6)} ${num.slice(6, 9)}`;
   }
   
-  // Z prefiksem +48
-  if (cleaned.startsWith('+48') && cleaned.length === 12) {
-    const num = cleaned.slice(3);
-    return `+48 ${num.slice(0, 3)}-${num.slice(3, 6)}-${num.slice(6)}`;
+  return phone;
+};
+
+// Formatowanie adresu (skrócone)
+const formatAddressShort = (address: string | undefined): string => {
+  if (!address) return 'BRAK ADRESU';
+  
+  // Try to split by comma to get Street and City
+  const parts = address.split(',');
+  
+  if (parts.length >= 2) {
+    const street = parts[0].trim();
+    let city = parts[1].trim();
+    
+    // Remove zip code XX-XXX from city
+    city = city.replace(/\d{2}-\d{3}\s*/, '').trim();
+    
+    // If city is empty (was just zip), try next part
+    if (!city && parts[2]) {
+      city = parts[2].trim();
+    }
+    
+    return city ? `${street}, ${city}` : street;
   }
   
-  // Numery stacjonarne (z kierunkowym)
-  if (cleaned.length === 9 && /^[1-3]/.test(cleaned)) {
-    return `${cleaned.slice(0, 2)} ${cleaned.slice(2, 5)}-${cleaned.slice(5, 7)}-${cleaned.slice(7)}`;
-  }
-  
-  return phone; // Zwróć oryginalny jeśli nie pasuje do wzorca
+  return address;
 };
 
 // Helper function for payment status color
@@ -323,35 +341,32 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
             {job.data.jobTitle}
           </h4>
           
-          {/* Przyciski Nawiguj i Zadzwoń */}
-          <div className="flex gap-1 mb-2">
-            {/* Nawiguj */}
-            <a
+          {/* Przyciski Nawiguj i Zadzwoń - układ pionowy */}
+          <div className="flex flex-col gap-1.5 mb-2 mt-auto">
+            {/* Nawiguj - pełna szerokość z adresem */}
+            <a 
               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.data.address || '')}`}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[9px] rounded transition-all"
-              title={job.data.address || 'Brak adresu'}
+              className="flex items-center justify-center gap-2 p-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-xs font-bold w-full border border-blue-200"
+              style={{ minHeight: '36px' }}
             >
-              <MapPin className="w-3 h-3" />
-              NAWIGUJ
+              <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="truncate">{formatAddressShort(job.data.address)}</span>
             </a>
-            
-            {/* Zadzwoń */}
-            {job.data.phoneNumber ? (
-              <a
+
+            {/* Zadzwoń - pełna szerokość z numerem */}
+            {job.data.phoneNumber && (
+              <a 
                 href={`tel:${job.data.phoneNumber}`}
                 onClick={(e) => e.stopPropagation()}
-                className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 font-bold text-[9px] rounded transition-all"
-                title={job.data.phoneNumber}
+                className="flex items-center justify-start gap-2 pl-3 pr-2 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-xs font-bold w-full border border-green-200"
+                style={{ minHeight: '36px' }}
               >
-                📞 {formatPhone(job.data.phoneNumber)}
+                <span className="text-[9px] flex-shrink-0">📞</span>
+                <span className="truncate">{formatPhoneNumber(job.data.phoneNumber)}</span>
               </a>
-            ) : (
-              <div className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-slate-50 text-slate-400 text-[9px] rounded">
-                📞 Brak tel.
-              </div>
             )}
           </div>
           
