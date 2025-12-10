@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { PortalDropdown } from './PortalDropdown';
 import { Job, JobStatus, UserRole, JobColumnId, PaymentStatus } from '../types';
 import { jobsService } from '../services/apiService';
 import { 
@@ -11,6 +13,7 @@ import MapBoardGoogle from './MapBoardGoogle';
 import MapBoardOSM from './MapBoardOSM';
 import PaymentStatusBadge, { PaymentStatusBar, PaymentStatusIcon } from './PaymentStatusBadge';
 import PaymentStatusDropdown from './PaymentStatusDropdown';
+import MoveToDropdown from './MoveToDropdown';
 
 import {
   DndContext,
@@ -111,16 +114,36 @@ interface DraggableJobCardProps {
   onMoveToColumn?: (jobId: string, columnId: JobColumnId) => void;
 }
 
-// Kolumny do wyboru w dropdown "Przenieś do..."
-const COLUMN_OPTIONS: { id: JobColumnId; title: string; color: string }[] = [
-  { id: 'PREPARE', title: 'Do przygotowania', color: '#64748b' },
-  { id: 'MON', title: 'Poniedziałek', color: '#3b82f6' },
-  { id: 'TUE', title: 'Wtorek', color: '#22c55e' },
-  { id: 'WED', title: 'Środa', color: '#f97316' },
-  { id: 'THU', title: 'Czwartek', color: '#a855f7' },
-  { id: 'FRI', title: 'Piątek', color: '#ef4444' },
-  { id: 'COMPLETED', title: 'Wykonane', color: '#22c55e' },
-];
+const BASE_COORDS = { lat: 52.2297, lng: 21.0122 }; // ul. Poprawna 39R, Warszawa
+
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371; // Radius of the earth in km
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const d = R * c; // Distance in km
+  return d;
+};
+
+const deg2rad = (deg: number) => {
+  return deg * (Math.PI / 180);
+};
+
+const parseAddressForNav = (address: string | undefined) => {
+  if (!address) return { street: 'Brak adresu', city: '' };
+  const parts = address.split(',').map(p => p.trim());
+  if (parts.length >= 2) {
+    const street = parts[0];
+    let city = parts[1].replace(/\d{2}-\d{3}\s*/g, '').trim(); // Remove postal code
+    if (!city && parts[2]) city = parts[2].replace(/\d{2}-\d{3}\s*/g, '').trim();
+    return { street, city };
+  }
+  return { street: address, city: '' };
+};
 
 // Formatowanie numeru telefonu
 const formatPhoneNumber = (phone: string | undefined): string => {
@@ -139,6 +162,7 @@ const formatPhoneNumber = (phone: string | undefined): string => {
   
   return phone;
 };
+
 
 // Formatowanie adresu (skrócone)
 const formatAddressShort = (address: string | undefined): string => {
@@ -229,7 +253,12 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
 
   const [showClickHint, setShowClickHint] = useState(false);
   const [showArrows, setShowArrows] = useState(false);
-  const [showMoveMenu, setShowMoveMenu] = useState(false);
+
+  // Address & Distance for Navigation Button
+  const distance = job.data.coordinates 
+    ? calculateDistance(BASE_COORDS.lat, BASE_COORDS.lng, job.data.coordinates.lat, job.data.coordinates.lng)
+    : null;
+  const addressParts = parseAddressForNav(job.data.address);
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (isDragging) return;
@@ -343,17 +372,23 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           
           {/* Przyciski Nawiguj i Zadzwoń - układ pionowy */}
           <div className="flex flex-col gap-1.5 mb-2 mt-auto">
-            {/* Nawiguj - pełna szerokość z adresem */}
+            {/* Nawiguj - Nowy Wygląd */}
             <a 
               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.data.address || '')}`}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="flex items-center justify-center gap-2 p-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-xs font-bold w-full border border-blue-200"
-              style={{ minHeight: '36px' }}
+              className="flex items-center justify-start gap-2 pl-2 pr-1 py-1 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-xs border border-blue-200 w-full"
+              style={{ minHeight: '40px' }}
             >
-              <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-              <span className="truncate">{formatAddressShort(job.data.address)}</span>
+              <MapPin className="w-4 h-4 flex-shrink-0 text-blue-600" />
+              <div className="flex flex-col min-w-0 leading-tight text-left">
+                <span className="font-bold truncate text-[11px]">{addressParts.street}</span>
+                <span className="text-[9px] text-blue-600/80 truncate font-medium">
+                  {addressParts.city}
+                  {distance !== null && ` • ${distance.toFixed(1)} km`}
+                </span>
+              </div>
             </a>
 
             {/* Zadzwoń - pełna szerokość z numerem */}
@@ -414,47 +449,16 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
             )}
           </div>
           
-          {/* Przycisk "Przenieś do" - na dole karty */}
-          <button
-            onClick={(e) => { e.stopPropagation(); setShowMoveMenu(!showMoveMenu); }}
+          {/* Przycisk "Przenieś do" - PORTAL */}
+          <MoveToDropdown
+            jobId={job.id}
+            currentColumnId={job.columnId || 'PREPARE'}
+            onMoveToColumn={(jid, colId) => {
+              if (onMoveToColumn) onMoveToColumn(jid, colId);
+            }}
             className="w-full py-1.5 text-[9px] font-bold text-slate-500 hover:bg-slate-100 transition-all flex items-center justify-center gap-1 border-t"
-            style={{ borderColor: 'var(--border-light)' }}
-          >
-            📅 PRZENIEŚ DO...
-          </button>
+          />
         </div>
-        
-        {/* Dropdown "Przenieś do kolumny" - W GÓRĘ (żeby nie uciekał pod dół ekranu) */}
-        {showMoveMenu && (
-          <div 
-            className="absolute bottom-full left-0 right-0 mb-1 z-[9999] bg-white rounded-lg shadow-2xl border border-slate-200"
-            style={{ maxHeight: '250px', overflowY: 'auto' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="text-[9px] font-bold text-slate-400 uppercase px-2 py-1.5 bg-slate-50 border-b border-slate-100 sticky top-0">
-              Przenieś do
-            </div>
-            {COLUMN_OPTIONS
-              .filter(col => col.id !== (job.columnId || 'PREPARE'))
-              .map(col => (
-                <button
-                  key={col.id}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMoveToColumn?.(job.id, col.id);
-                    setShowMoveMenu(false);
-                  }}
-                  className="w-full text-left px-2 py-2 hover:bg-blue-50 text-[11px] font-medium text-slate-700 flex items-center gap-2 border-b border-slate-50 last:border-b-0"
-                >
-                  <span 
-                    className="w-3 h-3 rounded-full flex-shrink-0"
-                    style={{ background: col.color }}
-                  />
-                  {col.title}
-                </button>
-              ))}
-          </div>
-        )}
       </div>
     </div>
     </>
@@ -543,6 +547,12 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
 
   const [showClickHint, setShowClickHint] = useState(false);
   const [showArrows, setShowArrows] = useState(false);
+
+  // Address & Distance for Navigation Button
+  const distance = job.data.coordinates 
+    ? calculateDistance(BASE_COORDS.lat, BASE_COORDS.lng, job.data.coordinates.lat, job.data.coordinates.lng)
+    : null;
+  const addressParts = parseAddressForNav(job.data.address);
 
   const showDropIndicator = isDropOver && !isDragging;
 
@@ -753,6 +763,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
 
       console.log(`🩹 Auto-Heal: Znaleziono ${jobsToHeal.length} zleceń do naprawy geolokalizacji.`);
 
+      let fixedCount = 0;
+
       for (const job of jobsToHeal) {
         try {
           const response = await fetch('/api/geocode', {
@@ -774,6 +786,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
               }
             });
             
+            fixedCount++;
             console.log(`✅ Auto-Heal: Naprawiono ${job.friendlyId} (${bestMatch.formattedAddress})`);
           }
         } catch (e) {
@@ -782,9 +795,9 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
         await new Promise(r => setTimeout(r, 500));
       }
       
-      // Odśwież listę po naprawie
-      if (jobsToHeal.length > 0) {
-        loadJobs();
+      // Odśwież listę po naprawie TYLKO jeśli coś naprawiono
+      if (fixedCount > 0) {
+        loadJobs(true);
       }
     };
 
@@ -814,15 +827,15 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     loadJobs();
   }, []);
 
-  const loadJobs = async () => {
-    setLoading(true);
+  const loadJobs = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = await jobsService.getJobs();
       setJobs(data);
     } catch (error) {
       console.error('Failed to load jobs:', error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -1278,7 +1291,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
           
           {/* Refresh */}
           <button 
-            onClick={loadJobs}
+            onClick={() => loadJobs()}
             className="theme-card p-2.5 transition-all"
             style={{ borderRadius: 'var(--radius-lg)', color: 'var(--text-secondary)' }}
             title="Odśwież"

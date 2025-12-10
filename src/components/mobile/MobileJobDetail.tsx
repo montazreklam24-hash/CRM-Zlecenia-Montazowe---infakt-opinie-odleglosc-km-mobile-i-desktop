@@ -263,8 +263,8 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
 
   return (
     <div 
-      className="min-h-screen bg-white pb-32"
-      style={{ touchAction: 'pan-y' }}
+      className="h-full overflow-y-auto bg-white pb-32"
+      style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
     >
       {/* Header */}
       <div className="sticky top-0 z-30 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">

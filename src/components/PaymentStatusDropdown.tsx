@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { PaymentStatus } from '../types';
 import { ChevronDown } from 'lucide-react';
 
@@ -32,22 +33,79 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
   showLabel = true
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   
   const currentConfig = getPaymentStatusConfig(currentStatus);
   
-  // Zamknij dropdown gdy kliknięto poza
+  // Update coords on scroll/resize to keep dropdown attached
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+    if (!isOpen || !buttonRef.current) return;
+
+    const updateCoords = () => {
+      if (buttonRef.current) {
+        const rect = buttonRef.current.getBoundingClientRect();
+        setCoords({
+          top: rect.bottom,
+          left: rect.left,
+          width: rect.width
+        });
       }
     };
-    
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+
+    updateCoords(); // Initial update
+
+    window.addEventListener('scroll', updateCoords, true);
+    window.addEventListener('resize', updateCoords);
+
+    return () => {
+      window.removeEventListener('scroll', updateCoords, true);
+      window.removeEventListener('resize', updateCoords);
+    };
+  }, [isOpen]);
+
+  // Close handling
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      // Ignore clicks on the button itself (toggle handles them)
+      if (buttonRef.current && buttonRef.current.contains(e.target as Node)) {
+        return;
+      }
+      // Close on any other click (including inside portal - items handle their own actions)
+      // Actually, we want to allow clicks inside portal to propagate to item handlers
+      // But since portal is in body, e.target will be in portal.
+      // We can check if click is inside the portal content.
+      const portalElement = document.getElementById(`payment-dropdown-portal-${currentStatus}`);
+      if (portalElement && portalElement.contains(e.target as Node)) {
+        return;
+      }
+      setIsOpen(false);
+    };
+
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => window.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen, currentStatus]);
   
+  const toggleDropdown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (disabled) return;
+    
+    if (isOpen) {
+      setIsOpen(false);
+    } else if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom,
+        left: rect.left,
+        width: rect.width
+      });
+      setIsOpen(true);
+    }
+  };
+
   const handleSelect = (newStatus: PaymentStatus) => {
     if (onStatusChange) {
       onStatusChange(newStatus);
@@ -55,27 +113,22 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
     setIsOpen(false);
   };
   
-  // Size classes - zwiększone rozmiary
+  // Size classes
   const sizeClasses = {
     small: 'text-[9px] h-[18px] min-h-[18px]',
     medium: 'text-[10px] h-[22px] min-h-[22px]',
     large: 'text-xs h-[26px] min-h-[26px]'
   };
   
-  // Jeśli status to NONE i nie chcemy pokazywać - pokaż pusty
   if (currentStatus === PaymentStatus.NONE && !showLabel) {
     return null;
   }
   
   return (
-    <div className="relative w-full" ref={dropdownRef}>
-      {/* Przycisk główny - pasek statusu */}
+    <>
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          if (!disabled) setIsOpen(!isOpen);
-        }}
+        ref={buttonRef}
+        onClick={toggleDropdown}
         disabled={disabled}
         className={`w-full ${sizeClasses[size]} font-bold flex items-center justify-center gap-0.5 transition-all ${disabled ? 'cursor-default' : 'cursor-pointer hover:opacity-90'}`}
         style={{ 
@@ -88,11 +141,17 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
         {showLabel && currentConfig.label}
         {!disabled && <ChevronDown className="w-2.5 h-2.5" style={{ marginLeft: '2px' }} />}
       </button>
-      
-      {/* Dropdown menu - FIXED Z-INDEX and Overflow */}
-      {isOpen && (
+
+      {isOpen && coords && createPortal(
         <div 
-          className="absolute top-full left-0 right-0 mt-0.5 bg-white rounded-b-lg shadow-2xl border border-slate-200 z-[9999] overflow-hidden"
+          id={`payment-dropdown-portal-${currentStatus}`}
+          className="fixed z-[99999] bg-white rounded-b-lg shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100"
+          style={{ 
+            top: coords.top + 1, // +1px gap
+            left: coords.left, 
+            width: coords.width,
+            minWidth: '100px' // Ensure it's not too narrow
+          }}
           onClick={(e) => e.stopPropagation()}
         >
           {PAYMENT_OPTIONS.map((option) => (
@@ -103,8 +162,8 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
                 e.preventDefault();
                 handleSelect(option.value);
               }}
-              className={`w-full px-2 py-1.5 text-[9px] font-bold hover:opacity-80 transition-all flex items-center justify-center gap-1 ${
-                option.value === currentStatus ? 'ring-1 ring-inset ring-blue-500' : ''
+              className={`w-full px-2 py-2 text-[9px] font-bold hover:opacity-80 transition-all flex items-center justify-center gap-1 border-b border-slate-50 last:border-0 ${
+                option.value === currentStatus ? 'ring-1 ring-inset ring-blue-500 z-10' : ''
               }`}
               style={{ 
                 background: option.bgColor, 
@@ -115,9 +174,10 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
               {option.value === currentStatus && <span>✓</span>}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 };
 
