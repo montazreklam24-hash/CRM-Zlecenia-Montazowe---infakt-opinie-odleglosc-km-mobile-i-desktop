@@ -32,7 +32,9 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
   showLabel = true
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 130 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const currentConfig = getPaymentStatusConfig(currentStatus);
   
   // Size classes
@@ -42,12 +44,38 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
     large: 'text-xs h-[26px] min-h-[26px]'
   };
 
+  const handleOpen = () => {
+    if (!containerRef.current) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const dropdownHeight = PAYMENT_OPTIONS.length * 36 + 8; // przybliżona wysokość
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    
+    let top: number;
+    if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
+      // Pokaż poniżej
+      top = rect.bottom + 4;
+    } else {
+      // Pokaż powyżej
+      top = rect.top - dropdownHeight - 4;
+    }
+    
+    setDropdownPos({
+      top,
+      left: rect.left,
+      width: Math.max(rect.width, 130)
+    });
+    setIsOpen(true);
+  };
+
   // Close on outside click
   useEffect(() => {
     if (!isOpen) return;
     
     const handleClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node) &&
+          dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -56,16 +84,22 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
       if (e.key === 'Escape') setIsOpen(false);
     };
     
+    const handleScroll = () => {
+      setIsOpen(false);
+    };
+    
     // Małe opóźnienie żeby uniknąć zamknięcia od tego samego kliknięcia
     const timer = setTimeout(() => {
       document.addEventListener('mousedown', handleClick);
       document.addEventListener('keydown', handleEscape);
+      window.addEventListener('scroll', handleScroll, true);
     }, 10);
     
     return () => {
       clearTimeout(timer);
       document.removeEventListener('mousedown', handleClick);
       document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('scroll', handleScroll, true);
     };
   }, [isOpen]);
   
@@ -84,7 +118,13 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
-          if (!disabled) setIsOpen(!isOpen);
+          if (!disabled) {
+            if (isOpen) {
+              setIsOpen(false);
+            } else {
+              handleOpen();
+            }
+          }
         }}
         disabled={disabled}
         className={`w-full ${sizeClasses[size]} font-bold flex items-center justify-center gap-0.5 transition-all ${disabled ? 'cursor-default' : 'cursor-pointer hover:opacity-90'}`}
@@ -101,16 +141,20 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
 
       {isOpen && (
         <div 
-          className="absolute left-0 right-0 z-[99999] mt-1"
-          style={{ top: '100%' }}
+          ref={dropdownRef}
+          className="fixed z-[99999]"
+          style={{ 
+            top: dropdownPos.top,
+            left: dropdownPos.left,
+            width: dropdownPos.width
+          }}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div 
             className="bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden"
             style={{ 
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
-              minWidth: '120px'
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)'
             }}
           >
             {PAYMENT_OPTIONS.map((option) => (

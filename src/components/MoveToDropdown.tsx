@@ -27,14 +27,42 @@ const MoveToDropdown: React.FC<MoveToDropdownProps> = ({
   className = ''
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 160 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleOpen = () => {
+    if (!containerRef.current) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const dropdownHeight = COLUMN_OPTIONS.length * 36 + 8;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    
+    let top: number;
+    if (spaceAbove >= dropdownHeight || spaceAbove >= spaceBelow) {
+      // Pokaż powyżej (bo przycisk jest na dole karty)
+      top = rect.top - dropdownHeight - 4;
+    } else {
+      // Pokaż poniżej
+      top = rect.bottom + 4;
+    }
+    
+    setDropdownPos({
+      top,
+      left: rect.left,
+      width: Math.max(rect.width, 160)
+    });
+    setIsOpen(true);
+  };
 
   // Close on outside click
   useEffect(() => {
     if (!isOpen) return;
     
     const handleClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node) &&
+          dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -43,15 +71,21 @@ const MoveToDropdown: React.FC<MoveToDropdownProps> = ({
       if (e.key === 'Escape') setIsOpen(false);
     };
     
+    const handleScroll = () => {
+      setIsOpen(false);
+    };
+    
     const timer = setTimeout(() => {
       document.addEventListener('mousedown', handleClick);
       document.addEventListener('keydown', handleEscape);
+      window.addEventListener('scroll', handleScroll, true);
     }, 10);
     
     return () => {
       clearTimeout(timer);
       document.removeEventListener('mousedown', handleClick);
       document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('scroll', handleScroll, true);
     };
   }, [isOpen]);
 
@@ -68,7 +102,11 @@ const MoveToDropdown: React.FC<MoveToDropdownProps> = ({
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
-          setIsOpen(!isOpen);
+          if (isOpen) {
+            setIsOpen(false);
+          } else {
+            handleOpen();
+          }
         }}
         className={className || "w-full py-1.5 text-[9px] font-bold text-slate-500 hover:bg-slate-100 transition-all flex items-center justify-center gap-1 border-t"}
         style={{ borderColor: 'var(--border-light)' }}
@@ -79,16 +117,20 @@ const MoveToDropdown: React.FC<MoveToDropdownProps> = ({
 
       {isOpen && (
         <div 
-          className="absolute left-0 right-0 z-[99999]"
-          style={{ bottom: '100%', marginBottom: '4px' }}
+          ref={dropdownRef}
+          className="fixed z-[99999]"
+          style={{ 
+            top: dropdownPos.top,
+            left: dropdownPos.left,
+            width: dropdownPos.width
+          }}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div 
             className="bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden py-1"
             style={{ 
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
-              minWidth: '160px'
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)'
             }}
           >
             {COLUMN_OPTIONS.map((col) => {
