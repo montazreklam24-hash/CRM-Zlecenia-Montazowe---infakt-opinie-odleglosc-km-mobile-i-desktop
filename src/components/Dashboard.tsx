@@ -1142,8 +1142,20 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             </button>
           )}
 
-          {/* View toggle - 2 widoki (mapa zawsze pod spodem) */}
+          {/* View toggle - 3 widoki */}
           <div className="theme-surface flex p-1 flex-shrink-0" style={{ borderRadius: 'var(--radius-lg)' }}>
+            <button 
+              onClick={() => setViewMode('MIXED')} 
+              className="p-2 transition-all"
+              style={{ 
+                borderRadius: 'var(--radius-md)',
+                background: viewMode === 'MIXED' ? 'var(--bg-card)' : 'transparent',
+                color: viewMode === 'MIXED' ? 'var(--accent-primary)' : 'var(--text-muted)'
+              }}
+              title="Widok mieszany (PRZYGOT. + PN-PT + MAPA + WYKONANE)"
+            >
+              <LayoutDashboard className="w-5 h-5" />
+            </button>
             <button 
               onClick={() => setViewMode('KANBAN')} 
               className="p-2 transition-all"
@@ -1152,7 +1164,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                 background: viewMode === 'KANBAN' ? 'var(--bg-card)' : 'transparent',
                 color: viewMode === 'KANBAN' ? 'var(--accent-primary)' : 'var(--text-muted)'
               }}
-              title="Kolumny pionowe"
+              title="Kolumny pionowe (7 kolumn)"
             >
               <Kanban className="w-5 h-5" />
             </button>
@@ -1164,37 +1176,9 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                 background: viewMode === 'BOARD' ? 'var(--bg-card)' : 'transparent',
                 color: viewMode === 'BOARD' ? 'var(--accent-primary)' : 'var(--text-muted)'
               }}
-              title="Wiersze poziome"
+              title="Wiersze poziome (7 wierszy)"
             >
               <StretchHorizontal className="w-5 h-5" />
-            </button>
-          </div>
-          
-          {/* Open map in new window */}
-          <div className="theme-surface flex p-1 flex-shrink-0" style={{ borderRadius: 'var(--radius-lg)' }}>
-            <button 
-              onClick={() => setMapProvider('GOOGLE')} 
-              className="p-2 transition-all flex items-center gap-1 text-xs font-bold"
-              style={{ 
-                borderRadius: 'var(--radius-md)',
-                background: mapProvider === 'GOOGLE' ? 'var(--bg-card)' : 'transparent',
-                color: mapProvider === 'GOOGLE' ? 'var(--accent-primary)' : 'var(--text-muted)'
-              }}
-              title="Google Maps"
-            >
-              <MapIcon className="w-4 h-4" /> GM
-            </button>
-            <button 
-              onClick={() => setMapProvider('OSM')} 
-              className="p-2 transition-all flex items-center gap-1 text-xs font-bold"
-              style={{ 
-                borderRadius: 'var(--radius-md)',
-                background: mapProvider === 'OSM' ? 'var(--bg-card)' : 'transparent',
-                color: mapProvider === 'OSM' ? 'var(--accent-primary)' : 'var(--text-muted)'
-              }}
-              title="OpenStreetMap"
-            >
-              <Layers className="w-4 h-4" /> OSM
             </button>
           </div>
         </div>
@@ -1283,24 +1267,58 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                })}
             </div>
 
-            {/* 3. MAP (Embedded in Mixed View) */}
-             <div className="mt-4">
-              {mapProvider === 'GOOGLE' ? (
-                <MapBoardGoogle 
-                  jobs={filteredJobs} 
-                  onSelectJob={onSelectJob} 
-                  onJobsUpdated={loadJobs}
-                  onChangeColumn={async (jobId, newColumnId) => {
-                    setJobs(prev => prev.map(j => j.id === jobId ? { ...j, columnId: newColumnId } : j));
-                    await jobsService.updateJobColumn(jobId, newColumnId);
-                  }}
-                />
-              ) : (
-                <MapBoardOSM 
-                  jobs={filteredJobs} 
-                  onSelectJob={onSelectJob} 
-                />
-              )}
+            {/* 3. MAP with toggle buttons */}
+            <div className="mt-4 theme-surface overflow-hidden" style={{ borderRadius: 'var(--radius-lg)' }}>
+              {/* Map toggle buttons */}
+              <div className="bg-gradient-to-r from-slate-600 to-slate-700 px-4 py-2 flex justify-between items-center">
+                <h3 className="text-white font-bold text-sm flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  MAPA ZLECEŃ
+                </h3>
+                <div className="flex gap-1 bg-white/20 p-1" style={{ borderRadius: 'var(--radius-md)' }}>
+                  <button 
+                    onClick={() => setMapProvider('GOOGLE')} 
+                    className="px-3 py-1 text-xs font-bold transition-all flex items-center gap-1"
+                    style={{ 
+                      borderRadius: 'var(--radius-sm)',
+                      background: mapProvider === 'GOOGLE' ? 'white' : 'transparent',
+                      color: mapProvider === 'GOOGLE' ? 'var(--accent-primary)' : 'white'
+                    }}
+                  >
+                    <MapIcon className="w-3 h-3" /> Google
+                  </button>
+                  <button 
+                    onClick={() => setMapProvider('OSM')} 
+                    className="px-3 py-1 text-xs font-bold transition-all flex items-center gap-1"
+                    style={{ 
+                      borderRadius: 'var(--radius-sm)',
+                      background: mapProvider === 'OSM' ? 'white' : 'transparent',
+                      color: mapProvider === 'OSM' ? 'var(--accent-primary)' : 'white'
+                    }}
+                  >
+                    <Layers className="w-3 h-3" /> OSM
+                  </button>
+                </div>
+              </div>
+              {/* Map content */}
+              <div className="p-2">
+                {mapProvider === 'GOOGLE' ? (
+                  <MapBoardGoogle 
+                    jobs={filteredJobs} 
+                    onSelectJob={onSelectJob} 
+                    onJobsUpdated={loadJobs}
+                    onChangeColumn={async (jobId, newColumnId) => {
+                      setJobs(prev => prev.map(j => j.id === jobId ? { ...j, columnId: newColumnId } : j));
+                      await jobsService.updateJobColumn(jobId, newColumnId);
+                    }}
+                  />
+                ) : (
+                  <MapBoardOSM 
+                    jobs={filteredJobs} 
+                    onSelectJob={onSelectJob} 
+                  />
+                )}
+              </div>
             </div>
 
             {/* 4. BOTTOM: COMPLETED ROW (Horizontal) */}
@@ -1359,6 +1377,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
 
       {/* KANBAN BOARD VIEW with DnD Kit */}
       {viewMode === 'BOARD' && (
+        <>
         <DndContext
           sensors={sensors}
           collisionDetection={cardFirstCollision}
@@ -1432,10 +1451,64 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             })() : null}
           </DragOverlay>
         </DndContext>
+
+        {/* MAP for BOARD view */}
+        <div className="mt-4 theme-surface overflow-hidden" style={{ borderRadius: 'var(--radius-lg)' }}>
+          <div className="bg-gradient-to-r from-slate-600 to-slate-700 px-4 py-2 flex justify-between items-center">
+            <h3 className="text-white font-bold text-sm flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              MAPA ZLECEŃ
+            </h3>
+            <div className="flex gap-1 bg-white/20 p-1" style={{ borderRadius: 'var(--radius-md)' }}>
+              <button 
+                onClick={() => setMapProvider('GOOGLE')} 
+                className="px-3 py-1 text-xs font-bold transition-all flex items-center gap-1"
+                style={{ 
+                  borderRadius: 'var(--radius-sm)',
+                  background: mapProvider === 'GOOGLE' ? 'white' : 'transparent',
+                  color: mapProvider === 'GOOGLE' ? 'var(--accent-primary)' : 'white'
+                }}
+              >
+                <MapIcon className="w-3 h-3" /> Google
+              </button>
+              <button 
+                onClick={() => setMapProvider('OSM')} 
+                className="px-3 py-1 text-xs font-bold transition-all flex items-center gap-1"
+                style={{ 
+                  borderRadius: 'var(--radius-sm)',
+                  background: mapProvider === 'OSM' ? 'white' : 'transparent',
+                  color: mapProvider === 'OSM' ? 'var(--accent-primary)' : 'white'
+                }}
+              >
+                <Layers className="w-3 h-3" /> OSM
+              </button>
+            </div>
+          </div>
+          <div className="p-2">
+            {mapProvider === 'GOOGLE' ? (
+              <MapBoardGoogle 
+                jobs={filteredJobs} 
+                onSelectJob={onSelectJob} 
+                onJobsUpdated={loadJobs}
+                onChangeColumn={async (jobId, newColumnId) => {
+                  setJobs(prev => prev.map(j => j.id === jobId ? { ...j, columnId: newColumnId } : j));
+                  await jobsService.updateJobColumn(jobId, newColumnId);
+                }}
+              />
+            ) : (
+              <MapBoardOSM 
+                jobs={filteredJobs} 
+                onSelectJob={onSelectJob} 
+              />
+            )}
+          </div>
+        </div>
+        </>
       )}
 
       {/* VERTICAL KANBAN VIEW (Trello style) - 7 columns */}
       {viewMode === 'KANBAN' && (
+        <>
         <DndContext
           sensors={sensors}
           collisionDetection={cardFirstCollision}
@@ -1515,28 +1588,61 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             })() : null}
           </DragOverlay>
         </DndContext>
+
+        {/* MAP for KANBAN view */}
+        <div className="mt-4 theme-surface overflow-hidden" style={{ borderRadius: 'var(--radius-lg)' }}>
+          <div className="bg-gradient-to-r from-slate-600 to-slate-700 px-4 py-2 flex justify-between items-center">
+            <h3 className="text-white font-bold text-sm flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              MAPA ZLECEŃ
+            </h3>
+            <div className="flex gap-1 bg-white/20 p-1" style={{ borderRadius: 'var(--radius-md)' }}>
+              <button 
+                onClick={() => setMapProvider('GOOGLE')} 
+                className="px-3 py-1 text-xs font-bold transition-all flex items-center gap-1"
+                style={{ 
+                  borderRadius: 'var(--radius-sm)',
+                  background: mapProvider === 'GOOGLE' ? 'white' : 'transparent',
+                  color: mapProvider === 'GOOGLE' ? 'var(--accent-primary)' : 'white'
+                }}
+              >
+                <MapIcon className="w-3 h-3" /> Google
+              </button>
+              <button 
+                onClick={() => setMapProvider('OSM')} 
+                className="px-3 py-1 text-xs font-bold transition-all flex items-center gap-1"
+                style={{ 
+                  borderRadius: 'var(--radius-sm)',
+                  background: mapProvider === 'OSM' ? 'white' : 'transparent',
+                  color: mapProvider === 'OSM' ? 'var(--accent-primary)' : 'white'
+                }}
+              >
+                <Layers className="w-3 h-3" /> OSM
+              </button>
+            </div>
+          </div>
+          <div className="p-2">
+            {mapProvider === 'GOOGLE' ? (
+              <MapBoardGoogle 
+                jobs={filteredJobs} 
+                onSelectJob={onSelectJob} 
+                onJobsUpdated={loadJobs}
+                onChangeColumn={async (jobId, newColumnId) => {
+                  setJobs(prev => prev.map(j => j.id === jobId ? { ...j, columnId: newColumnId } : j));
+                  await jobsService.updateJobColumn(jobId, newColumnId);
+                }}
+              />
+            ) : (
+              <MapBoardOSM 
+                jobs={filteredJobs} 
+                onSelectJob={onSelectJob} 
+              />
+            )}
+          </div>
+        </div>
+        </>
       )}
 
-      {/* MAPA pod kafelkami - zawsze widoczna */}
-      <div className="mt-4">
-        {mapProvider === 'GOOGLE' ? (
-          <MapBoardGoogle 
-            jobs={filteredJobs} 
-            onSelectJob={onSelectJob} 
-            onJobsUpdated={loadJobs}
-            onChangeColumn={async (jobId, newColumnId) => {
-              setJobs(prev => prev.map(j => j.id === jobId ? { ...j, columnId: newColumnId } : j));
-              await jobsService.updateJobColumn(jobId, newColumnId);
-            }}
-          />
-        ) : (
-          <MapBoardOSM 
-            jobs={filteredJobs} 
-            onSelectJob={onSelectJob} 
-          />
-        )}
-      </div>
-      
       {/* Modal wyboru typu zlecenia */}
       {showTypeModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
