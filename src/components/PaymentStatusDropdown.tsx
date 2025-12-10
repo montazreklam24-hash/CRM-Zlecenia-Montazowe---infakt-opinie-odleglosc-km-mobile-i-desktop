@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { PaymentStatus } from '../types';
 import { ChevronDown, Check } from 'lucide-react';
 
@@ -33,9 +32,7 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
   showLabel = true
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const currentConfig = getPaymentStatusConfig(currentStatus);
   
   // Size classes
@@ -45,56 +42,25 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
     large: 'text-xs h-[26px] min-h-[26px]'
   };
 
-  // Oblicz pozycję przy otwieraniu - PRZED renderem portalu
-  const openDropdown = () => {
-    if (!buttonRef.current) return;
-    
-    const rect = buttonRef.current.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
-    const dropdownHeight = PAYMENT_OPTIONS.length * 40 + 16;
-    
-    let top = rect.bottom + 2;
-    // Jeśli wyjdzie poza viewport, pokaż nad przyciskiem
-    if (top + dropdownHeight > viewportHeight - 20) {
-      top = rect.top - dropdownHeight - 2;
-    }
-    
-    setPosition({
-      top,
-      left: rect.left,
-      width: Math.max(rect.width, 120)
-    });
-    setIsOpen(true);
-  };
-
-  const closeDropdown = () => {
-    setIsOpen(false);
-    setPosition(null);
-  };
-
-  // Close on outside click - sprawdza zarówno button jak i dropdown
+  // Close on outside click
   useEffect(() => {
     if (!isOpen) return;
     
     const handleClick = (e: MouseEvent) => {
-      const target = e.target as Node;
-      const isInsideButton = buttonRef.current?.contains(target);
-      const isInsideDropdown = dropdownRef.current?.contains(target);
-      
-      if (!isInsideButton && !isInsideDropdown) {
-        closeDropdown();
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
       }
     };
     
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeDropdown();
+      if (e.key === 'Escape') setIsOpen(false);
     };
     
-    // Użyj setTimeout żeby uniknąć natychmiastowego zamknięcia
+    // Małe opóźnienie żeby uniknąć zamknięcia od tego samego kliknięcia
     const timer = setTimeout(() => {
       document.addEventListener('mousedown', handleClick);
       document.addEventListener('keydown', handleEscape);
-    }, 0);
+    }, 10);
     
     return () => {
       clearTimeout(timer);
@@ -109,20 +75,16 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
   
   const handleSelect = (status: PaymentStatus) => {
     onStatusChange?.(status);
-    closeDropdown();
+    setIsOpen(false);
   };
 
   return (
-    <>
+    <div ref={containerRef} className="relative">
       <button
-        ref={buttonRef}
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
-          if (!disabled) {
-            if (isOpen) closeDropdown();
-            else openDropdown();
-          }
+          if (!disabled) setIsOpen(!isOpen);
         }}
         disabled={disabled}
         className={`w-full ${sizeClasses[size]} font-bold flex items-center justify-center gap-0.5 transition-all ${disabled ? 'cursor-default' : 'cursor-pointer hover:opacity-90'}`}
@@ -137,15 +99,10 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
         {!disabled && <ChevronDown className="w-2.5 h-2.5" style={{ marginLeft: '2px' }} />}
       </button>
 
-      {isOpen && position && createPortal(
-        <div
-          ref={dropdownRef}
-          className="fixed z-[99999]"
-          style={{
-            top: position.top,
-            left: position.left,
-            width: position.width,
-          }}
+      {isOpen && (
+        <div 
+          className="absolute left-0 right-0 z-[99999] mt-1"
+          style={{ top: '100%' }}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
         >
@@ -153,7 +110,7 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
             className="bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden"
             style={{ 
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
-              animation: 'fadeIn 0.15s ease-out'
+              minWidth: '120px'
             }}
           >
             {PAYMENT_OPTIONS.map((option) => (
@@ -182,18 +139,9 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
               </button>
             ))}
           </div>
-        </div>,
-        document.body
+        </div>
       )}
-
-      {/* Styles */}
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-    </>
+    </div>
   );
 };
 

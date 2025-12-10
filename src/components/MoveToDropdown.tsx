@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { JobColumnId } from '../types';
 import { Check, Calendar } from 'lucide-react';
 
@@ -28,60 +27,26 @@ const MoveToDropdown: React.FC<MoveToDropdownProps> = ({
   className = ''
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Oblicz pozycję przy otwieraniu - PRZED renderem portalu
-  const openDropdown = () => {
-    if (!buttonRef.current) return;
-    
-    const rect = buttonRef.current.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
-    const dropdownHeight = COLUMN_OPTIONS.length * 40 + 16;
-    
-    let top = rect.bottom + 4;
-    // Jeśli wyjdzie poza viewport, pokaż nad przyciskiem
-    if (top + dropdownHeight > viewportHeight - 20) {
-      top = rect.top - dropdownHeight - 4;
-    }
-    
-    setPosition({
-      top,
-      left: rect.left,
-      width: Math.max(rect.width, 160)
-    });
-    setIsOpen(true);
-  };
-
-  const closeDropdown = () => {
-    setIsOpen(false);
-    setPosition(null);
-  };
-
-  // Close on outside click - sprawdza zarówno button jak i dropdown
+  // Close on outside click
   useEffect(() => {
     if (!isOpen) return;
     
     const handleClick = (e: MouseEvent) => {
-      const target = e.target as Node;
-      const isInsideButton = buttonRef.current?.contains(target);
-      const isInsideDropdown = dropdownRef.current?.contains(target);
-      
-      if (!isInsideButton && !isInsideDropdown) {
-        closeDropdown();
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
       }
     };
     
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeDropdown();
+      if (e.key === 'Escape') setIsOpen(false);
     };
     
-    // Use setTimeout to avoid immediate close from the button click
     const timer = setTimeout(() => {
       document.addEventListener('mousedown', handleClick);
       document.addEventListener('keydown', handleEscape);
-    }, 0);
+    }, 10);
     
     return () => {
       clearTimeout(timer);
@@ -94,18 +59,16 @@ const MoveToDropdown: React.FC<MoveToDropdownProps> = ({
     if (columnId !== currentColumnId) {
       onMoveToColumn?.(jobId, columnId);
     }
-    closeDropdown();
+    setIsOpen(false);
   };
 
   return (
-    <>
+    <div ref={containerRef} className="relative">
       <button
-        ref={buttonRef}
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
-          if (isOpen) closeDropdown();
-          else openDropdown();
+          setIsOpen(!isOpen);
         }}
         className={className || "w-full py-1.5 text-[9px] font-bold text-slate-500 hover:bg-slate-100 transition-all flex items-center justify-center gap-1 border-t"}
         style={{ borderColor: 'var(--border-light)' }}
@@ -114,15 +77,10 @@ const MoveToDropdown: React.FC<MoveToDropdownProps> = ({
         PRZENIEŚ DO...
       </button>
 
-      {isOpen && position && createPortal(
-        <div
-          ref={dropdownRef}
-          className="fixed z-[99999]"
-          style={{
-            top: position.top,
-            left: position.left,
-            width: position.width,
-          }}
+      {isOpen && (
+        <div 
+          className="absolute left-0 right-0 z-[99999]"
+          style={{ bottom: '100%', marginBottom: '4px' }}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
         >
@@ -130,7 +88,7 @@ const MoveToDropdown: React.FC<MoveToDropdownProps> = ({
             className="bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden py-1"
             style={{ 
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
-              animation: 'fadeInMove 0.15s ease-out'
+              minWidth: '160px'
             }}
           >
             {COLUMN_OPTIONS.map((col) => {
@@ -163,18 +121,9 @@ const MoveToDropdown: React.FC<MoveToDropdownProps> = ({
               );
             })}
           </div>
-        </div>,
-        document.body
+        </div>
       )}
-
-      {/* Styles */}
-      <style>{`
-        @keyframes fadeInMove {
-          from { opacity: 0; transform: translateY(-4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-    </>
+    </div>
   );
 };
 
