@@ -35,16 +35,24 @@ try {
     rmSync(apiDest, { recursive: true, force: true });
   }
 
-  // Windows: użyj xcopy
+  // Windows: użyj xcopy z wykluczeniem uploads
   if (process.platform === 'win32') {
+    // Najpierw kopiuj wszystko
     execSync(`xcopy /E /I /Y "${apiSrc}" "${apiDest}"`, { stdio: 'inherit' });
+    // Usuń folder uploads z dist/api (zostaje tylko na serwerze)
+    const uploadsInDist = resolve(apiDest, 'uploads');
+    if (existsSync(uploadsInDist)) {
+      rmSync(uploadsInDist, { recursive: true, force: true });
+      console.log('\n🗑️  Usunięto dist/api/uploads/ (folder uploads jest osobno na serwerze)');
+    }
   } else {
-    // Linux/Mac: użyj cp
-    execSync(`cp -r "${apiSrc}" "${apiDest}"`, { stdio: 'inherit' });
+    // Linux/Mac: użyj cp z wykluczeniem
+    execSync(`rsync -av --exclude='uploads' "${apiSrc}/" "${apiDest}/"`, { stdio: 'inherit' });
   }
 
   console.log('\n✅ Skopiowano api/ → dist/api/');
-  console.log('📦 Teraz wgraj tylko folder dist/ na serwer!\n');
+  console.log('📦 Teraz wgraj ZAWARTOŚĆ folderu dist/ na serwer!');
+  console.log('⚠️  Folder uploads/ na serwerze NIE jest w dist - zostaje nienaruszony!\n');
 } catch (error) {
   console.error('❌ Błąd kopiowania:', error.message);
   process.exit(1);

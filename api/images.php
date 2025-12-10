@@ -4,12 +4,13 @@
  */
 require_once __DIR__ . '/config.php';
 
-// Folder na obrazy (wewnątrz folderu api!)
+// Folder na obrazy (OBOK api, w głównym katalogu)
+// Dzięki temu uploads NIE jest nadpisywany przy deploymencie
 if (!defined('UPLOADS_DIR')) {
-    define('UPLOADS_DIR', __DIR__ . '/uploads');
+    define('UPLOADS_DIR', __DIR__ . '/../uploads');
 }
 if (!defined('UPLOADS_URL')) {
-    define('UPLOADS_URL', '/api/uploads');
+    define('UPLOADS_URL', '/uploads');
 }
 
 /**
