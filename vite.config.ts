@@ -11,10 +11,11 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        // Stałe nazwy plików - małe litery, bez hashów z wielkimi literami
-        entryFileNames: 'assets/app.js',
-        chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name].[ext]',
+        // Hashe z małymi literami (hex: 0-9, a-f)
+        hashCharacters: 'hex',
+        entryFileNames: 'assets/app.[hash].js',
+        chunkFileNames: 'assets/[name].[hash].js',
+        assetFileNames: 'assets/[name].[hash].[ext]',
         manualChunks: {
           vendor: ['react', 'react-dom'],
           leaflet: ['leaflet', 'react-leaflet'],
