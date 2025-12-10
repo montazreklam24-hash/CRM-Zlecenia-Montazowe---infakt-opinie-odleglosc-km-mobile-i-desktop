@@ -1,6 +1,4 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { PortalDropdown } from './PortalDropdown';
 import { Job, JobStatus, UserRole, JobColumnId, PaymentStatus } from '../types';
 import { jobsService } from '../services/apiService';
 import { 
