@@ -51,29 +51,28 @@ const JobContextMenu: React.FC<JobContextMenuProps> = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const [submenu, setSubmenu] = React.useState<'payment' | 'move' | null>(null);
 
-  // Oblicz pozycję menu - upewnij się że nie wychodzi poza ekran
-  const getMenuPosition = () => {
-    const menuWidth = 200;
-    const menuHeight = 300;
-    const submenuWidth = 180;
-    
-    let finalX = x;
-    let finalY = y;
-    
-    // Jeśli wychodzi za prawą krawędź
-    if (x + menuWidth > window.innerWidth) {
-      finalX = window.innerWidth - menuWidth - 10;
-    }
-    
-    // Jeśli wychodzi za dolną krawędź
-    if (y + menuHeight > window.innerHeight) {
-      finalY = window.innerHeight - menuHeight - 10;
-    }
-    
-    return { x: finalX, y: finalY };
-  };
-
-  const pos = getMenuPosition();
+  // Pozycja jest już w clientX/clientY (względem viewport)
+  // position: fixed używa tych samych współrzędnych
+  const menuWidth = 200;
+  const menuHeight = 280;
+  
+  // Korekta pozycji żeby menu nie wychodziło poza ekran
+  let posX = x;
+  let posY = y;
+  
+  // Jeśli wychodzi za prawą krawędź
+  if (x + menuWidth > window.innerWidth) {
+    posX = x - menuWidth;
+  }
+  
+  // Jeśli wychodzi za dolną krawędź
+  if (y + menuHeight > window.innerHeight) {
+    posY = y - menuHeight;
+  }
+  
+  // Minimalne marginesy od krawędzi
+  posX = Math.max(10, posX);
+  posY = Math.max(10, posY);
 
   // Zamknij na kliknięcie poza menu
   useEffect(() => {
@@ -118,8 +117,8 @@ const JobContextMenu: React.FC<JobContextMenuProps> = ({
       ref={menuRef}
       className="fixed z-[99999] bg-white rounded-lg shadow-2xl border border-gray-200 py-1 min-w-[200px]"
       style={{ 
-        left: pos.x, 
-        top: pos.y,
+        left: posX, 
+        top: posY,
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)'
       }}
       onClick={(e) => e.stopPropagation()}
