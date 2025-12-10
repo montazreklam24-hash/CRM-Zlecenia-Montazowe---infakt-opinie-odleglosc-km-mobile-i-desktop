@@ -80,7 +80,7 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [currentImageIndex, setCurrentImageIndex] = useState(-1); // -1 = modal closed
   
   // Completion section state
   const [showCompletion, setShowCompletion] = useState(false);
@@ -311,38 +311,6 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
         )}
       </div>
 
-      {/* Image Gallery */}
-      {images.length > 0 && (
-        <div className="relative bg-slate-900">
-          <img
-            src={images[currentImageIndex]}
-            alt={`Zdjęcie ${currentImageIndex + 1}`}
-            className="w-full h-64 object-contain"
-            loading="lazy"
-          />
-          {images.length > 1 && (
-            <>
-              {/* Image Navigation Dots */}
-              <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2">
-                {images.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setCurrentImageIndex(idx)}
-                    className={`w-2 h-2 rounded-full transition-all ${
-                      idx === currentImageIndex ? 'bg-white scale-125' : 'bg-white/50'
-                    }`}
-                  />
-                ))}
-              </div>
-              {/* Swipe hint */}
-              <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                {currentImageIndex + 1} / {images.length}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
       {/* Content */}
       <div className="p-4 space-y-4">
         {/* Title Section */}
@@ -535,6 +503,67 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
               <Trash2 className="w-5 h-5" />
               Usuń
             </button>
+          </div>
+        )}
+
+        {/* ============ ATTACHMENTS / IMAGES ============ */}
+        {images.length > 0 && (
+          <div className="bg-slate-50 rounded-2xl p-4">
+            <label className="text-xs text-slate-400 font-medium uppercase tracking-wider flex items-center gap-2 mb-3">
+              <ImageIcon className="w-4 h-4" />
+              Załączniki ({images.length})
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {images.map((img, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentImageIndex(idx)}
+                  className={`relative w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${
+                    currentImageIndex === idx ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-200'
+                  }`}
+                >
+                  <img 
+                    src={img} 
+                    alt={`Zdjęcie ${idx + 1}`} 
+                    className="w-full h-full object-cover" 
+                    loading="lazy" 
+                  />
+                </button>
+              ))}
+            </div>
+            
+            {/* Enlarged Image Modal */}
+            {currentImageIndex >= 0 && (
+              <div 
+                className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+                onClick={() => setCurrentImageIndex(-1)}
+              >
+                <button 
+                  className="absolute top-4 right-4 p-2 bg-white/20 rounded-full text-white"
+                  onClick={() => setCurrentImageIndex(-1)}
+                >
+                  <X className="w-6 h-6" />
+                </button>
+                <img 
+                  src={images[currentImageIndex]} 
+                  alt="Powiększone zdjęcie"
+                  className="max-w-full max-h-full object-contain rounded-lg"
+                />
+                {images.length > 1 && (
+                  <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-3">
+                    {images.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={(e) => { e.stopPropagation(); setCurrentImageIndex(idx); }}
+                        className={`w-3 h-3 rounded-full transition-all ${
+                          idx === currentImageIndex ? 'bg-white scale-125' : 'bg-white/50'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
