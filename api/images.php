@@ -4,12 +4,12 @@
  */
 require_once __DIR__ . '/config.php';
 
-// Folder na obrazy (w api/uploads/ - jak w wersji produkcyjnej)
+// Folder na obrazy (w głównym folderze uploads/ - poza api/)
 if (!defined('UPLOADS_DIR')) {
-    define('UPLOADS_DIR', __DIR__ . '/uploads');
+    define('UPLOADS_DIR', __DIR__ . '/../uploads');
 }
 if (!defined('UPLOADS_URL')) {
-    define('UPLOADS_URL', '/api/uploads');
+    define('UPLOADS_URL', '/uploads');
 }
 
 /**

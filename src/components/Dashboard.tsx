@@ -12,8 +12,8 @@ import {
 import MapBoardGoogle from './MapBoardGoogle';
 import MapBoardOSM from './MapBoardOSM';
 import PaymentStatusBadge, { PaymentStatusBar, PaymentStatusIcon } from './PaymentStatusBadge';
-import PaymentStatusDropdown from './PaymentStatusDropdown';
-import MoveToDropdown from './MoveToDropdown';
+import PaymentStatusDropdown, { PAYMENT_OPTIONS } from './PaymentStatusDropdown';
+import MoveToDropdown, { COLUMN_OPTIONS } from './MoveToDropdown';
 
 import {
   DndContext,
