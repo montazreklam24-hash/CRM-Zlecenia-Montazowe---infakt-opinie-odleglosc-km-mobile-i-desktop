@@ -424,10 +424,10 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           </button>
         </div>
         
-        {/* Dropdown "Przenieś do kolumny" - w DÓŁ, z przewijaniem */}
+        {/* Dropdown "Przenieś do kolumny" - W GÓRĘ (żeby nie uciekał pod dół ekranu) */}
         {showMoveMenu && (
           <div 
-            className="absolute top-full left-0 right-0 mt-1 z-[100] bg-white rounded-lg shadow-2xl border border-slate-200"
+            className="absolute bottom-full left-0 right-0 mb-1 z-[9999] bg-white rounded-lg shadow-2xl border border-slate-200"
             style={{ maxHeight: '250px', overflowY: 'auto' }}
             onClick={(e) => e.stopPropagation()}
           >

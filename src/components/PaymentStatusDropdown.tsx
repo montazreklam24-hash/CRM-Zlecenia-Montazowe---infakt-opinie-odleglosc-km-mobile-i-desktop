@@ -89,10 +89,10 @@ const PaymentStatusDropdown: React.FC<PaymentStatusDropdownProps> = ({
         {!disabled && <ChevronDown className="w-2.5 h-2.5" style={{ marginLeft: '2px' }} />}
       </button>
       
-      {/* Dropdown menu */}
+      {/* Dropdown menu - FIXED Z-INDEX and Overflow */}
       {isOpen && (
         <div 
-          className="absolute top-full left-0 right-0 mt-0.5 bg-white rounded-b-lg shadow-xl border border-slate-200 z-50 overflow-hidden"
+          className="absolute top-full left-0 right-0 mt-0.5 bg-white rounded-b-lg shadow-2xl border border-slate-200 z-[9999] overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           {PAYMENT_OPTIONS.map((option) => (
