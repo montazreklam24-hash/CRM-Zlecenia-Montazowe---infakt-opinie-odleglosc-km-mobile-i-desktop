@@ -10,7 +10,6 @@ RewriteRule ^api/(.*)$ api/index.php [QSA,L]
 
 # =====================================================
 # Pliki statyczne - jeśli istnieją, podaj bezpośrednio
-# (dotyczy też /api/uploads/*.jpg)
 # =====================================================
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
