@@ -1,0 +1,23 @@
+RewriteEngine On
+RewriteBase /
+
+# =====================================================
+# API - wszystkie requesty /api/* idą do api/index.php
+# =====================================================
+RewriteCond %{REQUEST_URI} ^/api/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+
+# =====================================================
+# Pliki statyczne - jeśli istnieją, podaj bezpośrednio
+# (dotyczy też /api/uploads/*.jpg)
+# =====================================================
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# =====================================================
+# SPA - wszystko inne do index.html (React Router)
+# =====================================================
+RewriteRule ^ index.html [L]
+
