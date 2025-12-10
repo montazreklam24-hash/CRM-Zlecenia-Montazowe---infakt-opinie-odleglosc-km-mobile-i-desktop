@@ -11,6 +11,26 @@
  *   GET  /api/invoices/pdf/{id}  - Pobierz PDF faktury
  */
 
+// Wyłącz wyświetlanie błędów HTML - zawsze zwracaj JSON
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
+
+// Obsługa błędów PHP jako JSON
+set_error_handler(function($severity, $message, $file, $line) {
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+
+set_exception_handler(function($exception) {
+    header('Content-Type: application/json; charset=utf-8');
+    http_response_code(500);
+    echo json_encode(array(
+        'error' => 'Błąd serwera: ' . $exception->getMessage(),
+        'file' => basename($exception->getFile()),
+        'line' => $exception->getLine()
+    ));
+    exit;
+});
+
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/InfaktClient.php';
 
