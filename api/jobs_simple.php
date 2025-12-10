@@ -5,6 +5,7 @@
  */
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/images.php';
 
 function handleJobsSimple($method, $id = null) {
     switch ($method) {
@@ -107,60 +108,7 @@ function getAttachments($jobId, $jobType = 'simple') {
     }
 }
 
-/**
- * Zapisuje obrazy do tabeli job_images
- */
-function saveSimpleJobImages($jobId, $images, $type = 'project', $jobType = 'simple') {
-    if (empty($images) || !is_array($images)) {
-        return;
-    }
-    
-    $pdo = getDB();
-    
-    // Usuń stare obrazy tego typu
-    $stmt = $pdo->prepare('DELETE FROM job_images WHERE job_id = ? AND job_type = ? AND type = ?');
-    $stmt->execute(array($jobId, $jobType, $type));
-    
-    // Wstaw nowe
-    $stmt = $pdo->prepare('
-        INSERT INTO job_images (job_id, job_type, type, file_data, is_cover, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ');
-    
-    $order = 0;
-    foreach ($images as $imageData) {
-        if (!empty($imageData) && is_string($imageData)) {
-            $isCover = ($order === 0) ? 1 : 0;
-            $stmt->execute(array($jobId, $jobType, $type, $imageData, $isCover, $order));
-            $order++;
-        }
-    }
-}
-
-/**
- * Pobiera obrazy dla zlecenia
- */
-function getSimpleJobImages($jobId, $type = 'project', $jobType = 'simple') {
-    $pdo = getDB();
-    
-    try {
-        $stmt = $pdo->prepare('
-            SELECT file_data FROM job_images 
-            WHERE job_id = ? AND job_type = ? AND type = ? 
-            ORDER BY sort_order ASC
-        ');
-        $stmt->execute(array($jobId, $jobType, $type));
-        $rows = $stmt->fetchAll();
-        
-        $images = array();
-        foreach ($rows as $row) {
-            $images[] = $row['file_data'];
-        }
-        return $images;
-    } catch (Exception $e) {
-        return array();
-    }
-}
+// Obrazy obsługiwane przez images.php (saveJobImages, getJobImages)
 
 // ===========================================
 // CRUD ZLECEŃ
@@ -224,13 +172,8 @@ function createJobSimple() {
             $title = 'Nowe zlecenie';
         }
         
-        // Generuj friendly ID
-        $year = date('Y');
-        $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM jobs_simple WHERE YEAR(created_at) = ?");
-        $stmt->execute(array($year));
-        $result = $stmt->fetch();
-        $count = $result['count'] + 1;
-        $friendlyId = '#S' . $year . '/' . str_pad($count, 3, '0', STR_PAD_LEFT);
+        // Generuj friendly ID (używamy funkcji z config.php)
+        $friendlyId = generateFriendlyId('simple');
         
         // INSERT
         $stmt = $pdo->prepare('
@@ -277,12 +220,12 @@ function createJobSimple() {
         
         $jobId = $pdo->lastInsertId();
         
-        // Zapisz obrazy
+        // Zapisz obrazy (używamy saveJobImages z images.php)
         if (isset($input['projectImages']) && is_array($input['projectImages'])) {
-            saveSimpleJobImages($jobId, $input['projectImages'], 'project', 'simple');
+            saveJobImages($jobId, $input['projectImages'], 'project', 'simple');
         }
         if (isset($input['completionImages']) && is_array($input['completionImages'])) {
-            saveSimpleJobImages($jobId, $input['completionImages'], 'completion', 'simple');
+            saveJobImages($jobId, $input['completionImages'], 'completion', 'simple');
         }
         
         // Zapisz załączniki
@@ -402,6 +345,32 @@ function updateJobSimple($id) {
             }
         }
         
+        // Data zakończenia
+        if (isset($input['completedAt'])) {
+            $updates[] = "completed_at = ?";
+            $params[] = date('Y-m-d H:i:s', $input['completedAt'] / 1000);
+        }
+        
+        // Notatki z zakończenia
+        if (isset($input['completionNotes'])) {
+            $updates[] = "completion_notes = ?";
+            $params[] = $input['completionNotes'];
+        }
+        
+        // Prośba o opinię
+        if (array_key_exists('reviewRequestSentAt', $input)) {
+            $updates[] = "review_request_sent_at = ?";
+            if ($input['reviewRequestSentAt'] === null || $input['reviewRequestSentAt'] === '') {
+                $params[] = null;
+            } else {
+                $params[] = date('Y-m-d H:i:s', $input['reviewRequestSentAt'] / 1000);
+            }
+        }
+        if (array_key_exists('reviewRequestEmail', $input)) {
+            $updates[] = "review_request_email = ?";
+            $params[] = $input['reviewRequestEmail'];
+        }
+        
         if (count($updates) > 0) {
             $params[] = $id;
             $sql = 'UPDATE jobs_simple SET ' . implode(', ', $updates) . ' WHERE id = ?';
@@ -409,12 +378,12 @@ function updateJobSimple($id) {
             $stmt->execute($params);
         }
         
-        // Aktualizuj obrazy
+        // Aktualizuj obrazy (saveJobImages)
         if (isset($input['projectImages']) && is_array($input['projectImages'])) {
-            saveSimpleJobImages($id, $input['projectImages'], 'project', 'simple');
+            saveJobImages($id, $input['projectImages'], 'project', 'simple');
         }
         if (isset($input['completionImages']) && is_array($input['completionImages'])) {
-            saveSimpleJobImages($id, $input['completionImages'], 'completion', 'simple');
+            saveJobImages($id, $input['completionImages'], 'completion', 'simple');
         }
         
         // Aktualizuj załączniki
@@ -447,7 +416,21 @@ function deleteJobSimple($id) {
         jsonResponse(array('error' => 'Zlecenie nie istnieje'), 404);
     }
     
-    // Usuń powiązane dane
+    // Usuń pliki obrazów z dysku
+    $stmt = $pdo->prepare('SELECT file_path FROM job_images WHERE job_id = ? AND job_type = ?');
+    $stmt->execute(array($id, 'simple'));
+    $images = $stmt->fetchAll();
+    foreach ($images as $img) {
+        if (!empty($img['file_path'])) {
+            // UPLOADS_DIR z images.php
+            $file = UPLOADS_DIR . '/' . basename($img['file_path']);
+            if (file_exists($file)) {
+                @unlink($file);
+            }
+        }
+    }
+    
+    // Usuń powiązane dane z bazy
     $pdo->prepare('DELETE FROM job_images WHERE job_id = ? AND job_type = ?')->execute(array($id, 'simple'));
     $pdo->prepare('DELETE FROM job_attachments WHERE job_id = ? AND job_type = ?')->execute(array($id, 'simple'));
     
@@ -498,10 +481,13 @@ function mapJobSimpleToFrontend($job) {
                 'grossAmount' => $job['value_gross'] ? floatval($job['value_gross']) : null
             )
         ),
-        'projectImages' => getSimpleJobImages($jobId, 'project', 'simple'),
-        'completionImages' => getSimpleJobImages($jobId, 'completion', 'simple'),
+        'projectImages' => getJobImages($jobId, 'project', 'simple'),
+        'completionImages' => getJobImages($jobId, 'completion', 'simple'),
         'attachments' => getAttachments($jobId, 'simple'),
         'adminNotes' => $job['notes'],
-        'completedAt' => $job['completed_at'] ? strtotime($job['completed_at']) * 1000 : null
+        'completedAt' => $job['completed_at'] ? strtotime($job['completed_at']) * 1000 : null,
+        'completionNotes' => isset($job['completion_notes']) ? $job['completion_notes'] : null,
+        'reviewRequestSentAt' => !empty($job['review_request_sent_at']) ? strtotime($job['review_request_sent_at']) * 1000 : null,
+        'reviewRequestEmail' => isset($job['review_request_email']) ? $job['review_request_email'] : null
     );
 }

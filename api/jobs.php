@@ -4,74 +4,12 @@
  * Z obsługą obrazów (tabela job_images)
  */
 
+// DEBUG - pokaż błędy
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 require_once __DIR__ . '/config.php';
-
-// ===========================================
-// FUNKCJE OBSŁUGI OBRAZÓW
-// ===========================================
-
-/**
- * Zapisuje obrazy do tabeli job_images
- * @param int $jobId ID zlecenia
- * @param array $images Tablica obrazów base64
- * @param string $type 'project' lub 'completion'
- */
-function saveJobImages($jobId, $images, $type = 'project') {
-    if (empty($images) || !is_array($images)) {
-        return;
-    }
-    
-    $pdo = getDB();
-    
-    // Usuń stare obrazy tego typu dla zlecenia
-    $stmt = $pdo->prepare('DELETE FROM job_images WHERE job_id = ? AND type = ?');
-    $stmt->execute(array($jobId, $type));
-    
-    // Wstaw nowe obrazy
-    $stmt = $pdo->prepare('
-        INSERT INTO job_images (job_id, type, file_data, is_cover, sort_order, job_type)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ');
-    
-    $order = 0;
-    foreach ($images as $imageData) {
-        if (!empty($imageData) && is_string($imageData)) {
-            $isCover = ($order === 0) ? 1 : 0;
-            $stmt->execute(array($jobId, $type, $imageData, $isCover, $order, 'ai'));
-            $order++;
-        }
-    }
-}
-
-/**
- * Pobiera obrazy dla zlecenia
- * @param int $jobId ID zlecenia
- * @param string $type 'project' lub 'completion'
- * @return array Tablica obrazów base64
- */
-function getJobImages($jobId, $type = 'project') {
-    $pdo = getDB();
-    
-    // Sprawdź czy tabela istnieje
-    try {
-        $stmt = $pdo->prepare('
-            SELECT file_data FROM job_images 
-            WHERE job_id = ? AND type = ? AND job_type = ?
-            ORDER BY sort_order ASC
-        ');
-        $stmt->execute(array($jobId, $type, 'ai'));
-        $rows = $stmt->fetchAll();
-        
-        $images = array();
-        foreach ($rows as $row) {
-            $images[] = $row['file_data'];
-        }
-        return $images;
-    } catch (Exception $e) {
-        // Tabela nie istnieje lub inna kolumna
-        return array();
-    }
-}
+require_once __DIR__ . '/images.php';
 
 // ===========================================
 // CRUD ZLECEŃ
@@ -169,13 +107,8 @@ function createJob() {
             $title = 'Nowe zlecenie';
         }
         
-        // Generuj friendly ID
-        $year = date('Y');
-        $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM jobs_ai WHERE YEAR(created_at) = ?");
-        $stmt->execute(array($year));
-        $result = $stmt->fetch();
-        $count = $result['count'] + 1;
-        $friendlyId = '#' . $year . '/' . str_pad($count, 3, '0', STR_PAD_LEFT);
+        // Generuj friendly ID (używamy funkcji z config.php)
+        $friendlyId = generateFriendlyId('ai');
         
         // INSERT
         $stmt = $pdo->prepare('
@@ -196,37 +129,45 @@ function createJob() {
         
         $coordLat = null;
         $coordLng = null;
-        if (isset($data['coordinates']) && is_array($data['coordinates'])) {
-            $coordLat = isset($data['coordinates']['lat']) ? $data['coordinates']['lat'] : null;
-            $coordLng = isset($data['coordinates']['lng']) ? $data['coordinates']['lng'] : null;
+        if (isset($data['coordinates'])) {
+            $coords = $data['coordinates'];
+            if (is_array($coords)) {
+                $coordLat = isset($coords['lat']) ? $coords['lat'] : null;
+                $coordLng = isset($coords['lng']) ? $coords['lng'] : null;
+            }
         }
-        
-        $stmt->execute(array(
-            $friendlyId,
-            $title,
-            isset($data['clientName']) ? $data['clientName'] : null,
-            $phone,
-            isset($data['email']) ? $data['email'] : null,
-            isset($data['nip']) ? $data['nip'] : null,
-            isset($data['address']) ? $data['address'] : null,
-            $coordLat,
-            $coordLng,
-            $description,
-            isset($input['adminNotes']) ? $input['adminNotes'] : null,
-            'NEW',
-            isset($input['columnId']) ? $input['columnId'] : 'PREPARE',
-            0,
-            $user['id']
-        ));
+
+        try {
+            $stmt->execute(array(
+                $friendlyId,
+                $title,
+                isset($data['clientName']) ? $data['clientName'] : null,
+                $phone,
+                isset($data['email']) ? $data['email'] : null,
+                isset($data['nip']) ? $data['nip'] : null,
+                isset($data['address']) ? $data['address'] : null,
+                $coordLat,
+                $coordLng,
+                $description,
+                isset($input['adminNotes']) ? $input['adminNotes'] : null,
+                'NEW',
+                isset($input['columnId']) ? $input['columnId'] : 'PREPARE',
+                0,
+                $user['id']
+            ));
+        } catch (PDOException $e) {
+            logError("SQL Error in createJob: " . $e->getMessage());
+            throw $e;
+        }
         
         $jobId = $pdo->lastInsertId();
         
         // Zapisz obrazy
         if (isset($input['projectImages']) && is_array($input['projectImages'])) {
-            saveJobImages($jobId, $input['projectImages'], 'project');
+            saveJobImages($jobId, $input['projectImages'], 'project', 'ai');
         }
         if (isset($input['completionImages']) && is_array($input['completionImages'])) {
-            saveJobImages($jobId, $input['completionImages'], 'completion');
+            saveJobImages($jobId, $input['completionImages'], 'completion', 'ai');
         }
         
         // Zwróć utworzone zlecenie
@@ -294,6 +235,10 @@ function updateJob($id) {
             $updates[] = "status = ?";
             $params[] = $input['status'];
         }
+        if (isset($data['paymentStatus'])) {
+            $updates[] = "payment_status = ?";
+            $params[] = $data['paymentStatus'];
+        }
         if (isset($input['columnId'])) {
             $updates[] = "column_id = ?";
             $params[] = $input['columnId'];
@@ -304,18 +249,20 @@ function updateJob($id) {
         }
         
         // Współrzędne
-        if (isset($data['coordinates'])) {
-            if ($data['coordinates'] === null || empty($data['coordinates'])) {
+        if (array_key_exists('coordinates', $data)) {
+            $coords = $data['coordinates'];
+            
+            if (empty($coords)) {
                 $updates[] = "coordinates_lat = NULL";
                 $updates[] = "coordinates_lng = NULL";
-            } else {
-                if (isset($data['coordinates']['lat'])) {
+            } elseif (is_array($coords)) {
+                if (isset($coords['lat'])) {
                     $updates[] = "coordinates_lat = ?";
-                    $params[] = $data['coordinates']['lat'];
+                    $params[] = $coords['lat'];
                 }
-                if (isset($data['coordinates']['lng'])) {
+                if (isset($coords['lng'])) {
                     $updates[] = "coordinates_lng = ?";
-                    $params[] = $data['coordinates']['lng'];
+                    $params[] = $coords['lng'];
                 }
             }
         }
@@ -332,6 +279,32 @@ function updateJob($id) {
             }
         }
         
+        // Data zakończenia
+        if (isset($input['completedAt'])) {
+            $updates[] = "completed_at = ?";
+            $params[] = date('Y-m-d H:i:s', $input['completedAt'] / 1000);
+        }
+        
+        // Notatki z zakończenia
+        if (isset($input['completionNotes'])) {
+            $updates[] = "completion_notes = ?";
+            $params[] = $input['completionNotes'];
+        }
+        
+        // Prośba o opinię - obsługuje też NULL (gdy chcemy wyczyścić)
+        if (array_key_exists('reviewRequestSentAt', $input)) {
+            $updates[] = "review_request_sent_at = ?";
+            if ($input['reviewRequestSentAt'] === null || $input['reviewRequestSentAt'] === '') {
+                $params[] = null;
+            } else {
+                $params[] = date('Y-m-d H:i:s', $input['reviewRequestSentAt'] / 1000);
+            }
+        }
+        if (array_key_exists('reviewRequestEmail', $input)) {
+            $updates[] = "review_request_email = ?";
+            $params[] = $input['reviewRequestEmail'];
+        }
+        
         if (count($updates) > 0) {
             $params[] = $id;
             $sql = 'UPDATE jobs_ai SET ' . implode(', ', $updates) . ' WHERE id = ?';
@@ -341,10 +314,10 @@ function updateJob($id) {
         
         // Aktualizuj obrazy (jeśli przesłane)
         if (isset($input['projectImages']) && is_array($input['projectImages'])) {
-            saveJobImages($id, $input['projectImages'], 'project');
+            saveJobImages($id, $input['projectImages'], 'project', 'ai');
         }
         if (isset($input['completionImages']) && is_array($input['completionImages'])) {
-            saveJobImages($id, $input['completionImages'], 'completion');
+            saveJobImages($id, $input['completionImages'], 'completion', 'ai');
         }
         
         // Zwróć zaktualizowane zlecenie
@@ -372,6 +345,24 @@ function deleteJob($id) {
         jsonResponse(array('error' => 'Zlecenie nie istnieje'), 404);
     }
     
+    // Usuń pliki obrazów z dysku
+    $stmt = $pdo->prepare('SELECT file_path FROM job_images WHERE job_id = ? AND job_type = ?');
+    $stmt->execute(array($id, 'ai'));
+    $images = $stmt->fetchAll();
+    foreach ($images as $img) {
+        if (!empty($img['file_path'])) {
+            // UPLOADS_DIR z images.php
+            $file = UPLOADS_DIR . '/' . basename($img['file_path']);
+            if (file_exists($file)) {
+                @unlink($file);
+            }
+        }
+    }
+    
+    // Usuń obrazy z bazy
+    $pdo->prepare('DELETE FROM job_images WHERE job_id = ? AND job_type = ?')->execute(array($id, 'ai'));
+    
+    // Usuń zlecenie
     $stmt = $pdo->prepare('DELETE FROM jobs_ai WHERE id = ?');
     $stmt->execute(array($id));
     
@@ -398,6 +389,7 @@ function mapJobToFrontend($job) {
         'type' => 'ai',
         'createdAt' => strtotime($job['created_at']) * 1000,
         'status' => $job['status'] ? $job['status'] : 'NEW',
+        'paymentStatus' => isset($job['payment_status']) ? $job['payment_status'] : 'none',
         'columnId' => $job['column_id'] ? $job['column_id'] : 'PREPARE',
         'columnOrder' => intval($job['column_order']),
         'data' => array(
@@ -415,12 +407,14 @@ function mapJobToFrontend($job) {
                 'grossAmount' => $job['value_gross'] ? floatval($job['value_gross']) : null
             )
         ),
-        'projectImages' => getJobImages($jobId, 'project'),
-        'completionImages' => getJobImages($jobId, 'completion'),
+        'projectImages' => getJobImages($jobId, 'project', 'ai'),
+        'completionImages' => getJobImages($jobId, 'completion', 'ai'),
         'adminNotes' => $job['notes'],
         'checklist' => array(),
-        'completedAt' => null,
-        'completionNotes' => null
+        'completedAt' => !empty($job['completed_at']) ? strtotime($job['completed_at']) * 1000 : null,
+        'completionNotes' => isset($job['completion_notes']) ? $job['completion_notes'] : null,
+        'reviewRequestSentAt' => !empty($job['review_request_sent_at']) ? strtotime($job['review_request_sent_at']) * 1000 : null,
+        'reviewRequestEmail' => isset($job['review_request_email']) ? $job['review_request_email'] : null
     );
 }
 
@@ -465,5 +459,3 @@ function handleJobsAll() {
         'total' => count($result)
     ));
 }
-
-

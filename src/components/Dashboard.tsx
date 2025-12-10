@@ -4,7 +4,8 @@ import { jobsService } from '../services/apiService';
 import { 
   Plus, MapPin, CheckCircle2, Trash2, Box, Kanban, 
   Download, Copy, RefreshCw, Search, StretchHorizontal, ExternalLink,
-  ChevronUp, ChevronDown, Map as MapIcon, Layers
+  ChevronUp, ChevronDown, Map as MapIcon, Layers, LayoutDashboard,
+  ChevronLeft, ChevronRight, Archive
 } from 'lucide-react';
 import MapBoardGoogle from './MapBoardGoogle';
 import MapBoardOSM from './MapBoardOSM';
@@ -57,9 +58,10 @@ import { CSS } from '@dnd-kit/utilities';
 
 interface DashboardProps {
   role: UserRole;
-  onSelectJob: (job: Job) => void;
+  onSelectJob: (job: Job, fromArchive?: boolean) => void;
   onCreateNew: () => void;
   onCreateNewSimple?: () => void;
+  initialTab?: 'ACTIVE' | 'ARCHIVED';
 }
 
 // 7 kolumn: PRZYGOTOWANIE, PN-PT, WYKONANE (bez weekendu)
@@ -95,10 +97,15 @@ interface DraggableJobCardProps {
   onSelectJob: (job: Job) => void;
   onDelete: (id: string, e: React.MouseEvent) => void;
   onDuplicate: (id: string, e: React.MouseEvent) => void;
+  onArchive?: (id: string, e: React.MouseEvent) => void;
   onMoveUp?: (id: string) => void;
   onMoveDown?: (id: string) => void;
+  onMoveLeft?: (id: string) => void;
+  onMoveRight?: (id: string) => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  canMoveLeft?: boolean;
+  canMoveRight?: boolean;
 }
 
 // Helper function for payment status color
@@ -106,7 +113,6 @@ const getPaymentStatusColor = (status: PaymentStatus): string => {
   switch (status) {
     case PaymentStatus.PAID: return '#22c55e'; // green
     case PaymentStatus.PROFORMA: return '#f97316'; // orange
-    case PaymentStatus.INVOICE: return '#3b82f6'; // blue
     case PaymentStatus.PARTIAL: return '#a855f7'; // purple
     case PaymentStatus.CASH: return '#eab308'; // yellow
     case PaymentStatus.OVERDUE: return '#ef4444'; // red
@@ -118,7 +124,6 @@ const getPaymentStatusLabel = (status: PaymentStatus): string => {
   switch (status) {
     case PaymentStatus.PAID: return 'OPŁACONE';
     case PaymentStatus.PROFORMA: return 'PROFORMA';
-    case PaymentStatus.INVOICE: return 'FAKTURA';
     case PaymentStatus.PARTIAL: return 'ZALICZKA';
     case PaymentStatus.CASH: return 'GOTÓWKA';
     case PaymentStatus.OVERDUE: return 'DO ZAPŁATY';
@@ -126,7 +131,10 @@ const getPaymentStatusLabel = (status: PaymentStatus): string => {
   }
 };
 
-const DraggableJobCard: React.FC<DraggableJobCardProps> = ({ job, isAdmin, onSelectJob, onDelete, onDuplicate }) => {
+const DraggableJobCard: React.FC<DraggableJobCardProps> = ({ 
+  job, isAdmin, onSelectJob, onDelete, onDuplicate, onArchive,
+  onMoveLeft, onMoveRight, canMoveLeft, canMoveRight
+}) => {
   // Draggable
   const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
     id: job.id,
@@ -163,6 +171,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({ job, isAdmin, onSel
   }) : '';
 
   const [showClickHint, setShowClickHint] = useState(false);
+  const [showArrows, setShowArrows] = useState(false);
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (isDragging) return;
@@ -189,116 +198,154 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({ job, isAdmin, onSel
         </div>
       )}
       <div 
-        ref={setNodeRef}
-        style={style}
-        {...listeners}
-        {...attributes}
-        onClick={handleCardClick}
-        onDoubleClick={handleCardDoubleClick}
-        className={`theme-card min-w-[160px] w-40 cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group relative flex flex-col overflow-hidden touch-none ${showDropIndicator ? 'ring-2 ring-blue-400' : ''}`}
+        className="relative group"
+        onMouseEnter={() => setShowArrows(true)}
+        onMouseLeave={() => setShowArrows(false)}
       >
-        {/* Click hint tooltip */}
-        {showClickHint && (
-          <div 
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 px-3 py-2 text-xs font-medium whitespace-nowrap animate-fade-in pointer-events-none"
-            style={{ 
-              background: 'rgba(0,0,0,0.85)', 
-              color: 'white', 
-              borderRadius: 'var(--radius-md)',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-            }}
+        {/* LEFT arrow - appears on hover at left */}
+        {showArrows && canMoveLeft && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onMoveLeft?.(job.id); }}
+            className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
+            title="Przesuń w lewo"
           >
-            👆 Kliknij dwukrotnie aby otworzyć
-          </div>
-        )}
-      {/* Image with payment status bar on top */}
-      <div className="aspect-square relative overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
-        {/* Payment Status Bar - 8% height at top */}
-        {job.paymentStatus && job.paymentStatus !== PaymentStatus.NONE && (
-          <div 
-            className="absolute top-0 left-0 right-0 z-10 flex items-center justify-center"
-            style={{ 
-              height: '8%', 
-              minHeight: '12px',
-              background: paymentColor,
-              color: 'white',
-              fontSize: '8px',
-              fontWeight: 700,
-              letterSpacing: '0.5px'
-            }}
-          >
-            {paymentLabel}
-          </div>
+            <ChevronLeft className="w-5 h-5" />
+          </button>
         )}
         
-        {job.projectImages?.[0] ? (
-          <img src={job.projectImages[0]} className="w-full h-full object-cover pointer-events-none" alt="preview" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center" style={{ color: 'var(--text-muted)' }}>
-            <Box className="w-10 h-10" />
-          </div>
+        {/* RIGHT arrow - appears on hover at right */}
+        {showArrows && canMoveRight && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onMoveRight?.(job.id); }}
+            className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
+            title="Przesuń w prawo"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
         )}
-        
-        {/* Job ID - more subtle */}
+
         <div 
-          className="absolute bottom-2 right-2 text-[9px] font-medium px-1.5 py-0.5 backdrop-blur-sm" 
-          style={{ background: 'rgba(0,0,0,0.4)', color: 'rgba(255,255,255,0.8)', borderRadius: 'var(--radius-sm)' }}
+          ref={setNodeRef}
+          style={style}
+          {...listeners}
+          {...attributes}
+          onClick={handleCardClick}
+          onDoubleClick={handleCardDoubleClick}
+          className={`theme-card min-w-[160px] w-40 cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group relative flex flex-col overflow-hidden touch-none ${showDropIndicator ? 'ring-2 ring-blue-400' : ''}`}
         >
-          {job.friendlyId}
-        </div>
-      </div>
-      
-      <div className="p-3 flex flex-col" style={{ minHeight: '110px' }}>
-        {/* Title - max 3 linie */}
-        <h4 className="font-bold text-xs leading-tight mb-2 line-clamp-3" style={{ color: 'var(--text-primary)' }}>
-          {job.data.jobTitle}
-        </h4>
-        
-        {/* Full Address */}
-        <div className="flex items-start gap-1 text-[10px] mb-2" style={{ color: 'var(--text-secondary)' }}>
-          <MapPin className="w-3 h-3 mt-0.5 flex-shrink-0" style={{ color: 'var(--accent-orange)' }} />
-          <span className="truncate">{job.data.address || 'Brak adresu'}</span>
-        </div>
-        
-        {/* Phone Number - bold black */}
-        {job.data.phoneNumber && (
-          <div className="text-[11px] font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-            📞 {job.data.phoneNumber}
-          </div>
-        )}
-        
-        <div className="flex justify-between items-center pt-2 mt-auto" style={{ borderTop: '1px solid var(--border-light)' }}>
-          <div className="flex items-center gap-2">
-            {/* Creation date instead of checklist */}
-            {createdDate && (
-              <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
-                {createdDate}
-              </span>
-            )}
-            {job.totalGross && job.totalGross > 0 && (
-              <span className="text-[10px] font-bold" style={{ color: 'var(--accent-primary)' }}>
-                {job.totalGross.toFixed(0)} zł
-              </span>
-            )}
-          </div>
-          {isAdmin && (
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button 
-                onClick={(e) => { e.stopPropagation(); onDuplicate(job.id, e); }} 
-                className="p-1"
-                style={{ color: 'var(--accent-primary)' }}
-              >
-                <Copy className="w-3.5 h-3.5" />
-              </button>
-              <button 
-                onClick={(e) => { e.stopPropagation(); onDelete(job.id, e); }} 
-                className="p-1 hover:text-red-500"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+          {/* Click hint tooltip */}
+          {showClickHint && (
+            <div 
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 px-3 py-2 text-xs font-medium whitespace-nowrap animate-fade-in pointer-events-none"
+              style={{ 
+                background: 'rgba(0,0,0,0.85)', 
+                color: 'white', 
+                borderRadius: 'var(--radius-md)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+              }}
+            >
+              👆 Kliknij dwukrotnie aby otworzyć
             </div>
           )}
+        {/* Image with payment status bar on top */}
+        <div className="aspect-square relative overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
+          {/* Payment Status Bar - 8% height at top */}
+          {job.paymentStatus && job.paymentStatus !== PaymentStatus.NONE && (
+            <div 
+              className="absolute top-0 left-0 right-0 z-10 flex items-center justify-center"
+              style={{ 
+                height: '8%', 
+                minHeight: '12px',
+                background: paymentColor,
+                color: 'white',
+                fontSize: '8px',
+                fontWeight: 700,
+                letterSpacing: '0.5px'
+              }}
+            >
+              {paymentLabel}
+            </div>
+          )}
+          
+          {job.projectImages?.[0] ? (
+            <img src={job.projectImages[0]} className="w-full h-full object-cover pointer-events-none" alt="preview" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center" style={{ color: 'var(--text-muted)' }}>
+              <Box className="w-10 h-10" />
+            </div>
+          )}
+          
+          {/* Job ID - more subtle */}
+          <div 
+            className="absolute bottom-2 right-2 text-[9px] font-medium px-1.5 py-0.5 backdrop-blur-sm" 
+            style={{ background: 'rgba(0,0,0,0.4)', color: 'rgba(255,255,255,0.8)', borderRadius: 'var(--radius-sm)' }}
+          >
+            {job.friendlyId}
+          </div>
+        </div>
+        
+        <div className="p-3 flex flex-col" style={{ minHeight: '110px' }}>
+          {/* Title - max 3 linie */}
+          <h4 className="font-bold text-xs leading-tight mb-2 line-clamp-3" style={{ color: 'var(--text-primary)' }}>
+            {job.data.jobTitle}
+          </h4>
+          
+          {/* Full Address */}
+          <div className="flex items-start gap-1 text-[10px] mb-2" style={{ color: 'var(--text-secondary)' }}>
+            <MapPin className="w-3 h-3 mt-0.5 flex-shrink-0" style={{ color: 'var(--accent-orange)' }} />
+            <span className="truncate">{job.data.address || 'Brak adresu'}</span>
+          </div>
+          
+          {/* Phone Number - bold black */}
+          {job.data.phoneNumber && (
+            <div className="text-[11px] font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+              📞 {job.data.phoneNumber}
+            </div>
+          )}
+          
+          <div className="flex justify-between items-center pt-2 mt-auto" style={{ borderTop: '1px solid var(--border-light)' }}>
+            <div className="flex items-center gap-2">
+              {/* Creation date instead of checklist */}
+              {createdDate && (
+                <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
+                  {createdDate}
+                </span>
+              )}
+              {job.totalGross && job.totalGross > 0 && (
+                <span className="text-[10px] font-bold" style={{ color: 'var(--accent-primary)' }}>
+                  {job.totalGross.toFixed(0)} zł
+                </span>
+              )}
+            </div>
+            {isAdmin && (
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onDuplicate(job.id, e); }} 
+                  className="p-1 hover:bg-slate-100 rounded"
+                  style={{ color: 'var(--accent-primary)' }}
+                  title="Duplikuj"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onArchive?.(job.id, e); }} 
+                  className="p-1 hover:bg-slate-100 rounded"
+                  style={{ color: 'var(--text-secondary)' }}
+                  title="Archiwizuj"
+                >
+                  <Archive className="w-3.5 h-3.5" />
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onDelete(job.id, e); }} 
+                  className="p-1 hover:text-red-500 hover:bg-slate-100 rounded"
+                  style={{ color: 'var(--text-muted)' }}
+                  title="Usuń"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -366,7 +413,7 @@ const DroppableColumn: React.FC<DroppableColumnProps> = ({ id, children }) => {
 
 // Small Kanban Card (for narrow vertical columns)
 const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({ 
-  job, isAdmin, onSelectJob, onDelete, onDuplicate, 
+  job, isAdmin, onSelectJob, onDelete, onDuplicate, onArchive,
   onMoveUp, onMoveDown, canMoveUp, canMoveDown 
 }) => {
   // Draggable
@@ -525,6 +572,14 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
                   <Copy className="w-3.5 h-3.5" />
                 </button>
                 <button 
+                  onClick={(e) => { e.stopPropagation(); onArchive?.(job.id, e); }} 
+                  className="p-1 hover:bg-slate-100 rounded"
+                  style={{ color: 'var(--text-secondary)' }}
+                  title="Archiwizuj"
+                >
+                  <Archive className="w-3.5 h-3.5" />
+                </button>
+                <button 
                   onClick={(e) => { e.stopPropagation(); onDelete(job.id, e); }} 
                   className="p-1 rounded hover:bg-slate-100 hover:text-red-500"
                   style={{ color: 'var(--text-muted)' }}
@@ -542,11 +597,18 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
   );
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, onCreateNewSimple }) => {
+const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, onCreateNewSimple, initialTab }) => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'ACTIVE' | 'ARCHIVED'>('ACTIVE');
-  const [viewMode, setViewMode] = useState<'BOARD' | 'KANBAN'>('KANBAN');
+  const [viewMode, setViewMode] = useState<'BOARD' | 'KANBAN' | 'MIXED'>(() => {
+    return (localStorage.getItem('dashboard_view_mode') as 'BOARD' | 'KANBAN' | 'MIXED') || 'MIXED';
+  });
+
+  // Persist view mode
+  useEffect(() => {
+    localStorage.setItem('dashboard_view_mode', viewMode);
+  }, [viewMode]);
   const [mapProvider, setMapProvider] = useState<'GOOGLE' | 'OSM'>('GOOGLE'); // Wybór mapy
   const [searchQuery, setSearchQuery] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -1137,6 +1199,163 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
           </div>
         </div>
       </div>
+
+      {/* MIXED VIEW (New Layout) */}
+      {viewMode === 'MIXED' && (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={cardFirstCollision}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="space-y-6">
+            
+            {/* 1. TOP: PREPARE ROW (Horizontal) */}
+            {ROWS_CONFIG.filter(r => r.id === 'PREPARE').map(row => {
+               const rowJobs = getJobsForColumn(row.id);
+               return (
+                <div key={row.id} className="theme-surface overflow-hidden transition-all" style={{ borderRadius: 'var(--radius-lg)', borderLeft: '4px solid', borderColor: row.dotColor.replace('text-', '') }}>
+                  <div className={`${row.headerBg} ${row.headerText} px-4 py-3 flex justify-between items-center`}>
+                    <h3 className="font-bold tracking-wide text-sm flex items-center gap-2">
+                       {row.title}
+                    </h3>
+                    <span className="bg-white/20 px-2.5 py-1 text-xs font-bold" style={{ borderRadius: 'var(--radius-md)' }}>{rowJobs.length}</span>
+                  </div>
+                  <DroppableRow id={row.id}>
+                    {rowJobs.length === 0 && !activeId ? (
+                      <div className="text-xs font-medium italic w-full text-center p-6 border-2 border-dashed rounded-xl" style={{ color: 'var(--text-muted)', borderColor: 'var(--border-medium)', background: 'rgba(255,255,255,0.15)', backdropFilter: 'var(--blur)' }}>
+                        Przeciągnij tutaj zlecenie
+                      </div>
+                    ) : (
+                      rowJobs.map(job => (
+                        <DraggableJobCard
+                          key={job.id}
+                          job={job}
+                          isAdmin={isAdmin}
+                          onSelectJob={onSelectJob}
+                          onDelete={handleDelete}
+                          onDuplicate={handleDuplicate}
+                        />
+                      ))
+                    )}
+                  </DroppableRow>
+                </div>
+               );
+            })}
+
+            {/* 2. MIDDLE: MON-FRI COLUMNS (Vertical Grid) */}
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+               {ROWS_CONFIG.filter(r => ['MON', 'TUE', 'WED', 'THU', 'FRI'].includes(r.id)).map(row => {
+                  const rowJobs = getJobsForColumn(row.id);
+                  return (
+                    <div key={row.id} className="theme-surface flex flex-col min-h-[500px]" style={{ borderRadius: 'var(--radius-lg)' }}>
+                      <div className={`${row.headerBg} ${row.headerText} px-3 py-3 flex justify-between items-center sticky top-0 z-10`}>
+                         <h3 className="font-bold tracking-wide text-xs sm:text-[10px] flex items-center gap-2">
+                           <span className="sm:hidden">{row.title}</span>
+                           <span className="hidden sm:inline">{row.shortTitle}</span>
+                         </h3>
+                         <span className="bg-white/20 px-2 py-0.5 text-xs font-bold" style={{ borderRadius: 'var(--radius-sm)' }}>{rowJobs.length}</span>
+                      </div>
+                      <DroppableColumn id={row.id}>
+                         <div className="flex flex-col gap-3 w-full p-1">
+                            {rowJobs.map(job => {
+                               const { canMoveUp, canMoveDown } = getJobMoveInfo(job.id);
+                               return (
+                                  <SmallKanbanCard
+                                    key={job.id}
+                                    job={job}
+                                    isAdmin={isAdmin}
+                                    onSelectJob={onSelectJob}
+                                    onDelete={handleDelete}
+                                    onDuplicate={handleDuplicate}
+                                    onMoveUp={handleMoveUp}
+                                    onMoveDown={handleMoveDown}
+                                    canMoveUp={canMoveUp}
+                                    canMoveDown={canMoveDown}
+                                  />
+                               );
+                            })}
+                         </div>
+                      </DroppableColumn>
+                    </div>
+                  );
+               })}
+            </div>
+
+            {/* 3. MAP (Embedded in Mixed View) */}
+             <div className="mt-4">
+              {mapProvider === 'GOOGLE' ? (
+                <MapBoardGoogle 
+                  jobs={filteredJobs} 
+                  onSelectJob={onSelectJob} 
+                  onJobsUpdated={loadJobs}
+                  onChangeColumn={async (jobId, newColumnId) => {
+                    setJobs(prev => prev.map(j => j.id === jobId ? { ...j, columnId: newColumnId } : j));
+                    await jobsService.updateJobColumn(jobId, newColumnId);
+                  }}
+                />
+              ) : (
+                <MapBoardOSM 
+                  jobs={filteredJobs} 
+                  onSelectJob={onSelectJob} 
+                />
+              )}
+            </div>
+
+            {/* 4. BOTTOM: COMPLETED ROW (Horizontal) */}
+            {ROWS_CONFIG.filter(r => r.id === 'COMPLETED').map(row => {
+               const rowJobs = getJobsForColumn(row.id);
+               return (
+                <div key={row.id} className="theme-surface overflow-hidden transition-all" style={{ borderRadius: 'var(--radius-lg)', borderLeft: '4px solid', borderColor: row.dotColor.replace('text-', '') }}>
+                  <div className={`${row.headerBg} ${row.headerText} px-4 py-3 flex justify-between items-center`}>
+                    <h3 className="font-bold tracking-wide text-sm flex items-center gap-2">
+                       <CheckCircle2 className="w-4 h-4" />
+                       {row.title}
+                    </h3>
+                    <span className="bg-white/20 px-2.5 py-1 text-xs font-bold" style={{ borderRadius: 'var(--radius-md)' }}>{rowJobs.length}</span>
+                  </div>
+                  <DroppableRow id={row.id}>
+                    {rowJobs.map(job => (
+                      <DraggableJobCard
+                        key={job.id}
+                        job={job}
+                        isAdmin={isAdmin}
+                        onSelectJob={onSelectJob}
+                        onDelete={handleDelete}
+                        onDuplicate={handleDuplicate}
+                      />
+                    ))}
+                  </DroppableRow>
+                </div>
+               );
+            })}
+          </div>
+
+          <DragOverlay>
+            {activeId ? (() => {
+              const activeJob = jobs.find(j => j.id === activeId);
+              if (!activeJob) return null;
+              return (
+                <div className="theme-card shadow-2xl rotate-2 opacity-95 p-2" style={{ width: '120px' }}>
+                  <div className="aspect-square rounded overflow-hidden mb-2" style={{ background: 'var(--bg-surface)' }}>
+                    {activeJob.projectImages?.[0] ? (
+                      <img src={activeJob.projectImages[0]} className="w-full h-full object-cover" alt="" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Box className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
+                      </div>
+                    )}
+                  </div>
+                  <h4 className="font-bold text-[9px] line-clamp-2" style={{ color: 'var(--text-primary)' }}>
+                    {activeJob.data.jobTitle || 'Bez nazwy'}
+                  </h4>
+                </div>
+              );
+            })() : null}
+          </DragOverlay>
+        </DndContext>
+      )}
 
       {/* KANBAN BOARD VIEW with DnD Kit */}
       {viewMode === 'BOARD' && (

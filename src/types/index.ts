@@ -8,10 +8,9 @@ export enum PaymentType {
 export enum PaymentStatus {
   NONE = 'none',           // Brak dokumentu - szary
   PROFORMA = 'proforma',   // Wystawiona proforma - pomarańczowy
-  INVOICE = 'invoice',     // Wystawiona faktura - niebieski
   PARTIAL = 'partial',     // Częściowo opłacone (zaliczka) - fioletowy
   PAID = 'paid',           // Opłacone - zielony
-  CASH = 'cash',           // Do zapłaty gotówką - żółty
+  CASH = 'cash',           // Barter (bez faktury) - żółty
   OVERDUE = 'overdue'      // Przeterminowane - czerwony
 }
 
@@ -28,7 +27,7 @@ export enum UserRole {
   PRINTER = 'printer'
 }
 
-export type JobColumnId = 'PREPARE' | 'ANYTIME' | 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN' | 'COMPLETED';
+export type JobColumnId = 'PREPARE' | 'ANYTIME' | 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN' | 'COMPLETED' | 'ARCHIVE';
 
 // =========================================================================
 // KLIENCI
@@ -228,6 +227,8 @@ export interface Job {
   checklist?: ChecklistItem[];
   completedAt?: number;
   completionNotes?: string;
+  reviewRequestSentAt?: number; // Data wysłania prośby o opinię
+  reviewRequestEmail?: string;  // Email na który wysłano prośbę
   // Nowe pola CRM v2
   clientId?: number;
   client?: Client;
@@ -265,4 +266,3 @@ export interface AppState {
   tempJobData: JobOrderData | null;
   error: string | null;
 }
-

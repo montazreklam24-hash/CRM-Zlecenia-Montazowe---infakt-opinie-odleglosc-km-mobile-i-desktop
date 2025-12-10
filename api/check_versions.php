@@ -35,3 +35,5 @@ echo "Jeśli data modyfikacji jobs.php jest stara (np. sprzed 10 minut), to znac
 
 
 
+
+

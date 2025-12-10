@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import InputForm from './components/InputForm';
@@ -6,8 +6,12 @@ import JobCard from './components/JobCard';
 import { SimpleJobCard } from './components/SimpleJobCard';
 import ThemeSwitcher from './components/ThemeSwitcher';
 import { geminiService, authService, settingsService, jobsService } from './services/apiService';
-import { User, UserRole, Job, JobOrderData } from './types';
+import { User, UserRole, Job, JobOrderData, JobStatus } from './types';
 import { AlertCircle, LogOut, Loader2 } from 'lucide-react';
+import { useDeviceType } from './hooks/useDeviceType';
+
+// Lazy load MobileApp for better desktop performance
+const MobileApp = lazy(() => import('./MobileApp'));
 
 interface AppState {
   currentView: 'LOGIN' | 'DASHBOARD' | 'CREATE' | 'VIEW_JOB' | 'CREATE_SIMPLE';
@@ -17,6 +21,7 @@ interface AppState {
   selectedImages: string[];
   isProcessing: boolean;
   error: string | null;
+  returnToArchive?: boolean; // Flaga - wróć do archiwum po zamknięciu karty
 }
 
 // Automatyczny użytkownik - bez logowania
@@ -44,6 +49,14 @@ const App: React.FC = () => {
   const [appLogo, setAppLogo] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false); // Start as false - no loading screen
 
+  // Mobile detection
+  const { isMobile, isTablet, isTouchDevice } = useDeviceType();
+  
+  // Allow forcing mobile view via URL param ?mobile=1
+  const urlParams = new URLSearchParams(window.location.search);
+  const forceMobile = urlParams.get('mobile') === '1';
+  const showMobileView = forceMobile || isMobile || (isTablet && isTouchDevice);
+
   // Navigation helpers
   const goToDashboard = () => {
     setState(prev => ({ 
@@ -53,6 +66,7 @@ const App: React.FC = () => {
       error: null, 
       selectedJob: null,
       selectedImages: []
+      // returnToArchive zostaje zachowane z poprzedniego stanu
     }));
   };
 
@@ -128,8 +142,13 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSelectJob = (job: Job) => {
-    setState(prev => ({ ...prev, currentView: 'VIEW_JOB', selectedJob: job }));
+  const handleSelectJob = (job: Job, fromArchive?: boolean) => {
+    setState(prev => ({ 
+      ...prev, 
+      currentView: 'VIEW_JOB', 
+      selectedJob: job,
+      returnToArchive: fromArchive ?? false
+    }));
   };
 
   // Loading screen
@@ -154,6 +173,92 @@ const App: React.FC = () => {
 
   const userRole = state.user.role as UserRole;
 
+  // Mobile View - completely different layout optimized for touch
+  if (showMobileView) {
+    return (
+      <Suspense fallback={
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="p-4 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl shadow-2xl shadow-orange-500/20">
+              <span className="text-2xl font-black text-white">M24</span>
+            </div>
+            <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+            <p className="text-slate-400 text-sm">Ładowanie widoku mobilnego...</p>
+          </div>
+        </div>
+      }>
+        {/* Mobile views that need desktop forms */}
+        {state.currentView === 'CREATE' && (
+          <div className="min-h-screen bg-white p-4">
+            <button 
+              onClick={goToDashboard} 
+              className="mb-4 text-slate-500 flex items-center text-sm font-medium"
+            >
+              ← Anuluj i wróć
+            </button>
+            <InputForm 
+              onSubmit={handleGenerate} 
+              isProcessing={state.isProcessing} 
+              onSwitchToManual={handleStartCreateSimple}
+            />
+          </div>
+        )}
+        
+        {state.currentView === 'CREATE_SIMPLE' && (
+          <SimpleJobCard
+            job={state.selectedJob || undefined}
+            onClose={goToDashboard}
+            onSave={handleSaveSimpleJob}
+          />
+        )}
+        
+        {state.currentView === 'VIEW_JOB' && (
+          <JobCard 
+            role={userRole}
+            job={state.selectedJob || undefined}
+            initialData={state.tempJobData || undefined}
+            initialImages={state.selectedImages}
+            onBack={goToDashboard}
+            onJobSaved={goToDashboard}
+            onArchive={async (id) => {
+              const job = state.selectedJob;
+              const jobType = job?.type === 'simple' ? 'simple' : 'ai';
+              try {
+                await jobsService.updateJob(id, { 
+                  status: JobStatus.ARCHIVED,
+                  completedAt: Date.now(),
+                  columnId: 'ARCHIVE' as const
+                }, jobType);
+                goToDashboard();
+              } catch (error) {
+                console.error('Failed to archive:', error);
+              }
+            }}
+            onDelete={async (id) => {
+              const job = state.selectedJob;
+              const jobType = job?.type === 'simple' ? 'simple' : 'ai';
+              try {
+                await jobsService.deleteJob(id, jobType);
+                goToDashboard();
+              } catch (error) {
+                console.error('Failed to delete:', error);
+              }
+            }}
+          />
+        )}
+        
+        {(state.currentView === 'DASHBOARD') && (
+          <MobileApp 
+            role={userRole}
+            onCreateNew={handleStartCreate}
+            onCreateNewSimple={handleStartCreateSimple}
+          />
+        )}
+      </Suspense>
+    );
+  }
+
+  // Desktop View
   return (
     <div className="min-h-screen pb-10 transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
       
@@ -173,7 +278,7 @@ const App: React.FC = () => {
                 Montaż Reklam 24
               </span>
               <span className="text-[10px] font-bold uppercase tracking-wider hidden md:block" style={{ color: 'var(--accent-orange)' }}>
-                CRM v2.0
+                CRM 5.0 PC + Mobile
               </span>
             </div>
           </div>
@@ -240,6 +345,7 @@ const App: React.FC = () => {
             onSelectJob={handleSelectJob}
             onCreateNew={handleStartCreate}
             onCreateNewSimple={handleStartCreateSimple}
+            initialTab={state.returnToArchive ? 'ARCHIVED' : 'ACTIVE'}
           />
         )}
 
@@ -251,7 +357,11 @@ const App: React.FC = () => {
             >
               ← Anuluj i wróć
             </button>
-            <InputForm onSubmit={handleGenerate} isProcessing={state.isProcessing} />
+            <InputForm 
+              onSubmit={handleGenerate} 
+              isProcessing={state.isProcessing} 
+              onSwitchToManual={handleStartCreateSimple}
+            />
           </div>
         )}
 
@@ -264,6 +374,28 @@ const App: React.FC = () => {
               initialImages={state.selectedImages}
               onBack={goToDashboard}
               onJobSaved={goToDashboard}
+              onArchive={async (id) => {
+                const job = state.selectedJob;
+                const jobType = job?.type === 'simple' ? 'simple' : 'ai';
+                try {
+                  await jobsService.updateJob(id, { 
+                    status: JobStatus.ARCHIVED,
+                    completedAt: Date.now(),
+                    columnId: 'ARCHIVE' as const
+                  }, jobType);
+                } catch (error) {
+                  console.error('Failed to archive:', error);
+                }
+              }}
+              onDelete={async (id) => {
+                const job = state.selectedJob;
+                const jobType = job?.type === 'simple' ? 'simple' : 'ai';
+                try {
+                  await jobsService.deleteJob(id, jobType);
+                } catch (error) {
+                  console.error('Failed to delete:', error);
+                }
+              }}
             />
           </div>
         )}
@@ -281,4 +413,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-

@@ -1,643 +1,519 @@
 <?php
 /**
- * CRM Zlecenia Montażowe - API Faktur (inFakt)
- * PHP 5.6 Compatible
+ * API Faktur - endpoint dla modułu fakturowania CRM
+ * Integracja z InfaktClient.php
+ * 
+ * Endpoints:
+ *   POST /api/invoices/proforma  - Utwórz proformę
+ *   POST /api/invoices/invoice   - Utwórz fakturę VAT
+ *   POST /api/invoices/send      - Wyślij fakturę emailem
+ *   GET  /api/invoices/{id}      - Pobierz dane faktury
+ *   GET  /api/invoices/pdf/{id}  - Pobierz PDF faktury
  */
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/InfaktClient.php';
 
+// Klucz API inFakt
+define('INFAKT_API_KEY', '4a21f1a475ec06c7613fa47ae1553fe4974a800e');
+
 /**
- * Router dla /api/invoices
+ * Inicjalizuj klienta inFakt
  */
-function handleInvoices($method, $id = null) {
-    switch ($method) {
-        case 'GET':
-            if ($id) {
-                getInvoice($id);
-            } else {
-                getInvoices();
-            }
-            break;
-        case 'POST':
-            createInvoice();
-            break;
-        case 'PUT':
-            if (!$id) {
-                jsonResponse(array('error' => 'Invoice ID required'), 400);
-            }
-            updateInvoice($id);
-            break;
-        case 'DELETE':
-            if (!$id) {
-                jsonResponse(array('error' => 'Invoice ID required'), 400);
-            }
-            deleteInvoice($id);
-            break;
-        default:
-            jsonResponse(array('error' => 'Method not allowed'), 405);
+function getInfaktClient() {
+    $client = new InfaktClient(INFAKT_API_KEY);
+    $client->setDebug(true);
+    return $client;
+}
+
+/**
+ * POST /api/invoices/proforma
+ * Utwórz proformę i opcjonalnie wyślij na email
+ */
+function handleCreateProforma() {
+    $user = requireAuth();
+    $input = getJsonInput();
+    
+    // Walidacja
+    if (empty($input['items']) || !is_array($input['items'])) {
+        jsonResponse(array('error' => 'Brak pozycji na fakturze'), 400);
+    }
+    
+    $infakt = getInfaktClient();
+    
+    // Przygotuj dane klienta
+    $clientData = array(
+        'type' => !empty($input['nip']) ? 'company' : 'person',
+        'company_name' => isset($input['companyName']) ? $input['companyName'] : '',
+        'first_name' => isset($input['firstName']) ? $input['firstName'] : '',
+        'last_name' => isset($input['lastName']) ? $input['lastName'] : '',
+        'nip' => isset($input['nip']) ? $input['nip'] : '',
+        'email' => isset($input['email']) ? $input['email'] : '',
+        'phone' => isset($input['phone']) ? $input['phone'] : '',
+        'street' => isset($input['street']) ? $input['street'] : '',
+        'city' => isset($input['city']) ? $input['city'] : '',
+        'post_code' => isset($input['postCode']) ? $input['postCode'] : '',
+        'payment_method' => 'transfer'
+    );
+    
+    // Nazwa klienta - priorytet: firma > imię+nazwisko > email
+    if (empty($clientData['company_name'])) {
+        if (!empty($clientData['first_name']) || !empty($clientData['last_name'])) {
+            $clientData['company_name'] = trim($clientData['first_name'] . ' ' . $clientData['last_name']);
+        } elseif (!empty($clientData['email'])) {
+            $clientData['company_name'] = $clientData['email'];
+        } else {
+            $clientData['company_name'] = 'Klient ' . date('Y-m-d H:i');
+        }
+    }
+    
+    try {
+        // Znajdź lub utwórz klienta w inFakt
+        $clientId = $infakt->findOrCreateClient($clientData);
+        
+        if (!$clientId) {
+            throw new Exception('Nie udało się utworzyć klienta w inFakt');
+        }
+        
+        // Przygotuj pozycje faktury
+        $invoiceItems = array();
+        foreach ($input['items'] as $item) {
+            $invoiceItems[] = array(
+                'name' => $item['name'],
+                'quantity' => isset($item['quantity']) ? floatval($item['quantity']) : 1,
+                'unit_price_net' => isset($item['unitPriceNet']) ? floatval($item['unitPriceNet']) : 0,
+                'vat_rate' => isset($item['vatRate']) ? intval($item['vatRate']) : 23
+            );
+        }
+        
+        // Opcje faktury
+        $options = array(
+            'type' => 'proforma',
+            'due_days' => isset($input['dueDays']) ? intval($input['dueDays']) : 7,
+            'description' => isset($input['description']) ? $input['description'] : '',
+            'install_address' => isset($input['installAddress']) ? $input['installAddress'] : '',
+            'phone' => isset($input['phone']) ? $input['phone'] : ''
+        );
+        
+        // Utwórz proformę
+        $invoice = $infakt->createInvoice($clientId, $invoiceItems, $options);
+        
+        if (!$invoice) {
+            throw new Exception('Nie udało się utworzyć proformy');
+        }
+        
+        // Utwórz link do udostępniania
+        $shareLink = $infakt->createShareLink($invoice['id']);
+        
+        // Wyślij email jeśli żądano
+        $emailSent = false;
+        if (!empty($input['sendEmail']) && !empty($input['email'])) {
+            $emailSent = $infakt->sendInvoiceByEmail($invoice['id'], $input['email']);
+        }
+        
+        // Zapisz w bazie (opcjonalnie)
+        $jobId = isset($input['jobId']) ? $input['jobId'] : null;
+        if ($jobId) {
+            saveInvoiceToDb($jobId, $invoice, 'proforma', $clientId);
+        }
+        
+        jsonResponse(array(
+            'success' => true,
+            'invoice' => array(
+                'id' => $invoice['id'],
+                'number' => $invoice['number'],
+                'type' => 'proforma',
+                'shareLink' => $shareLink,
+                'emailSent' => $emailSent
+            )
+        ));
+        
+    } catch (Exception $e) {
+        error_log('Proforma error: ' . $e->getMessage());
+        jsonResponse(array('error' => $e->getMessage()), 500);
     }
 }
 
 /**
- * GET /api/invoices
+ * POST /api/invoices/invoice
+ * Utwórz fakturę VAT
  */
-function getInvoices() {
+function handleCreateInvoice() {
     $user = requireAuth();
-    $pdo = getDB();
+    $input = getJsonInput();
     
-    $jobId = isset($_GET['job_id']) ? intval($_GET['job_id']) : null;
-    $clientId = isset($_GET['client_id']) ? intval($_GET['client_id']) : null;
-    $status = isset($_GET['status']) ? $_GET['status'] : null;
-    $type = isset($_GET['type']) ? $_GET['type'] : null;
-    
-    $where = array('1=1');
-    $params = array();
-    
-    if ($jobId) {
-        $where[] = 'i.job_id = ?';
-        $params[] = $jobId;
-    }
-    if ($clientId) {
-        $where[] = 'i.client_id = ?';
-        $params[] = $clientId;
-    }
-    if ($status) {
-        $where[] = 'i.payment_status = ?';
-        $params[] = $status;
-    }
-    if ($type) {
-        $where[] = 'i.type = ?';
-        $params[] = $type;
+    // Walidacja
+    if (empty($input['items']) || !is_array($input['items'])) {
+        jsonResponse(array('error' => 'Brak pozycji na fakturze'), 400);
     }
     
-    $whereClause = implode(' AND ', $where);
+    $infakt = getInfaktClient();
     
-    $sql = "
-        SELECT 
-            i.*,
-            c.company_name as client_company,
-            c.first_name as client_first_name,
-            c.last_name as client_last_name,
-            j.friendly_id as job_friendly_id,
-            j.job_title
-        FROM invoices i
-        LEFT JOIN clients c ON i.client_id = c.id
-        LEFT JOIN jobs j ON i.job_id = j.id
-        WHERE {$whereClause}
-        ORDER BY i.created_at DESC
-    ";
+    // Przygotuj dane klienta (tak samo jak dla proformy)
+    $clientData = array(
+        'type' => !empty($input['nip']) ? 'company' : 'person',
+        'company_name' => isset($input['companyName']) ? $input['companyName'] : '',
+        'first_name' => isset($input['firstName']) ? $input['firstName'] : '',
+        'last_name' => isset($input['lastName']) ? $input['lastName'] : '',
+        'nip' => isset($input['nip']) ? $input['nip'] : '',
+        'email' => isset($input['email']) ? $input['email'] : '',
+        'phone' => isset($input['phone']) ? $input['phone'] : '',
+        'street' => isset($input['street']) ? $input['street'] : '',
+        'city' => isset($input['city']) ? $input['city'] : '',
+        'post_code' => isset($input['postCode']) ? $input['postCode'] : '',
+        'payment_method' => isset($input['paymentMethod']) ? $input['paymentMethod'] : 'transfer'
+    );
     
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $invoices = $stmt->fetchAll();
-    
-    // Pobierz pozycje dla każdej faktury
-    foreach ($invoices as &$inv) {
-        $inv['items'] = getInvoiceItems($inv['id']);
-        $inv = mapInvoiceToFrontend($inv);
+    if (empty($clientData['company_name'])) {
+        if (!empty($clientData['first_name']) || !empty($clientData['last_name'])) {
+            $clientData['company_name'] = trim($clientData['first_name'] . ' ' . $clientData['last_name']);
+        } elseif (!empty($clientData['email'])) {
+            $clientData['company_name'] = $clientData['email'];
+        } else {
+            $clientData['company_name'] = 'Klient ' . date('Y-m-d H:i');
+        }
     }
     
-    jsonResponse(array('success' => true, 'invoices' => $invoices));
+    try {
+        $clientId = $infakt->findOrCreateClient($clientData);
+        
+        if (!$clientId) {
+            throw new Exception('Nie udało się utworzyć klienta w inFakt');
+        }
+        
+        // Przygotuj pozycje
+        $invoiceItems = array();
+        foreach ($input['items'] as $item) {
+            $invoiceItems[] = array(
+                'name' => $item['name'],
+                'quantity' => isset($item['quantity']) ? floatval($item['quantity']) : 1,
+                'unit_price_net' => isset($item['unitPriceNet']) ? floatval($item['unitPriceNet']) : 0,
+                'vat_rate' => isset($item['vatRate']) ? intval($item['vatRate']) : 23
+            );
+        }
+        
+        // Opcje faktury VAT
+        $markPaid = isset($input['markAsPaid']) && $input['markAsPaid'];
+        
+        $options = array(
+            'type' => 'vat',
+            'due_days' => isset($input['dueDays']) ? intval($input['dueDays']) : 14,
+            'description' => isset($input['description']) ? $input['description'] : '',
+            'install_address' => isset($input['installAddress']) ? $input['installAddress'] : '',
+            'phone' => isset($input['phone']) ? $input['phone'] : '',
+            'mark_paid' => $markPaid
+        );
+        
+        // Utwórz fakturę
+        $invoice = $infakt->createInvoice($clientId, $invoiceItems, $options);
+        
+        if (!$invoice) {
+            throw new Exception('Nie udało się utworzyć faktury');
+        }
+        
+        // Link do udostępniania
+        $shareLink = $infakt->createShareLink($invoice['id']);
+        
+        // Wyślij email
+        $emailSent = false;
+        if (!empty($input['sendEmail']) && !empty($input['email'])) {
+            $emailSent = $infakt->sendInvoiceByEmail($invoice['id'], $input['email']);
+        }
+        
+        // Zapisz w bazie
+        $jobId = isset($input['jobId']) ? $input['jobId'] : null;
+        if ($jobId) {
+            saveInvoiceToDb($jobId, $invoice, 'vat', $clientId);
+        }
+        
+        jsonResponse(array(
+            'success' => true,
+            'invoice' => array(
+                'id' => $invoice['id'],
+                'number' => $invoice['number'],
+                'type' => 'vat',
+                'shareLink' => $shareLink,
+                'emailSent' => $emailSent,
+                'isPaid' => $markPaid
+            )
+        ));
+        
+    } catch (Exception $e) {
+        error_log('Invoice error: ' . $e->getMessage());
+        jsonResponse(array('error' => $e->getMessage()), 500);
+    }
+}
+
+/**
+ * POST /api/invoices/send
+ * Wyślij fakturę emailem
+ */
+function handleSendInvoice() {
+    $user = requireAuth();
+    $input = getJsonInput();
+    
+    if (empty($input['invoiceId'])) {
+        jsonResponse(array('error' => 'Brak ID faktury'), 400);
+    }
+    
+    if (empty($input['email'])) {
+        jsonResponse(array('error' => 'Brak adresu email'), 400);
+    }
+    
+    $infakt = getInfaktClient();
+    
+    try {
+        $result = $infakt->sendInvoiceByEmail($input['invoiceId'], $input['email']);
+        
+        if ($result) {
+            jsonResponse(array('success' => true, 'message' => 'Email wysłany'));
+        } else {
+            throw new Exception('Nie udało się wysłać emaila');
+        }
+    } catch (Exception $e) {
+        jsonResponse(array('error' => $e->getMessage()), 500);
+    }
 }
 
 /**
  * GET /api/invoices/{id}
+ * Pobierz dane faktury
  */
-function getInvoice($id) {
+function handleGetInvoice($invoiceId) {
     $user = requireAuth();
-    $pdo = getDB();
     
-    $stmt = $pdo->prepare('
-        SELECT 
-            i.*,
-            c.company_name as client_company,
-            c.first_name as client_first_name,
-            c.last_name as client_last_name,
-            c.email as client_email,
-            j.friendly_id as job_friendly_id,
-            j.job_title
-        FROM invoices i
-        LEFT JOIN clients c ON i.client_id = c.id
-        LEFT JOIN jobs j ON i.job_id = j.id
-        WHERE i.id = ?
-    ');
-    $stmt->execute(array($id));
-    $invoice = $stmt->fetch();
+    $infakt = getInfaktClient();
     
-    if (!$invoice) {
-        jsonResponse(array('error' => 'Faktura nie istnieje'), 404);
-    }
-    
-    $invoice['items'] = getInvoiceItems($id);
-    
-    jsonResponse(array('success' => true, 'invoice' => mapInvoiceToFrontend($invoice)));
-}
-
-/**
- * POST /api/invoices
- * Tworzy fakturę lokalnie i w inFakt
- */
-function createInvoice() {
-    $user = requireAdmin();
-    $input = getJsonInput();
-    $pdo = getDB();
-    
-    // Walidacja
-    $jobId = isset($input['jobId']) ? intval($input['jobId']) : null;
-    $clientId = isset($input['clientId']) ? intval($input['clientId']) : null;
-    $type = isset($input['type']) ? $input['type'] : 'invoice';
-    $items = isset($input['items']) ? $input['items'] : array();
-    
-    if (empty($items)) {
-        jsonResponse(array('error' => 'Dodaj przynajmniej jedną pozycję'), 400);
-    }
-    
-    // Oblicz sumy
-    $totalNet = 0;
-    $totalGross = 0;
-    foreach ($items as $item) {
-        $itemNet = floatval($item['unitPriceNet']) * floatval($item['quantity']);
-        $vatRate = isset($item['vatRate']) ? intval($item['vatRate']) : 23;
-        $itemGross = $itemNet * (1 + $vatRate / 100);
-        $totalNet += $itemNet;
-        $totalGross += $itemGross;
-    }
-    $totalVat = $totalGross - $totalNet;
-    
-    // Generuj numer
-    $invoiceNumber = generateInvoiceNumber($type);
-    
-    // Wstaw do bazy lokalnej
-    $stmt = $pdo->prepare('
-        INSERT INTO invoices (
-            job_id, client_id, type, number,
-            total_net, total_vat, total_gross,
-            payment_method, payment_status, due_date,
-            issue_date, sell_date, description, notes,
-            created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ');
-    
-    $dueDays = isset($input['dueDays']) ? intval($input['dueDays']) : 7;
-    $dueDate = date('Y-m-d', strtotime('+' . $dueDays . ' days'));
-    
-    $stmt->execute(array(
-        $jobId,
-        $clientId,
-        $type,
-        $invoiceNumber,
-        $totalNet,
-        $totalVat,
-        $totalGross,
-        isset($input['paymentMethod']) ? $input['paymentMethod'] : 'transfer',
-        'pending',
-        $dueDate,
-        date('Y-m-d'),
-        date('Y-m-d'),
-        isset($input['description']) ? $input['description'] : null,
-        isset($input['notes']) ? $input['notes'] : null,
-        $user['id']
-    ));
-    
-    $invoiceId = $pdo->lastInsertId();
-    
-    // Dodaj pozycje
-    saveInvoiceItems($invoiceId, $items);
-    
-    // Wyślij do inFakt jeśli skonfigurowane
-    $infaktResult = null;
-    if (defined('INFAKT_API_KEY') && !empty(INFAKT_API_KEY) && isset($input['sendToInfakt']) && $input['sendToInfakt']) {
-        $infaktResult = sendToInfakt($invoiceId, $clientId, $items, $type, $input);
+    try {
+        $invoice = $infakt->getInvoice($invoiceId);
         
-        if ($infaktResult) {
-            // Zaktualizuj rekord z danymi inFakt
-            $stmt = $pdo->prepare('UPDATE invoices SET infakt_id = ?, infakt_number = ?, infakt_link = ? WHERE id = ?');
-            $stmt->execute(array(
-                $infaktResult['id'],
-                $infaktResult['number'],
-                isset($infaktResult['link']) ? $infaktResult['link'] : null,
-                $invoiceId
-            ));
+        if (!$invoice) {
+            jsonResponse(array('error' => 'Faktura nie znaleziona'), 404);
         }
-    }
-    
-    // Zaktualizuj status płatności w zleceniu
-    if ($jobId) {
-        updateJobPaymentStatus($jobId);
-    }
-    
-    // Pobierz i zwróć
-    $stmt = $pdo->prepare('SELECT * FROM invoices WHERE id = ?');
-    $stmt->execute(array($invoiceId));
-    $invoice = $stmt->fetch();
-    $invoice['items'] = getInvoiceItems($invoiceId);
-    
-    jsonResponse(array(
-        'success' => true, 
-        'invoice' => mapInvoiceToFrontend($invoice),
-        'infakt' => $infaktResult
-    ), 201);
-}
-
-/**
- * PUT /api/invoices/{id}
- */
-function updateInvoice($id) {
-    $user = requireAdmin();
-    $input = getJsonInput();
-    $pdo = getDB();
-    
-    // Sprawdź czy istnieje
-    $stmt = $pdo->prepare('SELECT * FROM invoices WHERE id = ?');
-    $stmt->execute(array($id));
-    $invoice = $stmt->fetch();
-    
-    if (!$invoice) {
-        jsonResponse(array('error' => 'Faktura nie istnieje'), 404);
-    }
-    
-    $updates = array();
-    $params = array();
-    
-    // Dozwolone pola
-    $allowedFields = array(
-        'payment_status' => 'paymentStatus',
-        'paid_amount' => 'paidAmount',
-        'paid_date' => 'paidDate',
-        'notes' => 'notes',
-        'description' => 'description'
-    );
-    
-    foreach ($allowedFields as $dbField => $inputField) {
-        if (isset($input[$inputField])) {
-            $updates[] = "`{$dbField}` = ?";
-            $params[] = $input[$inputField];
-        }
-    }
-    
-    // Oznacz jako opłacone
-    if (isset($input['markAsPaid']) && $input['markAsPaid']) {
-        $updates[] = 'payment_status = ?';
-        $params[] = 'paid';
-        $updates[] = 'paid_amount = total_gross';
-        $updates[] = 'paid_date = ?';
-        $params[] = date('Y-m-d');
         
-        // Oznacz w inFakt
-        if ($invoice['infakt_id']) {
-            $infakt = getInfaktClient();
-            if ($infakt) {
-                $infakt->markAsPaid($invoice['infakt_id']);
-            }
-        }
+        jsonResponse(array('success' => true, 'invoice' => $invoice));
+    } catch (Exception $e) {
+        jsonResponse(array('error' => $e->getMessage()), 500);
     }
-    
-    if (count($updates) > 0) {
-        $params[] = $id;
-        $sql = 'UPDATE invoices SET ' . implode(', ', $updates) . ' WHERE id = ?';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-    }
-    
-    // Zaktualizuj status w zleceniu
-    if ($invoice['job_id']) {
-        updateJobPaymentStatus($invoice['job_id']);
-    }
-    
-    // Pobierz i zwróć
-    $stmt = $pdo->prepare('SELECT * FROM invoices WHERE id = ?');
-    $stmt->execute(array($id));
-    $inv = $stmt->fetch();
-    $inv['items'] = getInvoiceItems($id);
-    
-    jsonResponse(array('success' => true, 'invoice' => mapInvoiceToFrontend($inv)));
 }
 
 /**
- * DELETE /api/invoices/{id}
- */
-function deleteInvoice($id) {
-    $user = requireAdmin();
-    $pdo = getDB();
-    
-    $stmt = $pdo->prepare('SELECT * FROM invoices WHERE id = ?');
-    $stmt->execute(array($id));
-    $invoice = $stmt->fetch();
-    
-    if (!$invoice) {
-        jsonResponse(array('error' => 'Faktura nie istnieje'), 404);
-    }
-    
-    $jobId = $invoice['job_id'];
-    
-    // Usuń (CASCADE usunie pozycje)
-    $stmt = $pdo->prepare('DELETE FROM invoices WHERE id = ?');
-    $stmt->execute(array($id));
-    
-    // Zaktualizuj status w zleceniu
-    if ($jobId) {
-        updateJobPaymentStatus($jobId);
-    }
-    
-    jsonResponse(array('success' => true, 'message' => 'Faktura usunięta'));
-}
-
-// =========================================================================
-// DODATKOWE ENDPOINTY
-// =========================================================================
-
-/**
- * POST /api/invoices/{id}/send
- * Wysyła fakturę emailem
- */
-function sendInvoiceEmail($id) {
-    $user = requireAdmin();
-    $input = getJsonInput();
-    $pdo = getDB();
-    
-    $email = isset($input['email']) ? $input['email'] : null;
-    
-    $stmt = $pdo->prepare('SELECT * FROM invoices WHERE id = ?');
-    $stmt->execute(array($id));
-    $invoice = $stmt->fetch();
-    
-    if (!$invoice) {
-        jsonResponse(array('error' => 'Faktura nie istnieje'), 404);
-    }
-    
-    // Wyślij przez inFakt jeśli mamy ID
-    if ($invoice['infakt_id']) {
-        $infakt = getInfaktClient();
-        if ($infakt && $infakt->sendInvoiceByEmail($invoice['infakt_id'], $email)) {
-            // Zapisz info o wysyłce
-            $stmt = $pdo->prepare('UPDATE invoices SET sent_at = NOW(), sent_to = ? WHERE id = ?');
-            $stmt->execute(array($email, $id));
-            
-            jsonResponse(array('success' => true, 'message' => 'Email wysłany'));
-        }
-    }
-    
-    jsonResponse(array('error' => 'Nie udało się wysłać emaila'), 500);
-}
-
-/**
- * GET /api/invoices/{id}/pdf
+ * GET /api/invoices/pdf/{id}
  * Pobierz PDF faktury
  */
-function getInvoicePdf($id) {
+function handleGetPdf($invoiceId) {
     $user = requireAuth();
-    $pdo = getDB();
     
-    $stmt = $pdo->prepare('SELECT * FROM invoices WHERE id = ?');
-    $stmt->execute(array($id));
-    $invoice = $stmt->fetch();
-    
-    if (!$invoice) {
-        jsonResponse(array('error' => 'Faktura nie istnieje'), 404);
-    }
-    
-    if ($invoice['infakt_id']) {
-        $infakt = getInfaktClient();
-        if ($infakt) {
-            $pdf = $infakt->getInvoicePdf($invoice['infakt_id']);
-            if ($pdf) {
-                header('Content-Type: application/pdf');
-                header('Content-Disposition: attachment; filename="' . $invoice['number'] . '.pdf"');
-                echo $pdf;
-                exit;
-            }
-        }
-    }
-    
-    jsonResponse(array('error' => 'PDF niedostępny'), 404);
-}
-
-// =========================================================================
-// HELPERS
-// =========================================================================
-
-function getInfaktClient() {
-    if (!defined('INFAKT_API_KEY') || empty(INFAKT_API_KEY)) {
-        return null;
-    }
-    
-    $apiUrl = defined('INFAKT_API_URL') ? INFAKT_API_URL : 'https://api.infakt.pl/v3';
-    $client = new InfaktClient(INFAKT_API_KEY, $apiUrl);
-    $client->setDebug(DEV_MODE);
-    return $client;
-}
-
-function sendToInfakt($invoiceId, $clientId, $items, $type, $options) {
     $infakt = getInfaktClient();
-    if (!$infakt) return null;
     
-    $pdo = getDB();
-    
-    // Pobierz dane klienta
-    $stmt = $pdo->prepare('SELECT * FROM clients WHERE id = ?');
-    $stmt->execute(array($clientId));
-    $client = $stmt->fetch();
-    
-    if (!$client) return null;
-    
-    // Znajdź lub utwórz klienta w inFakt
-    $infaktClientId = $infakt->findOrCreateClient(array(
-        'type' => $client['type'],
-        'company_name' => $client['company_name'],
-        'first_name' => $client['first_name'],
-        'last_name' => $client['last_name'],
-        'email' => $client['email'],
-        'phone' => $client['phone'],
-        'street' => $client['street'],
-        'post_code' => $client['post_code'],
-        'city' => $client['city'],
-        'nip' => $client['nip'],
-        'payment_method' => $client['payment_method']
-    ));
-    
-    if (!$infaktClientId) return null;
-    
-    // Zapisz infakt_id klienta
-    $stmt = $pdo->prepare('UPDATE clients SET infakt_id = ? WHERE id = ?');
-    $stmt->execute(array($infaktClientId, $clientId));
-    
-    // Przygotuj pozycje
-    $infaktItems = array();
-    foreach ($items as $item) {
-        $infaktItems[] = array(
-            'name' => $item['name'],
-            'quantity' => isset($item['quantity']) ? floatval($item['quantity']) : 1,
-            'unit_price_net' => floatval($item['unitPriceNet']),
-            'vat_rate' => isset($item['vatRate']) ? intval($item['vatRate']) : 23
-        );
-    }
-    
-    // Utwórz fakturę w inFakt
-    $result = $infakt->createInvoice($infaktClientId, $infaktItems, array(
-        'type' => $type === 'proforma' ? 'proforma' : 'vat',
-        'description' => isset($options['description']) ? $options['description'] : '',
-        'install_address' => isset($options['installAddress']) ? $options['installAddress'] : '',
-        'phone' => isset($options['phone']) ? $options['phone'] : '',
-        'due_days' => isset($options['dueDays']) ? intval($options['dueDays']) : 7,
-        'mark_paid' => isset($options['markAsPaid']) && $options['markAsPaid']
-    ));
-    
-    if ($result) {
-        // Pobierz link do udostępniania
-        $result['link'] = $infakt->createShareLink($result['id']);
-    }
-    
-    return $result;
-}
-
-function generateInvoiceNumber($type) {
-    $pdo = getDB();
-    $year = date('Y');
-    $month = date('m');
-    
-    $prefix = $type === 'proforma' ? 'PROF' : 'FV';
-    
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) as count 
-        FROM invoices 
-        WHERE type = ? AND YEAR(created_at) = ? AND MONTH(created_at) = ?
-    ");
-    $stmt->execute(array($type, $year, $month));
-    $result = $stmt->fetch();
-    
-    $number = intval($result['count']) + 1;
-    
-    return $prefix . '/' . $year . '/' . $month . '/' . str_pad($number, 3, '0', STR_PAD_LEFT);
-}
-
-function getInvoiceItems($invoiceId) {
-    $pdo = getDB();
-    $stmt = $pdo->prepare('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY sort_order ASC');
-    $stmt->execute(array($invoiceId));
-    $items = $stmt->fetchAll();
-    
-    $result = array();
-    foreach ($items as $item) {
-        $result[] = array(
-            'id' => intval($item['id']),
-            'name' => $item['name'],
-            'description' => $item['description'],
-            'quantity' => floatval($item['quantity']),
-            'unit' => $item['unit'],
-            'unitPriceNet' => floatval($item['unit_price_net']),
-            'vatRate' => intval($item['vat_rate']),
-            'totalNet' => floatval($item['total_net']),
-            'totalGross' => floatval($item['total_gross'])
-        );
-    }
-    return $result;
-}
-
-function saveInvoiceItems($invoiceId, $items) {
-    $pdo = getDB();
-    $stmt = $pdo->prepare('
-        INSERT INTO invoice_items (invoice_id, name, description, quantity, unit, unit_price_net, vat_rate, total_net, total_gross, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ');
-    
-    foreach ($items as $index => $item) {
-        $quantity = isset($item['quantity']) ? floatval($item['quantity']) : 1;
-        $unitPriceNet = floatval($item['unitPriceNet']);
-        $vatRate = isset($item['vatRate']) ? intval($item['vatRate']) : 23;
+    try {
+        $pdf = $infakt->getInvoicePdf($invoiceId);
         
-        $totalNet = $quantity * $unitPriceNet;
-        $totalGross = $totalNet * (1 + $vatRate / 100);
+        if (!$pdf) {
+            jsonResponse(array('error' => 'Nie udało się pobrać PDF'), 500);
+        }
+        
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="faktura_' . $invoiceId . '.pdf"');
+        echo $pdf;
+        exit;
+    } catch (Exception $e) {
+        jsonResponse(array('error' => $e->getMessage()), 500);
+    }
+}
+
+/**
+ * POST /api/invoices/mark-paid
+ * Oznacz fakturę jako opłaconą
+ */
+function handleMarkAsPaid() {
+    $user = requireAuth();
+    $input = getJsonInput();
+    
+    if (empty($input['invoiceId'])) {
+        jsonResponse(array('error' => 'Brak ID faktury'), 400);
+    }
+    
+    $infakt = getInfaktClient();
+    
+    try {
+        $paidDate = isset($input['paidDate']) ? $input['paidDate'] : date('Y-m-d');
+        $result = $infakt->markAsPaid($input['invoiceId'], $paidDate);
+        
+        if ($result) {
+            jsonResponse(array('success' => true));
+        } else {
+            throw new Exception('Nie udało się oznaczyć jako opłacone');
+        }
+    } catch (Exception $e) {
+        jsonResponse(array('error' => $e->getMessage()), 500);
+    }
+}
+
+/**
+ * Zapisz fakturę do lokalnej bazy danych
+ */
+function saveInvoiceToDb($jobId, $invoiceData, $type, $clientId) {
+    try {
+        $pdo = getDB();
+        
+        // Sprawdź czy tabela istnieje, jeśli nie - utwórz
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS invoices (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                job_id VARCHAR(50),
+                infakt_id INT,
+                infakt_number VARCHAR(50),
+                type ENUM('proforma', 'vat') DEFAULT 'proforma',
+                client_id INT,
+                total_net DECIMAL(10,2),
+                total_gross DECIMAL(10,2),
+                status ENUM('pending', 'paid', 'cancelled') DEFAULT 'pending',
+                share_link VARCHAR(255),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+        
+        $stmt = $pdo->prepare("
+            INSERT INTO invoices (job_id, infakt_id, infakt_number, type, client_id, created_at)
+            VALUES (?, ?, ?, ?, ?, NOW())
+        ");
         
         $stmt->execute(array(
-            $invoiceId,
-            $item['name'],
-            isset($item['description']) ? $item['description'] : null,
-            $quantity,
-            isset($item['unit']) ? $item['unit'] : 'szt.',
-            $unitPriceNet,
-            $vatRate,
-            $totalNet,
-            $totalGross,
-            $index
+            $jobId,
+            $invoiceData['id'],
+            isset($invoiceData['number']) ? $invoiceData['number'] : null,
+            $type,
+            $clientId
         ));
-    }
-}
-
-function updateJobPaymentStatus($jobId) {
-    $pdo = getDB();
-    
-    // Pobierz faktury dla zlecenia
-    $stmt = $pdo->prepare('SELECT type, payment_status, total_gross, paid_amount FROM invoices WHERE job_id = ? ORDER BY created_at DESC');
-    $stmt->execute(array($jobId));
-    $invoices = $stmt->fetchAll();
-    
-    $status = 'none';
-    $totalGross = 0;
-    $paidAmount = 0;
-    
-    foreach ($invoices as $inv) {
-        $totalGross += floatval($inv['total_gross']);
-        $paidAmount += floatval($inv['paid_amount']);
         
-        if ($inv['payment_status'] === 'paid') {
-            $status = 'paid';
-        } elseif ($inv['payment_status'] === 'partial' && $status !== 'paid') {
-            $status = 'partial';
-        } elseif ($inv['type'] === 'invoice' && $status === 'none') {
-            $status = 'invoice';
-        } elseif ($inv['type'] === 'proforma' && $status === 'none') {
-            $status = 'proforma';
+        return $pdo->lastInsertId();
+    } catch (Exception $e) {
+        error_log('Save invoice to DB error: ' . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * GET /api/invoices/job/{jobId}
+ * Pobierz faktury dla zlecenia
+ */
+function handleGetJobInvoices($jobId) {
+    $user = requireAuth();
+    
+    try {
+        $pdo = getDB();
+        
+        $stmt = $pdo->prepare("
+            SELECT * FROM invoices 
+            WHERE job_id = ? 
+            ORDER BY created_at DESC
+        ");
+        $stmt->execute(array($jobId));
+        $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        jsonResponse(array('success' => true, 'invoices' => $invoices));
+    } catch (Exception $e) {
+        // Tabela może nie istnieć - zwróć pustą listę
+        jsonResponse(array('success' => true, 'invoices' => array()));
+    }
+}
+
+// =============================================================================
+// GŁÓWNA FUNKCJA HANDLERA (wywoływana z index.php)
+// =============================================================================
+
+function handleInvoices($method, $id = null) {
+    // Pobierz dodatkową część ścieżki (np. /invoices/proforma -> proforma)
+    $requestUri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
+    $path = parse_url($requestUri, PHP_URL_PATH);
+    
+    // Wyciągnij akcję z path (invoices/{action})
+    $action = '';
+    if (preg_match('#/invoices/([a-z\-]+)#i', $path, $matches)) {
+        $action = $matches[1];
+    }
+    
+    error_log("[invoices.php] handleInvoices - Method: $method, ID: $id, Action: $action");
+    
+    if ($method === 'POST') {
+        switch ($action) {
+            case 'proforma':
+                handleCreateProforma();
+                break;
+            case 'invoice':
+                handleCreateInvoice();
+                break;
+            case 'send':
+                handleSendInvoice();
+                break;
+            case 'mark-paid':
+                handleMarkAsPaid();
+                break;
+            default:
+                // Domyślnie POST bez akcji = proforma
+                handleCreateProforma();
+                break;
         }
-    }
-    
-    // Zaktualizuj zlecenie (sprawdź w obu tabelach)
-    // Najpierw spróbuj jobs_ai
-    $stmt = $pdo->prepare('UPDATE jobs_ai SET payment_status = ?, value_gross = ? WHERE id = ?');
-    $stmt->execute(array($status, $totalGross, $jobId));
-    
-    // Jeśli nie znaleziono, spróbuj jobs_simple
-    if ($stmt->rowCount() === 0) {
-        $stmt = $pdo->prepare('UPDATE jobs_simple SET payment_status = ?, value_gross = ? WHERE id = ?');
-        $stmt->execute(array($status, $totalGross, $jobId));
+    } elseif ($method === 'GET') {
+        if ($action === 'pdf' && $id) {
+            handleGetPdf($id);
+        } elseif ($action === 'job' && $id) {
+            handleGetJobInvoices($id);
+        } elseif ($id && is_numeric($id)) {
+            handleGetInvoice($id);
+        } else {
+            // Lista faktur (opcjonalnie)
+            jsonResponse(array('error' => 'Specify invoice ID or action'), 400);
+        }
+    } else {
+        jsonResponse(array('error' => 'Method not allowed'), 405);
     }
 }
 
-function mapInvoiceToFrontend($invoice) {
-    return array(
-        'id' => intval($invoice['id']),
-        'jobId' => $invoice['job_id'] ? intval($invoice['job_id']) : null,
-        'clientId' => $invoice['client_id'] ? intval($invoice['client_id']) : null,
-        'type' => $invoice['type'],
-        'number' => $invoice['number'],
-        'infaktId' => $invoice['infakt_id'] ? intval($invoice['infakt_id']) : null,
-        'infaktNumber' => $invoice['infakt_number'],
-        'infaktLink' => $invoice['infakt_link'],
-        'totalNet' => floatval($invoice['total_net']),
-        'totalVat' => floatval($invoice['total_vat']),
-        'totalGross' => floatval($invoice['total_gross']),
-        'paymentMethod' => $invoice['payment_method'],
-        'paymentStatus' => $invoice['payment_status'],
-        'paidAmount' => floatval($invoice['paid_amount']),
-        'paidDate' => $invoice['paid_date'],
-        'dueDate' => $invoice['due_date'],
-        'issueDate' => $invoice['issue_date'],
-        'sellDate' => $invoice['sell_date'],
-        'description' => $invoice['description'],
-        'notes' => $invoice['notes'],
-        'sentAt' => $invoice['sent_at'] ? strtotime($invoice['sent_at']) * 1000 : null,
-        'sentTo' => $invoice['sent_to'],
-        'createdAt' => strtotime($invoice['created_at']) * 1000,
-        'items' => isset($invoice['items']) ? $invoice['items'] : array(),
-        // Join data
-        'clientName' => isset($invoice['client_company']) 
-            ? ($invoice['client_company'] ?: trim($invoice['client_first_name'] . ' ' . $invoice['client_last_name']))
-            : null,
-        'jobFriendlyId' => isset($invoice['job_friendly_id']) ? $invoice['job_friendly_id'] : null,
-        'jobTitle' => isset($invoice['job_title']) ? $invoice['job_title'] : null,
-    );
+// =============================================================================
+// STANDALONE ROUTER (gdy plik wywołany bezpośrednio)
+// =============================================================================
+
+// Sprawdź czy plik jest wywoływany bezpośrednio (nie przez index.php)
+if (basename($_SERVER['SCRIPT_FILENAME']) === 'invoices.php') {
+    $method = $_SERVER['REQUEST_METHOD'];
+    $uri = isset($_SERVER['PATH_INFO']) ? $_SERVER['PATH_INFO'] : '';
+    
+    // Wyczyść URI
+    $uri = trim($uri, '/');
+    $parts = explode('/', $uri);
+    
+    // Debug
+    error_log("[invoices.php] Standalone - Method: $method, URI: $uri");
+    
+    // Routing
+    if ($method === 'POST') {
+        if ($uri === 'proforma' || $uri === 'invoices/proforma') {
+            handleCreateProforma();
+        } elseif ($uri === 'invoice' || $uri === 'invoices/invoice') {
+            handleCreateInvoice();
+        } elseif ($uri === 'send' || $uri === 'invoices/send') {
+            handleSendInvoice();
+        } elseif ($uri === 'mark-paid' || $uri === 'invoices/mark-paid') {
+            handleMarkAsPaid();
+        } else {
+            handleCreateProforma();
+        }
+    } elseif ($method === 'GET') {
+        if (strpos($uri, 'pdf/') === 0 || strpos($uri, 'invoices/pdf/') === 0) {
+            $id = end($parts);
+            handleGetPdf($id);
+        } elseif (strpos($uri, 'job/') === 0 || strpos($uri, 'invoices/job/') === 0) {
+            $jobId = end($parts);
+            handleGetJobInvoices($jobId);
+        } elseif (!empty($parts[0]) && is_numeric(end($parts))) {
+            $id = end($parts);
+            handleGetInvoice($id);
+        } else {
+            jsonResponse(array('error' => 'Invalid endpoint'), 404);
+        }
+    } else {
+        jsonResponse(array('error' => 'Method not allowed'), 405);
+    }
 }
-
-
-
-

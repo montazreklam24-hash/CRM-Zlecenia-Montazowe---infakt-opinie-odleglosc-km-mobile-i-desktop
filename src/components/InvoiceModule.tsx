@@ -1,25 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  FileText, Plus, Trash2, Send, Download, Check, 
-  Receipt, Loader2, ExternalLink, CreditCard, Banknote,
-  AlertTriangle, ChevronDown, ChevronUp
+  FileText, Plus, Trash2, Send, Download, 
+  Receipt, Loader2, ExternalLink, Search, Building2,
+  AlertTriangle, ChevronDown, ChevronUp, User, Mail, Phone, MapPin,
+  AlertCircle
 } from 'lucide-react';
 import { Invoice, InvoiceItem, PaymentStatus } from '../types';
+import { invoiceService, InvoiceItemData, InvoiceClientData } from '../services/invoiceService';
 
 interface InvoiceModuleProps {
   jobId: string;
   clientId?: number;
   clientName?: string;
   clientEmail?: string;
-  address?: string;
+  installAddress?: string; // Adres MONTAŻU (nie do faktury!)
   phone?: string;
+  nip?: string;
   paymentStatus?: PaymentStatus;
   totalGross?: number;
   paidAmount?: number;
   invoices?: Invoice[];
   isAdmin: boolean;
   onStatusChange?: (status: PaymentStatus) => void;
+  onClientDataChange?: (data: InvoiceClientData) => void;
 }
+
+// Współrzędne Warszawy dla obliczania odległości
+const WARSAW_COORDS = { lat: 52.2297, lng: 21.0122 };
+const MAX_DISTANCE_KM = 100;
 
 // Domyślne pozycje dla montażu reklam
 const PRESET_ITEMS: Partial<InvoiceItem>[] = [
@@ -27,9 +35,20 @@ const PRESET_ITEMS: Partial<InvoiceItem>[] = [
   { name: 'Montaż szyldu/tablicy', unit: 'szt.', unitPriceNet: 300, vatRate: 23 },
   { name: 'Montaż banneru', unit: 'm²', unitPriceNet: 50, vatRate: 23 },
   { name: 'Oklejanie folią', unit: 'm²', unitPriceNet: 120, vatRate: 23 },
+  { name: 'Oklejanie witryn - folia OWV', unit: 'm²', unitPriceNet: 180, vatRate: 23 },
+  { name: 'Oklejanie witryn - folia mrożona', unit: 'm²', unitPriceNet: 150, vatRate: 23 },
   { name: 'Montaż liter 3D', unit: 'szt.', unitPriceNet: 80, vatRate: 23 },
-  { name: 'Usługa transportowa', unit: 'km', unitPriceNet: 3, vatRate: 23 },
-  { name: 'Dojazd', unit: 'szt.', unitPriceNet: 150, vatRate: 23 },
+  { name: 'Dojazd na montaż (do 20km)', unit: 'szt.', unitPriceNet: 350, vatRate: 23 },
+  { name: 'Dojazd - dopłata za km', unit: 'km', unitPriceNet: 6, vatRate: 23 },
+  { name: 'Pomiar', unit: 'szt.', unitPriceNet: 200, vatRate: 23 },
+  { name: 'Pomiar + gruntowanie', unit: 'szt.', unitPriceNet: 500, vatRate: 23 },
+];
+
+// Lista miast daleko od Warszawy (ostrzeżenie)
+const FAR_CITIES = [
+  'gdańsk', 'gdynia', 'sopot', 'katowice', 'kraków', 'wrocław', 'poznań', 
+  'łódź', 'szczecin', 'bydgoszcz', 'lublin', 'białystok', 'rzeszów', 
+  'olsztyn', 'kielce', 'opole', 'zielona góra', 'gorzów'
 ];
 
 const InvoiceModule: React.FC<InvoiceModuleProps> = ({
@@ -37,21 +56,65 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
   clientId,
   clientName,
   clientEmail,
-  address,
+  installAddress, // To jest adres MONTAŻU - NIE do faktury!
   phone,
+  nip: initialNip,
   paymentStatus = PaymentStatus.NONE,
   totalGross = 0,
   paidAmount = 0,
   invoices = [],
   isAdmin,
-  onStatusChange
+  onStatusChange,
+  onClientDataChange
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLookingUp, setIsLookingUp] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
   const [invoiceType, setInvoiceType] = useState<'proforma' | 'invoice'>('proforma');
   const [description, setDescription] = useState('');
+  const [sendEmail, setSendEmail] = useState(true);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [distanceWarning, setDistanceWarning] = useState<string | null>(null);
+  
+  // Dane do FAKTURY (adres siedziby firmy - z GUS)
+  const [clientData, setClientData] = useState<InvoiceClientData>({
+    companyName: clientName || '',
+    nip: initialNip || '',
+    email: clientEmail || '',
+    phone: phone || '',
+    street: '',      // Adres SIEDZIBY firmy (z GUS), NIE adres montażu!
+    city: '',
+    postCode: '',
+  });
+
+  // Sprawdź czy adres montażu nie jest za daleko od Warszawy
+  useEffect(() => {
+    if (installAddress) {
+      const addressLower = installAddress.toLowerCase();
+      const isFarCity = FAR_CITIES.some(city => addressLower.includes(city));
+      
+      if (isFarCity) {
+        setDistanceWarning(`⚠️ Adres montażu "${installAddress}" może być ponad ${MAX_DISTANCE_KM}km od Warszawy. Czy na pewno to poprawne zlecenie?`);
+      } else {
+        setDistanceWarning(null);
+      }
+    }
+  }, [installAddress]);
+
+  // Aktualizuj dane z propsów (ale NIE adres montażu!)
+  useEffect(() => {
+    setClientData(prev => ({
+      ...prev,
+      companyName: clientName || prev.companyName,
+      email: clientEmail || prev.email,
+      phone: phone || prev.phone,
+      nip: initialNip || prev.nip,
+      // NIE ustawiamy street/city/postCode z installAddress!
+      // Te pola pobieramy z GUS po NIP
+    }));
+  }, [clientName, clientEmail, phone, initialNip]);
 
   // Oblicz sumy
   const calculateTotals = () => {
@@ -69,6 +132,56 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
   };
 
   const { totalNet, totalGross: calculatedGross, totalVat } = calculateTotals();
+
+  // Pobierz dane firmy po NIP (adres SIEDZIBY do faktury)
+  const handleNipLookup = async () => {
+    const nip = clientData.nip?.replace(/[^0-9]/g, '');
+    if (!nip || nip.length !== 10) {
+      setLookupError('NIP musi mieć 10 cyfr');
+      return;
+    }
+
+    setIsLookingUp(true);
+    setLookupError(null);
+
+    try {
+      const result = await invoiceService.lookupNip(nip);
+      
+      if (result.success && result.company) {
+        // WAŻNE: Aktualizuj WSZYSTKIE dane rozliczeniowe z GUS razem!
+        // Nie mieszamy danych - jeśli GUS zwraca firmę, to bierzemy CAŁOŚĆ z GUS
+        const gusData = {
+          companyName: result.company!.name || '',
+          street: result.company!.street || '',
+          city: result.company!.city || '',
+          postCode: result.company!.postCode || '',
+          nip: result.company!.nip || nip,
+        };
+        
+        // Aktualizuj stan - wszystkie dane firmowe z GUS, zachowaj tylko email i telefon
+        setClientData(prev => ({
+          ...gusData,
+          email: prev.email,  // Email i telefon mogą być różne dla różnych osób w firmie
+          phone: prev.phone,
+        }));
+        
+        // Powiadom rodzica o zmianie danych (do zapisania w zleceniu)
+        if (onClientDataChange) {
+          onClientDataChange({
+            ...gusData,
+            email: clientData.email,
+            phone: clientData.phone,
+          });
+        }
+      } else {
+        setLookupError(result.error || 'Nie znaleziono firmy o podanym NIP');
+      }
+    } catch (error: any) {
+      setLookupError(error.message || 'Błąd podczas wyszukiwania');
+    } finally {
+      setIsLookingUp(false);
+    }
+  };
 
   // Dodaj pozycję
   const addItem = (preset?: Partial<InvoiceItem>) => {
@@ -102,43 +215,59 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
       return;
     }
 
-    if (!clientId && !clientName) {
-      alert('Brak danych klienta. Uzupełnij dane kontaktowe zlecenia.');
+    if (!clientData.companyName && !clientData.email) {
+      alert('Podaj nazwę firmy/klienta lub adres email');
       return;
+    }
+
+    // Ostrzeżenie o odległości
+    if (distanceWarning) {
+      const confirmed = window.confirm(distanceWarning + '\n\nCzy kontynuować wystawianie faktury?');
+      if (!confirmed) return;
     }
 
     setIsLoading(true);
     
     try {
-      // TODO: Wywołaj API /api/invoices
-      const response = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        },
-        body: JSON.stringify({
-          jobId,
-          clientId,
-          type: invoiceType,
-          items,
-          description,
-          installAddress: address,
-          phone,
-          sendToInfakt: true
-        })
-      });
+      // Przekształć pozycje do formatu API
+      const apiItems: InvoiceItemData[] = items.map(item => ({
+        name: item.name,
+        quantity: item.quantity,
+        unitPriceNet: item.unitPriceNet,
+        vatRate: item.vatRate,
+        unit: item.unit,
+      }));
 
-      const data = await response.json();
+      // Opis z adresem montażu (NIE adres do faktury!)
+      const fullDescription = installAddress 
+        ? `${description}\nAdres montażu: ${installAddress}`.trim()
+        : description;
+
+      let result;
       
-      if (data.success) {
-        alert(`${invoiceType === 'proforma' ? 'Proforma' : 'Faktura'} została wystawiona!`);
+      if (invoiceType === 'proforma') {
+        result = await invoiceService.createProforma(jobId, apiItems, clientData, {
+          description: fullDescription,
+          installAddress: installAddress, // Adres montażu jako osobna informacja
+          sendEmail,
+        });
+      } else {
+        result = await invoiceService.createInvoice(jobId, apiItems, clientData, {
+          description: fullDescription,
+          installAddress: installAddress,
+          sendEmail,
+          markAsPaid: false,
+        });
+      }
+      
+      if (result.success && result.invoice) {
+        alert(`${invoiceType === 'proforma' ? 'Proforma' : 'Faktura'} ${result.invoice.number} została wystawiona!${result.invoice.emailSent ? '\n✉️ Email wysłany!' : ''}`);
         setItems([]);
         if (onStatusChange) {
-          onStatusChange(invoiceType === 'proforma' ? PaymentStatus.PROFORMA : PaymentStatus.INVOICE);
+          onStatusChange(invoiceType === 'proforma' ? PaymentStatus.PROFORMA : PaymentStatus.PAID);
         }
       } else {
-        throw new Error(data.error);
+        throw new Error(result.error || 'Nieznany błąd');
       }
     } catch (error: any) {
       alert('Błąd: ' + (error.message || 'Nie udało się wystawić dokumentu'));
@@ -147,8 +276,8 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
     }
   };
 
-  // Oznacz jako gotówka
-  const handleMarkAsCash = () => {
+  // Oznacz jako barter (bez FV)
+  const handleMarkAsBarter = () => {
     if (onStatusChange) {
       onStatusChange(PaymentStatus.CASH);
     }
@@ -159,10 +288,9 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
     const badges: Record<PaymentStatus, { bg: string; text: string; label: string }> = {
       [PaymentStatus.NONE]: { bg: 'bg-slate-100', text: 'text-slate-600', label: 'Brak dokumentu' },
       [PaymentStatus.PROFORMA]: { bg: 'bg-orange-100', text: 'text-orange-700', label: '📄 Proforma' },
-      [PaymentStatus.INVOICE]: { bg: 'bg-blue-100', text: 'text-blue-700', label: '📋 Faktura' },
       [PaymentStatus.PARTIAL]: { bg: 'bg-purple-100', text: 'text-purple-700', label: '💸 Zaliczka' },
       [PaymentStatus.PAID]: { bg: 'bg-green-100', text: 'text-green-700', label: '✅ Opłacone' },
-      [PaymentStatus.CASH]: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: '💵 Gotówka' },
+      [PaymentStatus.CASH]: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: '🤝 Barter' },
       [PaymentStatus.OVERDUE]: { bg: 'bg-red-100', text: 'text-red-700', label: '⚠️ Przeterminowane' }
     };
     return badges[paymentStatus] || badges[PaymentStatus.NONE];
@@ -204,6 +332,30 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
       {isExpanded && (
         <div className="border-t border-slate-100 p-4 space-y-4">
           
+          {/* Ostrzeżenie o odległości */}
+          {distanceWarning && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-amber-800">
+                <strong>Uwaga!</strong> {distanceWarning}
+              </div>
+            </div>
+          )}
+
+          {/* Adres montażu (tylko informacja) */}
+          {installAddress && (
+            <div className="bg-blue-50 rounded-xl p-3">
+              <div className="flex items-center gap-2 text-sm text-blue-700">
+                <MapPin className="w-4 h-4" />
+                <span className="font-semibold">Adres montażu:</span>
+                <span>{installAddress}</span>
+              </div>
+              <p className="text-xs text-blue-600 mt-1 ml-6">
+                (Ten adres zostanie dodany do opisu faktury, NIE jako adres nabywcy)
+              </p>
+            </div>
+          )}
+          
           {/* Istniejące faktury */}
           {invoices.length > 0 && (
             <div className="space-y-2">
@@ -234,13 +386,22 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
                     <button 
                       className="p-2 bg-white rounded-lg border border-slate-200 hover:border-indigo-300 text-slate-600"
                       title="Pobierz PDF"
+                      onClick={() => window.open(invoiceService.getPdfUrl(inv.id), '_blank')}
                     >
                       <Download className="w-4 h-4" />
                     </button>
-                    {inv.paymentStatus !== 'paid' && clientEmail && (
+                    {inv.paymentStatus !== 'paid' && clientData.email && (
                       <button 
                         className="p-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600"
                         title="Wyślij email"
+                        onClick={async () => {
+                          try {
+                            await invoiceService.sendInvoiceEmail(inv.id, clientData.email!);
+                            alert('Email wysłany!');
+                          } catch (e) {
+                            alert('Błąd wysyłania emaila');
+                          }
+                        }}
                       >
                         <Send className="w-4 h-4" />
                       </button>
@@ -277,21 +438,131 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
                   📋 Faktura VAT
                 </button>
                 <button
-                  onClick={handleMarkAsCash}
+                  onClick={handleMarkAsBarter}
                   className={`flex-1 py-2 px-4 rounded-lg font-bold text-sm transition-all ${
                     paymentStatus === PaymentStatus.CASH
                       ? 'bg-yellow-100 text-yellow-700 ring-2 ring-yellow-300'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  💵 Gotówka
+                  🤝 Barter
                 </button>
+              </div>
+
+              {/* Dane do FAKTURY (adres siedziby firmy) */}
+              <div className="space-y-3 bg-slate-50 rounded-xl p-4">
+                <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                  <Building2 className="w-4 h-4" /> Dane nabywcy (do faktury)
+                </h4>
+                
+                {/* NIP z przyciskiem wyszukiwania */}
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      value={clientData.nip || ''}
+                      onChange={(e) => setClientData(prev => ({ ...prev, nip: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm pl-8"
+                      placeholder="NIP (10 cyfr)"
+                      maxLength={13}
+                    />
+                    <Building2 className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  </div>
+                  <button
+                    onClick={handleNipLookup}
+                    disabled={isLookingUp}
+                    className="px-4 py-2 bg-indigo-500 text-white rounded-lg font-bold text-sm hover:bg-indigo-600 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isLookingUp ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                    Pobierz z GUS
+                  </button>
+                </div>
+                
+                {lookupError && (
+                  <div className="text-red-500 text-xs flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" /> {lookupError}
+                  </div>
+                )}
+
+                {/* Nazwa firmy / klienta */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={clientData.companyName || ''}
+                    onChange={(e) => setClientData(prev => ({ ...prev, companyName: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm pl-8"
+                    placeholder="Nazwa firmy lub imię i nazwisko"
+                  />
+                  <User className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                </div>
+
+                {/* Adres SIEDZIBY firmy (do faktury) */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="col-span-2 relative">
+                    <input
+                      type="text"
+                      value={clientData.street || ''}
+                      onChange={(e) => setClientData(prev => ({ ...prev, street: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm pl-8"
+                      placeholder="Adres siedziby firmy"
+                    />
+                    <MapPin className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  </div>
+                  <input
+                    type="text"
+                    value={clientData.postCode || ''}
+                    onChange={(e) => setClientData(prev => ({ ...prev, postCode: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"
+                    placeholder="00-000"
+                    maxLength={6}
+                  />
+                </div>
+                
+                <input
+                  type="text"
+                  value={clientData.city || ''}
+                  onChange={(e) => setClientData(prev => ({ ...prev, city: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"
+                  placeholder="Miasto (siedziby)"
+                />
+
+                {/* Email i telefon */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="relative">
+                    <input
+                      type="email"
+                      value={clientData.email || ''}
+                      onChange={(e) => setClientData(prev => ({ ...prev, email: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm pl-8"
+                      placeholder="Email"
+                    />
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="tel"
+                      value={clientData.phone || ''}
+                      onChange={(e) => setClientData(prev => ({ ...prev, phone: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm pl-8"
+                      placeholder="Telefon"
+                    />
+                    <Phone className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+                
+                <p className="text-xs text-slate-500 italic">
+                  💡 Wpisz NIP i kliknij "Pobierz z GUS" - adres siedziby firmy uzupełni się automatycznie.
+                </p>
               </div>
 
               {/* Pozycje */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase">Pozycje</h4>
+                  <h4 className="text-xs font-bold text-slate-500 uppercase">Pozycje faktury</h4>
                   <div className="relative">
                     <button
                       onClick={() => setShowPresets(!showPresets)}
@@ -302,7 +573,7 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
                     
                     {/* Dropdown z presetami */}
                     {showPresets && (
-                      <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-10 p-2 space-y-1">
+                      <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2 space-y-1 max-h-72 overflow-y-auto">
                         {PRESET_ITEMS.map((preset, i) => (
                           <button
                             key={i}
@@ -446,27 +717,47 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
                 />
               </div>
 
-              {/* Przycisk wystawienia */}
-              {items.length > 0 && (
-                <button
-                  onClick={handleCreateInvoice}
-                  disabled={isLoading}
-                  className={`w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all ${
-                    invoiceType === 'proforma'
+              {/* Checkbox wysyłki email */}
+              {clientData.email && items.length > 0 && (
+                <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={sendEmail}
+                    onChange={(e) => setSendEmail(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <Mail className="w-4 h-4" />
+                  Wyślij automatycznie na: <span className="font-semibold">{clientData.email}</span>
+                </label>
+              )}
+
+              {/* Przycisk wystawienia - zawsze widoczny */}
+              <button
+                onClick={handleCreateInvoice}
+                disabled={isLoading || items.length === 0}
+                className={`w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all ${
+                  items.length === 0
+                    ? 'bg-slate-300 cursor-not-allowed'
+                    : invoiceType === 'proforma'
                       ? 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg shadow-orange-500/25'
                       : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/25'
-                  } disabled:opacity-50`}
-                >
-                  {isLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>
-                      <FileText className="w-5 h-5" />
-                      Wystaw {invoiceType === 'proforma' ? 'Proformę' : 'Fakturę VAT'}
-                    </>
-                  )}
-                </button>
-              )}
+                } disabled:opacity-50`}
+              >
+                {isLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : items.length === 0 ? (
+                  <>
+                    <Plus className="w-5 h-5" />
+                    Dodaj pozycje żeby wystawić {invoiceType === 'proforma' ? 'proformę' : 'fakturę'}
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-5 h-5" />
+                    Wystaw {invoiceType === 'proforma' ? 'Proformę' : 'Fakturę VAT'}
+                    {sendEmail && clientData.email && ' i wyślij'}
+                  </>
+                )}
+              </button>
             </>
           )}
 
@@ -483,12 +774,3 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
 };
 
 export default InvoiceModule;
-
-
-
-
-
-
-
-
-

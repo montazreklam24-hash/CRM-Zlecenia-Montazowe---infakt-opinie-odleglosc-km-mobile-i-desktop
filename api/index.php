@@ -82,6 +82,11 @@ switch ($endpoint) {
         require_once __DIR__ . '/invoices.php';
         handleInvoices($method, $id);
         break;
+    
+    case 'gus':
+        require_once __DIR__ . '/gus.php';
+        // gus.php ma własny router
+        break;
         
     case 'offers':
         require_once __DIR__ . '/offers.php';

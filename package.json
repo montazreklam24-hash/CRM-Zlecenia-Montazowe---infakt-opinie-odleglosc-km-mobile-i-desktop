@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "lint": "eslint src --ext ts,tsx"
+    "lint": "eslint src --ext ts,tsx",
+    "clean": "node -e \"import('fs').then(fs=>{if(fs.existsSync('dist')){fs.rmSync('dist',{recursive:true});console.log('✓ Wyczyszczono folder dist/')}})\""
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

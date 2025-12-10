@@ -7,8 +7,14 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    // Wyczyść dist przed buildem
+    emptyOutDir: true,
     rollupOptions: {
       output: {
+        // Stałe nazwy plików - małe litery, bez hashów z wielkimi literami
+        entryFileNames: 'assets/app.js',
+        chunkFileNames: 'assets/[name].js',
+        assetFileNames: 'assets/[name].[ext]',
         manualChunks: {
           vendor: ['react', 'react-dom'],
           leaflet: ['leaflet', 'react-leaflet'],

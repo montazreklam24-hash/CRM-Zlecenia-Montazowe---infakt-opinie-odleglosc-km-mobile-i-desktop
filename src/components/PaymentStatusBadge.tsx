@@ -39,14 +39,6 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
       label: 'Proforma',
       gradient: 'from-orange-400 to-orange-500'
     },
-    [PaymentStatus.INVOICE]: { 
-      bg: 'bg-blue-50', 
-      text: 'text-blue-700', 
-      border: 'border-blue-200',
-      icon: '📋', 
-      label: 'Faktura',
-      gradient: 'from-blue-400 to-blue-500'
-    },
     [PaymentStatus.PARTIAL]: { 
       bg: 'bg-purple-50', 
       text: 'text-purple-700', 
@@ -67,8 +59,8 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
       bg: 'bg-yellow-50', 
       text: 'text-yellow-700', 
       border: 'border-yellow-200',
-      icon: '💵', 
-      label: 'Gotówka',
+      icon: '🤝', 
+      label: 'Barter',
       gradient: 'from-yellow-400 to-yellow-500'
     },
     [PaymentStatus.OVERDUE]: { 
@@ -119,7 +111,6 @@ export const PaymentStatusBar: React.FC<{ status: PaymentStatus }> = ({ status }
   const colors: Record<PaymentStatus, string> = {
     [PaymentStatus.NONE]: '',
     [PaymentStatus.PROFORMA]: 'bg-gradient-to-r from-orange-400 to-orange-500',
-    [PaymentStatus.INVOICE]: 'bg-gradient-to-r from-blue-400 to-blue-500',
     [PaymentStatus.PARTIAL]: 'bg-gradient-to-r from-purple-400 to-purple-500',
     [PaymentStatus.PAID]: 'bg-gradient-to-r from-green-400 to-green-500',
     [PaymentStatus.CASH]: 'bg-gradient-to-r from-yellow-400 to-yellow-500',
@@ -143,10 +134,9 @@ export const PaymentStatusIcon: React.FC<{ status: PaymentStatus; className?: st
   const icons: Record<PaymentStatus, string> = {
     [PaymentStatus.NONE]: '',
     [PaymentStatus.PROFORMA]: '📄',
-    [PaymentStatus.INVOICE]: '📋',
     [PaymentStatus.PARTIAL]: '💸',
     [PaymentStatus.PAID]: '✅',
-    [PaymentStatus.CASH]: '💵',
+    [PaymentStatus.CASH]: '🤝',
     [PaymentStatus.OVERDUE]: '⚠️'
   };
 
@@ -158,6 +148,8 @@ export const PaymentStatusIcon: React.FC<{ status: PaymentStatus; className?: st
 };
 
 export default PaymentStatusBadge;
+
+
 
 
 

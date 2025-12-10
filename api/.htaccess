@@ -1,21 +1,9 @@
 RewriteEngine On
 
-# Przekaż nagłówek Authorization do PHP (Apache często go usuwa)
-RewriteCond %{HTTP:Authorization} ^(.*)
-RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
+# Jeśli plik lub folder istnieje - użyj go bezpośrednio
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
 
-# Routing do index.php
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
+# Wszystko inne kieruj do index.php
 RewriteRule ^(.*)$ index.php [QSA,L]
-
-# CORS Headers
-<IfModule mod_headers.c>
-    Header always set Access-Control-Allow-Origin "*"
-    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
-</IfModule>
-
-# Handle OPTIONS preflight
-RewriteCond %{REQUEST_METHOD} OPTIONS
-RewriteRule ^(.*)$ $1 [R=200,L]

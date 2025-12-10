@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Upload, FileText, Loader2, X, Type, Sparkles } from 'lucide-react';
+import { Upload, FileText, Loader2, X, Type, Sparkles, Mic, MicOff } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
+import { useVoiceInput } from '../hooks/useVoiceInput';
 
 // PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
@@ -8,14 +9,27 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs
 interface InputFormProps {
   onSubmit: (title: string, text: string, images: string[]) => void;
   isProcessing: boolean;
+  onSwitchToManual?: () => void;
 }
 
-const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing }) => {
+const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing, onSwitchToManual }) => {
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [isConvertingPdf, setIsConvertingPdf] = useState(false);
+  const { isListening, transcript, resetTranscript, startListening, stopListening, isSupported } = useVoiceInput();
+
+  // Update text with voice transcript
+  useEffect(() => {
+    if (transcript) {
+      setText(prev => {
+        const trimmed = prev.trim();
+        return trimmed ? `${trimmed} ${transcript}` : transcript;
+      });
+      resetTranscript(); // Wyczyść bufor po dodaniu
+    }
+  }, [transcript, resetTranscript]);
 
   // Paste support (Ctrl+V)
   useEffect(() => {
@@ -182,9 +196,25 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing }) => {
 
           {/* Email Text */}
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-slate-700">
-              Treść wątku Gmail / opis zlecenia
-            </label>
+            <div className="flex justify-between items-center">
+              <label className="block text-sm font-semibold text-slate-700">
+                Treść wątku Gmail / opis zlecenia
+              </label>
+              {isSupported && (
+                <button
+                  type="button"
+                  onClick={isListening ? stopListening : startListening}
+                  className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                    isListening 
+                      ? 'bg-red-100 text-red-600 animate-pulse' 
+                      : 'bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-600'
+                  }`}
+                >
+                  {isListening ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                  {isListening ? 'Zatrzymaj nagrywanie' : 'Nagraj głosowo'}
+                </button>
+              )}
+            </div>
             <textarea
               rows={6}
               className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 resize-none transition-all"
@@ -291,6 +321,19 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing }) => {
               </>
             )}
           </button>
+
+          {/* Manual Entry Link - moved here */}
+          {onSwitchToManual && (
+            <div className="text-center pt-2">
+              <button
+                type="button"
+                onClick={onSwitchToManual}
+                className="text-xs text-slate-400 hover:text-slate-600 font-medium underline decoration-slate-300 underline-offset-2 transition-colors"
+              >
+                Chcę dodać dane ręcznie (bez AI)
+              </button>
+            </div>
+          )}
         </form>
       </div>
     </div>
@@ -298,6 +341,8 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing }) => {
 };
 
 export default InputForm;
+
+
 
 
 

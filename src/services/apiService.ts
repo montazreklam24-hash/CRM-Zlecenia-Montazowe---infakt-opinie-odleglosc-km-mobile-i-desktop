@@ -342,7 +342,7 @@ export const jobsService = {
     return response.job;
   },
   
-  async updateJob(id: string, updates: Partial<Job> & { data?: Partial<JobOrderData> }): Promise<Job> {
+  async updateJob(id: string, updates: Partial<Job> & { data?: Partial<JobOrderData> }, jobType?: 'ai' | 'simple'): Promise<Job> {
     if (DEMO_MODE) {
       const index = DEMO_JOBS.findIndex(j => j.id === id);
       if (index === -1) throw new Error('Zlecenie nie istnieje');
@@ -357,7 +357,10 @@ export const jobsService = {
       return updatedJob;
     }
     
-    const response = await apiRequest<{ success: boolean; job: Job }>(`/jobs/${id}`, {
+    // Użyj odpowiedniego endpointu w zależności od typu zlecenia
+    const endpoint = jobType === 'simple' ? `/jobs-simple/${id}` : `/jobs/${id}`;
+    
+    const response = await apiRequest<{ success: boolean; job: Job }>(endpoint, {
       method: 'PUT',
       body: JSON.stringify(updates),
     });
@@ -410,36 +413,86 @@ export const jobsService = {
     });
   },
   
-  async completeJob(id: string, notes: string, images: string[]): Promise<void> {
+  async completeJob(
+    id: string, 
+    data: {
+      completionImages: string[];
+      completionNotes: string;
+      clientEmail?: string;
+      sendEmail?: boolean;
+      archiveJob?: boolean; // false = tylko wyślij email, nie archiwizuj
+    }
+  ): Promise<void> {
+    const shouldArchive = data.archiveJob !== false; // domyślnie true
+    
     if (DEMO_MODE) {
       const job = DEMO_JOBS.find(j => j.id === id);
       if (job) {
-        job.status = JobStatus.COMPLETED;
-        job.columnId = 'COMPLETED';
-        job.completedAt = Date.now();
-        job.completionNotes = notes;
-        job.completionImages = images;
+        if (shouldArchive) {
+          job.status = JobStatus.ARCHIVED;
+          job.columnId = 'ARCHIVE' as any;
+          job.completedAt = Date.now();
+        }
+        job.completionNotes = data.completionNotes;
+        job.completionImages = data.completionImages;
+        if (data.sendEmail && data.clientEmail) {
+          job.reviewRequestSentAt = Date.now();
+          job.reviewRequestEmail = data.clientEmail;
+        }
+      }
+      if (data.sendEmail && data.clientEmail) {
+        console.log('DEMO: Symulacja wysyłki emaila do:', data.clientEmail);
       }
       return;
     }
     
+    // Wyślij email jeśli potrzeba
+    let emailSent = false;
+    if (data.sendEmail && data.clientEmail && data.completionImages.length > 0) {
+      const job = await this.getJob(id);
+      await this.sendCompletionEmail({
+        jobId: id,
+        jobTitle: job.data.jobTitle || 'Zlecenie',
+        toEmail: data.clientEmail,
+        completionImage: data.completionImages[0],
+        completionNotes: data.completionNotes,
+      });
+      emailSent = true;
+    }
+    
+    // Przygotuj dane do aktualizacji
+    const updateData: any = {
+      completionNotes: data.completionNotes,
+      completionImages: data.completionImages,
+    };
+    
+    // Jeśli archiwizujemy
+    if (shouldArchive) {
+      updateData.status = 'ARCHIVED';
+      updateData.columnId = 'ARCHIVE';
+      updateData.completedAt = Date.now();
+    }
+    
+    // Jeśli wysłano email - zapisz datę
+    if (emailSent) {
+      updateData.reviewRequestSentAt = Date.now();
+      updateData.reviewRequestEmail = data.clientEmail;
+    }
+    
     await apiRequest(`/jobs/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({
-        complete: true,
-        completionNotes: notes,
-        completionImages: images,
-      }),
+      body: JSON.stringify(updateData),
     });
   },
   
-  async deleteJob(id: string): Promise<void> {
+  async deleteJob(id: string, jobType?: 'ai' | 'simple'): Promise<void> {
     if (DEMO_MODE) {
       DEMO_JOBS = DEMO_JOBS.filter(j => j.id !== id);
       return;
     }
     
-    await apiRequest(`/jobs/${id}`, { method: 'DELETE' });
+    const endpoint = jobType === 'simple' ? `/jobs-simple/${id}` : `/jobs/${id}`;
+    await apiRequest(endpoint, { method: 'DELETE' });
   },
   
   async duplicateJob(originalId: string): Promise<Job> {
@@ -453,6 +506,35 @@ export const jobsService = {
     );
     
     return newJob;
+  },
+
+  async sendCompletionEmail(data: {
+    jobId: string;
+    jobTitle: string;
+    toEmail: string;
+    completionImage?: string;
+    completionNotes?: string;
+  }): Promise<{ success: boolean; message?: string; error?: string }> {
+    if (DEMO_MODE) {
+      console.log('DEMO: Symulacja wysyłki emaila do:', data.toEmail);
+      return { success: true, message: 'Email wysłany (demo)' };
+    }
+
+    const response = await apiRequest<{ success: boolean; message?: string; error?: string }>(
+      '/send_completion_email.php',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          job_id: data.jobId,
+          job_title: data.jobTitle,
+          to_email: data.toEmail,
+          completion_image: data.completionImage,
+          completion_notes: data.completionNotes,
+        }),
+      }
+    );
+
+    return response;
   },
 };
 
@@ -582,4 +664,3 @@ export const storageService = {
     console.warn('Backup restore not implemented for API mode');
   },
 };
-

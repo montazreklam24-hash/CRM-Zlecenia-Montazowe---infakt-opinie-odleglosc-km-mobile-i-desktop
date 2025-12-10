@@ -1,12 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   ArrowLeft, CheckCircle2, Loader2, Camera, Save, Edit2, 
   ListTodo, Plus, Trash2, Copy, MessageSquare, Star, FileText,
-  X, Share2, ScrollText, ScanEye, Navigation, Phone, ExternalLink
+  X, Share2, ScrollText, ScanEye, Navigation, Phone, ExternalLink,
+  Mic, MicOff, RotateCw, Calendar, Archive, ChevronDown
 } from 'lucide-react';
-import { Job, JobOrderData, JobStatus, UserRole, ChecklistItem, PaymentStatus } from '../types';
-import { jobsService, compressImage } from '../services/apiService';
+import { Job, JobOrderData, JobStatus, UserRole, ChecklistItem, PaymentStatus, JobColumnId } from '../types';
+import { jobsService, compressImage, geminiService } from '../services/apiService';
 import InvoiceModule from './InvoiceModule';
+import CompletionSection from './CompletionSection';
+import { useVoiceInput } from '../hooks/useVoiceInput';
 
 interface JobCardProps {
   job?: Job;
@@ -15,6 +19,8 @@ interface JobCardProps {
   role: UserRole;
   onBack: () => void;
   onJobSaved?: () => void;
+  onArchive?: (id: string) => void;
+  onDelete?: (id: string) => void;
 }
 
 declare global {
@@ -23,7 +29,7 @@ declare global {
   }
 }
 
-const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role, onBack, onJobSaved }) => {
+const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role, onBack, onJobSaved, onArchive, onDelete }) => {
   const isAdmin = role === UserRole.ADMIN;
   const [isEditing, setIsEditing] = useState(!job);
   
@@ -60,43 +66,55 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
     city: 'Warszawa',
     postCode: ''
   });
+  
+  // Voice Input
+  const { isListening, transcript, resetTranscript, startListening, stopListening, isSupported } = useVoiceInput();
+  const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (transcript && activeVoiceField) {
+      if (activeVoiceField === 'adminNotes') {
+        setAdminNotes(prev => {
+          const trimmed = prev.trim();
+          return trimmed ? `${trimmed} ${transcript}` : transcript;
+        });
+      } else if (activeVoiceField === 'completionNotes') {
+        setCompletionNotes(prev => {
+          const trimmed = prev.trim();
+          return trimmed ? `${trimmed} ${transcript}` : transcript;
+        });
+      } else {
+        handleDataChange(activeVoiceField as keyof JobOrderData, 
+          ((editedData[activeVoiceField as keyof JobOrderData] as string) || '').trim() + ' ' + transcript
+        );
+      }
+      resetTranscript();
+    }
+  }, [transcript, activeVoiceField, resetTranscript, editedData]);
+
+  const toggleVoice = (field: string) => {
+    if (isListening && activeVoiceField === field) {
+      stopListening();
+      setActiveVoiceField(null);
+    } else {
+      setActiveVoiceField(field);
+      startListening();
+    }
+  };
+
   const addressInputRef = useRef<HTMLTextAreaElement>(null);
   
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Google Places Autocomplete
+  // Google Places Autocomplete - USUNIĘTE (powodowało błędy z textarea i API)
+  // Zamiast tego polegamy na naszym backendowym geokodowaniu (przycisk "Sprawdź na mapie")
+  // oraz "Silent Auto-Geocode" przy zapisie.
+  /*
   useEffect(() => {
     if (!addressInputRef.current || !window.google || !isEditing) return;
-
-    // Ponieważ używamy textarea, musimy stworzyć niewidoczny input dla Autocomplete
-    // lub po prostu podpiąć pod textarea (Google Maps JS API to obsługuje)
-    const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current as unknown as HTMLInputElement, {
-      types: ['geocode'],
-      componentRestrictions: { country: 'pl' },
-      fields: ['formatted_address', 'geometry']
-    });
-
-    // Preferencja dla Warszawy
-    const warsawBounds = new window.google.maps.LatLngBounds(
-      new window.google.maps.LatLng(52.1, 20.8),
-      new window.google.maps.LatLng(52.4, 21.3)
-    );
-    autocomplete.setBounds(warsawBounds);
-
-    autocomplete.addListener('place_changed', () => {
-      const place = autocomplete.getPlace();
-      if (place.formatted_address && place.geometry?.location) {
-        setEditedData(prev => ({
-          ...prev,
-          address: place.formatted_address || '',
-          coordinates: {
-            lat: place.geometry!.location!.lat(),
-            lng: place.geometry!.location!.lng()
-          }
-        }));
-      }
-    });
+    // ... kod usunięty ...
   }, [isEditing]);
+  */
 
   // Obsługa Ctrl+V dla zdjęć
   useEffect(() => {
@@ -350,11 +368,16 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
     if (!job) return;
     setIsProcessing(true);
     try {
-      await jobsService.completeJob(job.id, completionNotes, completionImages);
-      alert('Raport wysłany!');
+      await jobsService.completeJob(job.id, {
+        completionImages,
+        completionNotes,
+        clientEmail: '',
+        sendEmail: false,
+      });
+      alert('Zlecenie zakończone!');
       onBack();
     } catch { 
-      alert('Błąd zapisu raportu'); 
+      alert('Błąd zapisu'); 
     } finally { 
       setIsProcessing(false); 
     }
@@ -415,7 +438,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
   // 1. WhatsApp tylko linki (szybkie)
   const handleShareLinks = () => {
     const shareText = generateShareText();
-    // Używamy api.whatsapp.com dla lepszej kompatybilności desktop/mobile
+    // Używamy api.whatsapp.com zamiast wa.me dla większej kompatybilności
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
     window.open(whatsappUrl, '_blank');
   };
@@ -518,16 +541,31 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
     <div className="w-full max-w-3xl mx-auto pb-40">
       
       {/* Lightbox */}
-      {lightboxImage && (
-        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col justify-center items-center p-4 animate-fade-in">
-          <button onClick={() => setLightboxImage(null)} className="absolute top-4 right-4 text-white p-3 bg-white/10 rounded-full hover:bg-white/20">
-            <X className="w-8 h-8" />
+      {lightboxImage && createPortal(
+        <div 
+          className="fixed z-[99999] bg-black/95 flex items-center justify-center p-2 sm:p-4" 
+          style={{ top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' }}
+          onClick={() => setLightboxImage(null)}
+        >
+          <button 
+            onClick={(e) => { e.stopPropagation(); setLightboxImage(null); }}
+            className="absolute top-4 right-4 text-white/80 hover:text-white p-2 transition-colors z-[100000] hover:bg-white/10 rounded-full"
+          >
+            <X className="w-8 h-8 sm:w-10 sm:h-10" />
           </button>
-          {isPdf(lightboxImage) 
-            ? <iframe src={lightboxImage} className="w-full h-full bg-white rounded-xl" title="pdf" /> 
-            : <img src={lightboxImage} className="max-h-full max-w-full object-contain rounded-xl shadow-2xl" alt="view" />
-          }
-        </div>
+          
+          <div className="relative w-full h-full flex items-center justify-center pointer-events-none" onClick={(e) => e.stopPropagation()}>
+            {isPdf(lightboxImage) 
+              ? <iframe src={lightboxImage} className="w-full h-[85vh] max-w-5xl bg-white rounded-lg shadow-2xl pointer-events-auto" title="pdf" /> 
+              : <img 
+                  src={lightboxImage} 
+                  className="max-h-[90vh] max-w-[95vw] object-contain rounded-lg shadow-2xl pointer-events-auto animate-fade-in" 
+                  alt="view" 
+                />
+            }
+          </div>
+        </div>,
+        document.getElementById('modal-root') || document.body
       )}
 
 
@@ -536,14 +574,36 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
         <button onClick={onBack} className="flex items-center text-slate-700 font-bold bg-white px-4 py-2.5 rounded-xl shadow-sm hover:shadow border border-slate-200 transition-all">
           <ArrowLeft className="w-4 h-4 mr-2" /> Wróć
         </button>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap justify-end">
           {isAdmin && job && !isEditing && (
             <>
-              <button onClick={handleDuplicate} className="bg-violet-500 hover:bg-violet-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-500/25 flex items-center gap-2">
-                <Copy className="w-4 h-4" /> Duplikuj
+              <button onClick={handleDuplicate} className="bg-violet-500 hover:bg-violet-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-lg shadow-violet-500/25 flex items-center gap-1.5">
+                <Copy className="w-3.5 h-3.5" /> Duplikuj
               </button>
-              <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 text-sm bg-blue-500 hover:bg-blue-600 text-white px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-500/25">
-                <Edit2 className="w-4 h-4" /> Edytuj
+              <button 
+                onClick={() => {
+                  if (window.confirm('Czy na pewno chcesz przenieść to zlecenie do archiwum?')) {
+                    onArchive?.(job.id);
+                    onBack();
+                  }
+                }} 
+                className="bg-slate-500 hover:bg-slate-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-lg shadow-slate-500/25 flex items-center gap-1.5"
+              >
+                <Archive className="w-3.5 h-3.5" /> Archiwizuj
+              </button>
+              <button 
+                onClick={() => {
+                  if (window.confirm('Czy na pewno chcesz USUNĄĆ to zlecenie? Ta operacja jest nieodwracalna!')) {
+                    onDelete?.(job.id);
+                    onBack();
+                  }
+                }} 
+                className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-lg shadow-red-500/25 flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Usuń
+              </button>
+              <button onClick={() => setIsEditing(true)} className="flex items-center gap-1.5 text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-xl font-bold shadow-lg shadow-blue-500/25">
+                <Edit2 className="w-3.5 h-3.5" /> Edytuj
               </button>
             </>
           )}
@@ -578,17 +638,54 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
         <div className="p-5 space-y-4">
           {/* Title */}
           <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
-            {isEditing ? (
-              <input 
-                value={editedData.jobTitle || ''} 
-                onChange={(e) => handleDataChange('jobTitle', e.target.value)} 
-                className="w-full text-2xl font-black text-slate-800 bg-white border-b-2 border-slate-200 p-2 focus:border-orange-500 outline-none" 
-                placeholder="NAZWA ZLECENIA" 
-              />
-            ) : (
-              <h1 className="text-2xl font-black text-slate-800 leading-tight">{editedData.jobTitle}</h1>
-            )}
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-2">NAZWA ZLECENIA</p>
+            <div className="flex justify-between items-start gap-4">
+              <div className="flex-1">
+                {isEditing ? (
+                  <input 
+                    value={editedData.jobTitle || ''} 
+                    onChange={(e) => handleDataChange('jobTitle', e.target.value)} 
+                    className="w-full text-2xl font-black text-slate-800 bg-white border-b-2 border-slate-200 p-2 focus:border-orange-500 outline-none" 
+                    placeholder="NAZWA ZLECENIA" 
+                  />
+                ) : (
+                  <h1 className="text-2xl font-black text-slate-800 leading-tight">{editedData.jobTitle}</h1>
+                )}
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-2">NAZWA ZLECENIA</p>
+              </div>
+              
+              {isEditing && job && (
+                <div className="flex flex-col gap-1 min-w-[120px]">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                    <Calendar className="w-3 h-3" /> Dzień / Kolumna
+                  </label>
+                  <select
+                    value={job.columnId || 'PREPARE'}
+                    onChange={async (e) => {
+                      const newCol = e.target.value as JobColumnId;
+                      // Optimistic update handled by parent usually, but here we act on job directly
+                      // We'll just call API and reload/notify
+                      try {
+                        await jobsService.updateJobColumn(job.id, newCol);
+                        // Force reload or update local state? 
+                        // Ideally we should callback to parent to refresh
+                        if (onJobSaved) onJobSaved(); // Trigger refresh
+                      } catch (err) {
+                        alert('Błąd zmiany kolumny');
+                      }
+                    }}
+                    className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm font-bold text-slate-700 focus:border-blue-500 outline-none"
+                  >
+                    <option value="PREPARE">DO PRZYGOTOWANIA</option>
+                    <option value="MON">PONIEDZIAŁEK</option>
+                    <option value="TUE">WTOREK</option>
+                    <option value="WED">ŚRODA</option>
+                    <option value="THU">CZWARTEK</option>
+                    <option value="FRI">PIĄTEK</option>
+                    <option value="COMPLETED">WYKONANE</option>
+                  </select>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Address */}
@@ -684,9 +781,24 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
           {/* Scope of Work */}
           {(editedData.scopeWorkText || isEditing) && (
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-5 shadow-sm">
-              <p className="text-xs font-bold text-blue-600 mb-3 uppercase tracking-wide flex items-center gap-2">
-                <ScrollText className="w-4 h-4" /> ZAKRES PRAC
-              </p>
+              <div className="flex justify-between items-center mb-3">
+                <p className="text-xs font-bold text-blue-600 uppercase tracking-wide flex items-center gap-2">
+                  <ScrollText className="w-4 h-4" /> ZAKRES PRAC
+                </p>
+                {isEditing && isSupported && (
+                  <button
+                    onClick={() => toggleVoice('scopeWorkText')}
+                    className={`p-1.5 rounded-lg transition-all ${
+                      isListening && activeVoiceField === 'scopeWorkText'
+                        ? 'bg-red-100 text-red-600 animate-pulse'
+                        : 'bg-white text-slate-400 hover:text-blue-600'
+                    }`}
+                    title="Nagraj głosowo"
+                  >
+                    {isListening && activeVoiceField === 'scopeWorkText' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
+                )}
+              </div>
               {isEditing ? (
                 <textarea 
                   value={editedData.scopeWorkText || ''} 
@@ -705,9 +817,50 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
           {/* AI Analysis */}
           {(editedData.scopeWorkImages || isEditing) && (
             <div className="bg-violet-50 border border-violet-100 rounded-xl p-5 shadow-sm">
-              <p className="text-xs font-bold text-violet-600 mb-3 uppercase tracking-wide flex items-center gap-2">
-                <ScanEye className="w-4 h-4" /> ANALIZA TECHNICZNA
-              </p>
+              <div className="flex justify-between items-center mb-3">
+                <p className="text-xs font-bold text-violet-600 uppercase tracking-wide flex items-center gap-2">
+                  <ScanEye className="w-4 h-4" /> ANALIZA TECHNICZNA
+                </p>
+                <div className="flex gap-2">
+                  {isEditing && (
+                    <button
+                      onClick={async () => {
+                        if (!window.confirm('Czy na pewno chcesz ponownie przeanalizować zakres prac i zdjęcia? To nadpisze obecną analizę.')) return;
+                        setIsProcessing(true);
+                        try {
+                          // Construct a prompt from title, text and images context
+                          const prompt = `Proszę o ponowną analizę techniczną dla zlecenia: ${editedData.jobTitle}. Zakres prac: ${editedData.scopeWorkText}. Wygeneruj krótki, techniczny opis (wymiary, materiały) na podstawie tego tekstu i załączonych obrazów.`;
+                          const result = await geminiService.parseEmail(prompt, projectImages);
+                          if (result.scopeWorkImages) {
+                            handleDataChange('scopeWorkImages', result.scopeWorkImages);
+                          }
+                        } catch (e) {
+                          alert('Błąd analizy AI');
+                        } finally {
+                          setIsProcessing(false);
+                        }
+                      }}
+                      className="p-1.5 rounded-lg bg-white text-violet-500 hover:bg-violet-100 transition-all"
+                      title="Ponowna analiza AI"
+                    >
+                      <RotateCw className="w-4 h-4" />
+                    </button>
+                  )}
+                  {isEditing && isSupported && (
+                    <button
+                      onClick={() => toggleVoice('scopeWorkImages')}
+                      className={`p-1.5 rounded-lg transition-all ${
+                        isListening && activeVoiceField === 'scopeWorkImages'
+                          ? 'bg-red-100 text-red-600 animate-pulse'
+                          : 'bg-white text-slate-400 hover:text-violet-600'
+                      }`}
+                      title="Nagraj głosowo"
+                    >
+                      {isListening && activeVoiceField === 'scopeWorkImages' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                    </button>
+                  )}
+                </div>
+              </div>
               {isEditing ? (
                 <textarea 
                   value={editedData.scopeWorkImages || ''} 
@@ -723,9 +876,24 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
 
           {/* Admin Notes */}
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 shadow-sm">
-            <p className="text-xs font-bold text-amber-700 mb-3 uppercase tracking-wide flex items-center gap-2">
-              <MessageSquare className="w-4 h-4" /> UWAGI WEWNĘTRZNE
-            </p>
+            <div className="flex justify-between items-center mb-3">
+              <p className="text-xs font-bold text-amber-700 uppercase tracking-wide flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" /> UWAGI WEWNĘTRZNE
+              </p>
+              {isEditing && isSupported && (
+                <button
+                  onClick={() => toggleVoice('adminNotes')}
+                  className={`p-1.5 rounded-lg transition-all ${
+                    isListening && activeVoiceField === 'adminNotes'
+                      ? 'bg-red-100 text-red-600 animate-pulse'
+                      : 'bg-white text-slate-400 hover:text-amber-600'
+                  }`}
+                  title="Nagraj głosowo"
+                >
+                  {isListening && activeVoiceField === 'adminNotes' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              )}
+            </div>
             {isEditing ? (
               <textarea 
                 value={adminNotes} 
@@ -792,17 +960,61 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
               jobId={job.id}
               clientId={job.clientId}
               clientName={editedData.clientName || editedData.companyName}
-              clientEmail={undefined} // TODO: add email to editedData
-              address={editedData.address}
+              clientEmail={editedData.email}
+              installAddress={editedData.address}
               phone={editedData.phoneNumber}
+              nip={editedData.nip}
               paymentStatus={job.paymentStatus || PaymentStatus.NONE}
               totalGross={job.totalGross || 0}
               paidAmount={job.paidAmount || 0}
               invoices={job.invoices || []}
               isAdmin={isAdmin}
-              onStatusChange={(status) => {
-                // Refresh job data after status change
-                console.log('Payment status changed to:', status);
+              onStatusChange={async (status) => {
+                // Aktualizuj status płatności w bazie
+                try {
+                  await jobsService.updateJob(job.id, { paymentStatus: status });
+                  console.log('Payment status changed to:', status);
+                } catch (error) {
+                  console.error('Failed to update payment status:', error);
+                }
+              }}
+              onClientDataChange={(billingData) => {
+                // Aktualizuj dane ROZLICZENIOWE (do faktury) - NIE adres montażu!
+                // Adres montażu (editedData.address) zostaje bez zmian!
+                setEditedData(prev => ({
+                  ...prev,
+                  // Nazwa firmy z GUS (jeśli jest NIP)
+                  companyName: billingData.companyName || prev.companyName,
+                  nip: billingData.nip || prev.nip,
+                  // Email i telefon mogą być aktualizowane
+                  email: billingData.email || prev.email,
+                  phoneNumber: billingData.phone || prev.phoneNumber,
+                  // UWAGA: NIE nadpisujemy address - to jest adres MONTAŻU, nie adres firmy!
+                  // Adres siedziby firmy jest zapisywany tylko w InvoiceModule
+                }));
+              }}
+            />
+          )}
+
+          {/* Completion Section - for finishing jobs */}
+          {job && job.status !== JobStatus.ARCHIVED && (
+            <CompletionSection
+              job={job}
+              isAdmin={isAdmin}
+              onComplete={async (completionData) => {
+                try {
+                  await jobsService.completeJob(job.id, {
+                    completionImages: completionData.completionImages,
+                    completionNotes: completionData.completionNotes,
+                    clientEmail: completionData.clientEmail,
+                    sendEmail: completionData.sendEmail,
+                  });
+                  onJobSaved?.();
+                  onBack();
+                } catch (error) {
+                  console.error('Błąd zakończenia zlecenia:', error);
+                  throw error;
+                }
               }}
             />
           )}
@@ -1153,4 +1365,3 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
 };
 
 export default JobCard;
-
