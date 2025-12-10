@@ -506,13 +506,18 @@ const ColumnDropZone: React.FC<{ columnId: string; isActivelyDragging?: boolean 
 
 // Droppable for horizontal board (row layout)
 const DroppableRow: React.FC<DroppableColumnProps> = ({ id, children, activeId }) => {
+  // Cały wiersz jest droppable
+  const { setNodeRef, isOver } = useDroppable({ id });
+  
   return (
     <div 
-      className="p-5 transition-all overflow-visible"
+      ref={setNodeRef}
+      className={`p-5 transition-all overflow-visible ${isOver && activeId ? 'ring-2 ring-blue-400 ring-inset bg-blue-50/30' : ''}`}
       style={{ 
         background: 'var(--bg-surface)', 
         backdropFilter: 'var(--blur)', 
-        WebkitBackdropFilter: 'var(--blur)'
+        WebkitBackdropFilter: 'var(--blur)',
+        minHeight: '200px'
       }}
     >
       <div 
@@ -525,16 +530,25 @@ const DroppableRow: React.FC<DroppableColumnProps> = ({ id, children, activeId }
       >
         {children}
       </div>
-      <ColumnDropZone columnId={id} isActivelyDragging={!!activeId} />
+      {/* Wizualny wskaźnik gdy przeciągamy */}
+      {isOver && activeId && (
+        <div className="text-center text-sm font-bold text-blue-500 mt-2 py-2 bg-blue-100 rounded-lg">
+          ↓ Upuść tutaj ↓
+        </div>
+      )}
     </div>
   );
 };
 
 // Droppable for vertical kanban (column layout)
 const DroppableColumn: React.FC<DroppableColumnProps> = ({ id, children, activeId }) => {
+  // Cała kolumna jest droppable
+  const { setNodeRef, isOver } = useDroppable({ id });
+  
   return (
     <div 
-      className="p-3 min-h-[400px] flex-1 transition-all flex flex-col"
+      ref={setNodeRef}
+      className={`p-3 min-h-[400px] flex-1 transition-all flex flex-col ${isOver && activeId ? 'ring-2 ring-blue-400 ring-inset bg-blue-50/30' : ''}`}
       style={{ 
         background: 'var(--bg-surface)', 
         backdropFilter: 'var(--blur)', 
@@ -542,7 +556,12 @@ const DroppableColumn: React.FC<DroppableColumnProps> = ({ id, children, activeI
       }}
     >
       {children}
-      <ColumnDropZone columnId={id} isActivelyDragging={!!activeId} />
+      {/* Wizualny wskaźnik gdy przeciągamy */}
+      {isOver && activeId && (
+        <div className="text-center text-xs font-bold text-blue-500 mt-auto py-2 bg-blue-100 rounded-lg">
+          ↓ Upuść tutaj ↓
+        </div>
+      )}
     </div>
   );
 };
