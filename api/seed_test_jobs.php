@@ -129,13 +129,13 @@ try {
     foreach ($testJobs as $index => $job) {
         // Generuj friendlyId
         $year = date('Y');
-        $stmt = $pdo->query("SELECT COUNT(*) as count FROM jobs WHERE friendly_id LIKE '#$year/%'");
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM jobs_ai WHERE friendly_id LIKE '#$year/%'");
         $count = $stmt->fetch()['count'] + 1 + $index;
         $friendlyId = "#$year/" . str_pad($count, 3, '0', STR_PAD_LEFT);
         
-        // Wstaw zlecenie
+        // Wstaw zlecenie do jobs_ai (tabela dla zleceń AI)
         $stmt = $pdo->prepare("
-            INSERT INTO jobs (
+            INSERT INTO jobs_ai (
                 friendly_id, title, client_name, phone, email, nip,
                 address, description, status, column_id, column_order,
                 value_net, value_gross

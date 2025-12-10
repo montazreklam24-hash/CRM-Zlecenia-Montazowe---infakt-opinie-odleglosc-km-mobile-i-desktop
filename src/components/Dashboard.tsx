@@ -317,7 +317,11 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           {...attributes}
           onClick={handleCardClick}
           onDoubleClick={handleCardDoubleClick}
-          onContextMenu={(e) => onContextMenu?.(e, job)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onContextMenu?.(e, job);
+          }}
           className={`theme-card min-w-[160px] w-full min-h-[280px] h-full cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group relative flex flex-col overflow-visible touch-none ${showDropIndicator ? 'ring-2 ring-blue-400' : ''}`}
         >
           {/* Click hint tooltip */}
@@ -349,6 +353,19 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
             </div>
           )}
           
+          {/* Menu button - przycisk ⋮ */}
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onContextMenu?.(e, job);
+            }}
+            className="absolute top-2 right-2 z-20 w-7 h-7 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Menu"
+          >
+            ⋮
+          </button>
+
           {/* Job ID - more subtle */}
           <div 
             className="absolute bottom-2 right-2 text-[9px] font-medium px-1.5 py-0.5 backdrop-blur-sm" 
@@ -628,7 +645,11 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
           {...listeners}
           {...attributes}
           onDoubleClick={handleCardDoubleClick}
-          onContextMenu={(e) => onContextMenu?.(e, job)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onContextMenu?.(e, job);
+          }}
           className={`theme-card cursor-grab active:cursor-grabbing transition-all hover:shadow-md relative overflow-hidden touch-none ${showDropIndicator ? 'ring-2 ring-blue-400' : ''}`}
         >
         {/* Payment status bar on top */}
@@ -657,6 +678,18 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
               <Box className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
             </div>
           )}
+          {/* Menu button - przycisk ⋮ */}
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onContextMenu?.(e, job);
+            }}
+            className="absolute top-1 right-1 z-20 w-5 h-5 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Menu"
+          >
+            ⋮
+          </button>
           {/* Job ID */}
           <div 
             className="absolute bottom-1 right-1 text-[7px] font-medium px-1 py-0.5 backdrop-blur-sm" 
