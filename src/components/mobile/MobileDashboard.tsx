@@ -626,9 +626,7 @@ const MobileJobCardCompact: React.FC<MobileJobCardCompactProps> = ({
   const currentColName = COLUMNS.find(c => c.id === currentColumnId)?.short || '?';
 
   const handleMoveToColumn = (colId: JobColumnId) => {
-    if (!isDemo) {
-      onMoveToColumn(colId);
-    }
+    onMoveToColumn(colId);
     setShowMenu(false);
   };
 
@@ -653,10 +651,10 @@ const MobileJobCardCompact: React.FC<MobileJobCardCompactProps> = ({
         
         {/* Move UP button */}
         <button
-          onClick={() => !isDemo && onMoveUp()}
-          disabled={!canMoveUp || isDemo}
+          onClick={() => onMoveUp()}
+          disabled={!canMoveUp}
           className={`px-4 flex items-center justify-center transition-all ${
-            canMoveUp && !isDemo 
+            canMoveUp 
               ? 'bg-blue-500 text-white active:bg-blue-600' 
               : 'bg-slate-200 text-slate-400'
           }`}
@@ -746,10 +744,10 @@ const MobileJobCardCompact: React.FC<MobileJobCardCompactProps> = ({
         
         {/* Move DOWN button */}
         <button
-          onClick={(e) => { e.stopPropagation(); !isDemo && onMoveDown(); }}
-          disabled={!canMoveDown || isDemo}
+          onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
+          disabled={!canMoveDown}
           className={`px-4 flex items-center justify-center transition-all ${
-            canMoveDown && !isDemo 
+            canMoveDown 
               ? 'bg-blue-500 text-white active:bg-blue-600' 
               : 'bg-slate-200 text-slate-400'
           }`}
