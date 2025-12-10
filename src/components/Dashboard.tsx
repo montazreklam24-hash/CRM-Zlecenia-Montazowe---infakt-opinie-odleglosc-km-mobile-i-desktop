@@ -11,8 +11,6 @@ import {
 import MapBoardGoogle from './MapBoardGoogle';
 import MapBoardOSM from './MapBoardOSM';
 import PaymentStatusBadge, { PaymentStatusBar, PaymentStatusIcon } from './PaymentStatusBadge';
-import PaymentStatusDropdown, { PAYMENT_OPTIONS } from './PaymentStatusDropdown';
-import MoveToDropdown, { COLUMN_OPTIONS } from './MoveToDropdown';
 
 import {
   DndContext,
@@ -335,16 +333,8 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           )}
         {/* Image with payment status bar on top */}
         <div className="aspect-square relative overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
-          {/* Payment Status Bar - klikalny dropdown */}
-          <div className="absolute top-0 left-0 right-0 z-10">
-            <PaymentStatusDropdown
-              currentStatus={job.paymentStatus || PaymentStatus.NONE}
-              onStatusChange={(status) => onPaymentStatusChange?.(job.id, status)}
-              disabled={!isAdmin}
-              size="small"
-              showLabel={true}
-            />
-          </div>
+          {/* Payment Status Bar - prosty pasek */}
+          <PaymentStatusBar status={job.paymentStatus || PaymentStatus.NONE} />
           
           {job.projectImages?.[0] ? (
             <img src={job.projectImages[0]} className="w-full h-full object-cover pointer-events-none" alt="preview" loading="lazy" />
@@ -460,15 +450,6 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
             )}
           </div>
           
-          {/* Przycisk "Przenieś do" - PORTAL */}
-          <MoveToDropdown
-            jobId={job.id}
-            currentColumnId={job.columnId || 'PREPARE'}
-            onMoveToColumn={(jid, colId) => {
-              if (onMoveToColumn) onMoveToColumn(jid, colId);
-            }}
-            className="w-full py-1.5 text-[9px] font-bold text-slate-500 hover:bg-slate-100 transition-all flex items-center justify-center gap-1 border-t"
-          />
         </div>
       </div>
     </div>
