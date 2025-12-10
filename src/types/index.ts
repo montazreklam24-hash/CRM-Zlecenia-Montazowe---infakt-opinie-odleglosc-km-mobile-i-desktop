@@ -192,6 +192,8 @@ export interface JobOrderData {
   description?: string;
   scopeWorkImages?: string;
   scheduledDate?: string;
+  timeSlotStart?: string; // np. "08:00"
+  timeSlotEnd?: string;   // np. "16:00"
   paymentStatus?: string;
   payment?: {
     type?: PaymentType;

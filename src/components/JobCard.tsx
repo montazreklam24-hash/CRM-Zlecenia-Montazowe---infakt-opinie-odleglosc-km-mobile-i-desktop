@@ -4,7 +4,7 @@ import {
   ArrowLeft, CheckCircle2, Loader2, Camera, Save, Edit2, 
   ListTodo, Plus, Trash2, Copy, MessageSquare, Star, FileText,
   X, Share2, ScrollText, ScanEye, Navigation, Phone, ExternalLink,
-  Mic, MicOff, RotateCw, Calendar, Archive, ChevronDown
+  Mic, MicOff, RotateCw, Calendar, Archive, ChevronDown, Clock
 } from 'lucide-react';
 import { Job, JobOrderData, JobStatus, UserRole, ChecklistItem, PaymentStatus, JobColumnId } from '../types';
 import { jobsService, compressImage, geminiService } from '../services/apiService';
@@ -37,7 +37,10 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
     ...d,
     locations: d.locations || [],
     scopeWorkText: d.scopeWorkText || '',
-    scopeWorkImages: d.scopeWorkImages || ''
+    scopeWorkImages: d.scopeWorkImages || '',
+    scheduledDate: d.scheduledDate || '',
+    timeSlotStart: d.timeSlotStart || '',
+    timeSlotEnd: d.timeSlotEnd || ''
   });
 
   const [editedData, setEditedData] = useState<JobOrderData>(
@@ -808,6 +811,89 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                     <Navigation className="w-4 h-4" /> Nawiguj
                   </a>
                 )}
+              </div>
+            )}
+          </div>
+
+          {/* Scheduled Date & Time */}
+          <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-5 shadow-sm border border-indigo-200">
+            <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wide mb-3 flex items-center gap-2">
+              <Calendar className="w-4 h-4" /> TERMIN MONTAŻU
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Date */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                  <Calendar className="w-3 h-3" /> Data
+                </label>
+                {isEditing ? (
+                  <input 
+                    type="date"
+                    value={editedData.scheduledDate || ''} 
+                    onChange={(e) => handleDataChange('scheduledDate', e.target.value)} 
+                    className="w-full bg-white border border-indigo-200 rounded-lg p-2 text-sm mt-1"
+                  />
+                ) : (
+                  <p className="font-semibold text-slate-800 mt-1">
+                    {editedData.scheduledDate 
+                      ? new Date(editedData.scheduledDate).toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })
+                      : <span className="text-slate-400 italic">Nie ustalono</span>
+                    }
+                  </p>
+                )}
+              </div>
+              
+              {/* Time Start */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                  <Clock className="w-3 h-3" /> Od godziny
+                </label>
+                {isEditing ? (
+                  <input 
+                    type="time"
+                    value={editedData.timeSlotStart || ''} 
+                    onChange={(e) => handleDataChange('timeSlotStart', e.target.value)} 
+                    className="w-full bg-white border border-indigo-200 rounded-lg p-2 text-sm mt-1"
+                  />
+                ) : (
+                  <p className="font-semibold text-slate-800 mt-1">
+                    {editedData.timeSlotStart || <span className="text-slate-400 italic">-</span>}
+                  </p>
+                )}
+              </div>
+              
+              {/* Time End */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                  <Clock className="w-3 h-3" /> Do godziny
+                </label>
+                {isEditing ? (
+                  <input 
+                    type="time"
+                    value={editedData.timeSlotEnd || ''} 
+                    onChange={(e) => handleDataChange('timeSlotEnd', e.target.value)} 
+                    className="w-full bg-white border border-indigo-200 rounded-lg p-2 text-sm mt-1"
+                  />
+                ) : (
+                  <p className="font-semibold text-slate-800 mt-1">
+                    {editedData.timeSlotEnd || <span className="text-slate-400 italic">-</span>}
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            {/* Quick preview of scheduled time */}
+            {!isEditing && editedData.scheduledDate && (
+              <div className="mt-3 pt-3 border-t border-indigo-200 flex items-center gap-2 text-indigo-700">
+                <Calendar className="w-4 h-4" />
+                <span className="font-bold">
+                  {new Date(editedData.scheduledDate).toLocaleDateString('pl-PL', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  {editedData.timeSlotStart && editedData.timeSlotEnd && (
+                    <span className="ml-2 font-normal">
+                      {editedData.timeSlotStart} - {editedData.timeSlotEnd}
+                    </span>
+                  )}
+                </span>
               </div>
             )}
           </div>

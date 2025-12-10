@@ -364,9 +364,21 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
         
         <div className="p-3 flex flex-col" style={{ minHeight: '110px' }}>
           {/* Title - max 3 linie */}
-          <h4 className="font-bold text-xs leading-tight mb-2 line-clamp-3" style={{ color: 'var(--text-primary)' }}>
+          <h4 className="font-bold text-xs leading-tight mb-1 line-clamp-3" style={{ color: 'var(--text-primary)' }}>
             {job.data.jobTitle}
           </h4>
+          
+          {/* Scheduled Date/Time Badge */}
+          {job.data.scheduledDate && (
+            <div className="text-[9px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded font-medium mb-1 flex items-center gap-1 w-fit">
+              📅 {new Date(job.data.scheduledDate).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
+              {job.data.timeSlotStart && (
+                <span className="text-indigo-500">
+                  {job.data.timeSlotStart}{job.data.timeSlotEnd && `-${job.data.timeSlotEnd}`}
+                </span>
+              )}
+            </div>
+          )}
           
           {/* Przyciski Nawiguj i Zadzwoń - układ pionowy */}
           <div className="flex flex-col gap-1.5 mb-2 mt-auto">
