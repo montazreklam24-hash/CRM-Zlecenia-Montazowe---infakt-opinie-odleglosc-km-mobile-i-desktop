@@ -614,10 +614,17 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [showTypeModal, setShowTypeModal] = useState(false);
+  const healingDoneRef = useRef(false); // Zapobiega wielokrotnemu uruchamianiu healJobs
 
-  // Auto-Heal: Sprawdź zlecenia z adresem ale bez współrzędnych
+  // Auto-Heal: Sprawdź zlecenia z adresem ale bez współrzędnych (tylko RAZ po załadowaniu)
   useEffect(() => {
+    // Jeśli już wykonano healing - nie powtarzaj
+    if (healingDoneRef.current) return;
+    
     const healJobs = async () => {
+      // Oznacz że healing jest w trakcie
+      healingDoneRef.current = true;
+      
       // Filtruj zlecenia, które mają adres (>3 znaki) ale nie mają współrzędnych
       const jobsToHeal = jobs.filter(j => 
         j.data.address && 
@@ -645,7 +652,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             await jobsService.updateJob(job.id, {
               data: {
                 ...job.data,
-                address: bestMatch.formattedAddress, // Ujednolicamy adres
+                address: bestMatch.formattedAddress,
                 coordinates: bestMatch.coordinates
               }
             });
@@ -655,22 +662,21 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
         } catch (e) {
           console.error(`❌ Auto-Heal błąd dla ${job.friendlyId}:`, e);
         }
-        // Małe opóźnienie żeby nie zajechać API
         await new Promise(r => setTimeout(r, 500));
       }
       
-      // Po zakończeniu odśwież listę
+      // Odśwież listę po naprawie
       if (jobsToHeal.length > 0) {
         loadJobs();
       }
     };
 
-    // Uruchom po 3 sekundach od załadowania, żeby nie blokować startu
+    // Uruchom po 3 sekundach od załadowania (tylko raz!)
     if (!loading && jobs.length > 0) {
       const timer = setTimeout(healJobs, 3000);
       return () => clearTimeout(timer);
     }
-  }, [loading, jobs.length]); // Zależność od długości, ale healJobs ma guard na jobsToHeal
+  }, [loading, jobs.length]);
 
   // Sensors for both mouse and touch
   const sensors = useSensors(
