@@ -181,6 +181,7 @@ interface MobileDashboardProps {
   onMoveUp: (jobId: string) => void;
   onMoveDown: (jobId: string) => void;
   onMoveToColumn: (jobId: string, columnId: JobColumnId) => void;
+  onPaymentStatusChange: (jobId: string, status: PaymentStatus) => void;
   onDelete: (jobId: string) => void;
   onDuplicate: (jobId: string) => void;
   onArchive: (jobId: string) => void;
@@ -206,6 +207,7 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({
   onMoveUp,
   onMoveDown,
   onMoveToColumn,
+  onPaymentStatusChange,
   onDelete,
   onDuplicate,
   onArchive,
@@ -423,6 +425,7 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({
         onMoveUp={onMoveUp}
         onMoveDown={onMoveDown}
         onMoveToColumn={onMoveToColumn}
+        onPaymentStatusChange={onPaymentStatusChange}
         onDelete={onDelete}
         onDuplicate={onDuplicate}
         onArchive={onArchive}
@@ -443,6 +446,7 @@ interface SwipeableJobListProps {
   onMoveUp: (jobId: string) => void;
   onMoveDown: (jobId: string) => void;
   onMoveToColumn: (jobId: string, columnId: JobColumnId) => void;
+  onPaymentStatusChange: (jobId: string, status: PaymentStatus) => void;
   onDelete: (jobId: string) => void;
   onDuplicate: (jobId: string) => void;
   onArchive: (jobId: string) => void;
@@ -459,6 +463,7 @@ const SwipeableJobList: React.FC<SwipeableJobListProps> = ({
   onMoveUp,
   onMoveDown,
   onMoveToColumn,
+  onPaymentStatusChange,
   onDelete,
   onDuplicate,
   onArchive,
@@ -564,6 +569,7 @@ const SwipeableJobList: React.FC<SwipeableJobListProps> = ({
               onMoveUp={() => onMoveUp(job.id)}
               onMoveDown={() => onMoveDown(job.id)}
               onMoveToColumn={(colId) => onMoveToColumn(job.id, colId)}
+              onPaymentStatusChange={(status) => onPaymentStatusChange(job.id, status)}
               onDelete={() => onDelete(job.id)}
               onDuplicate={() => onDuplicate(job.id)}
               onArchive={() => onArchive(job.id)}
@@ -590,6 +596,7 @@ interface MobileJobCardCompactProps {
   onMoveUp: () => void;
   onMoveDown: () => void;
   onMoveToColumn: (columnId: JobColumnId) => void;
+  onPaymentStatusChange: (status: PaymentStatus) => void;
   onDelete: () => void;
   onDuplicate: () => void;
   onArchive: () => void;
@@ -600,12 +607,23 @@ interface MobileJobCardCompactProps {
   isDemo?: boolean;
 }
 
+// Payment status options for mobile
+const PAYMENT_OPTIONS: { value: PaymentStatus; label: string; color: string }[] = [
+  { value: PaymentStatus.NONE, label: 'BRAK', color: '#64748b' },
+  { value: PaymentStatus.PROFORMA, label: 'PROFORMA', color: '#f97316' },
+  { value: PaymentStatus.PARTIAL, label: 'ZALICZKA', color: '#a855f7' },
+  { value: PaymentStatus.PAID, label: 'OPŁACONE', color: '#22c55e' },
+  { value: PaymentStatus.CASH, label: 'BARTER', color: '#eab308' },
+  { value: PaymentStatus.OVERDUE, label: 'DO ZAPŁATY', color: '#ef4444' },
+];
+
 const MobileJobCardCompact: React.FC<MobileJobCardCompactProps> = ({
   job,
   onOpen,
   onMoveUp,
   onMoveDown,
   onMoveToColumn,
+  onPaymentStatusChange,
   onDelete,
   onDuplicate,
   onArchive,
@@ -630,24 +648,26 @@ const MobileJobCardCompact: React.FC<MobileJobCardCompactProps> = ({
     setShowMenu(false);
   };
 
+  const handlePaymentChange = (status: PaymentStatus) => {
+    onPaymentStatusChange(status);
+    setShowMenu(false);
+  };
+
   return (
     <div 
       className="bg-white rounded-2xl shadow-md overflow-hidden border border-slate-200 relative"
       style={{ touchAction: 'manipulation' }}
     >
-      {/* TOP: Payment status + Move UP arrow */}
+      {/* TOP: Payment status (clickable) + Move UP arrow */}
       <div className="flex items-stretch">
-        {/* Payment status */}
-        {paymentLabel ? (
-          <div 
-            className="flex-1 text-[9px] font-bold text-white text-center py-1.5 uppercase tracking-wide"
-            style={{ background: paymentColor }}
-          >
-            {paymentLabel}
-          </div>
-        ) : (
-          <div className="flex-1 bg-slate-100 py-1.5" />
-        )}
+        {/* Payment status - now clickable to open menu */}
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+          className="flex-1 text-[9px] font-bold text-white text-center py-1.5 uppercase tracking-wide active:opacity-80"
+          style={{ background: paymentColor || '#64748b' }}
+        >
+          {paymentLabel || 'BRAK'} ▼
+        </button>
         
         {/* Move UP button */}
         <button
@@ -720,10 +740,13 @@ const MobileJobCardCompact: React.FC<MobileJobCardCompactProps> = ({
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-blue-50 text-blue-700 font-bold text-xs active:bg-blue-100 border-r border-slate-100"
+          className="flex-1 flex flex-col items-center justify-center py-2 bg-blue-50 text-blue-700 active:bg-blue-100 border-r border-slate-100"
         >
-          <Navigation className="w-4 h-4" />
-          NAWIGUJ
+          <div className="flex items-center gap-1">
+            <Navigation className="w-3 h-3" />
+            <span className="text-[10px] font-bold truncate max-w-[90px]">{street}</span>
+          </div>
+          {city && <span className="text-[8px] text-blue-500 font-medium">{city}</span>}
         </a>
         
         {phone ? (
@@ -764,6 +787,31 @@ const MobileJobCardCompact: React.FC<MobileJobCardCompactProps> = ({
             className="fixed left-4 right-4 top-1/2 -translate-y-1/2 z-[101] bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 max-h-[80vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* PAYMENT STATUS SECTION */}
+            <div className="text-xs font-bold text-slate-500 uppercase px-3 py-2 border-b border-slate-100 mb-2 flex items-center gap-2">
+              💳 Status płatności:
+            </div>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {PAYMENT_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => handlePaymentChange(opt.value)}
+                  className={`px-2 py-2 rounded-xl text-[10px] font-bold text-center transition-all ${
+                    job.paymentStatus === opt.value 
+                      ? 'ring-2 ring-offset-1 ring-blue-500' 
+                      : ''
+                  }`}
+                  style={{ 
+                    background: opt.color,
+                    color: opt.value === PaymentStatus.CASH ? '#000' : '#fff'
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            
+            {/* MOVE TO COLUMN SECTION */}
             <div className="text-xs font-bold text-slate-500 uppercase px-3 py-2 border-b border-slate-100 mb-2 flex items-center gap-2">
               📅 Przenieś zlecenie do:
             </div>

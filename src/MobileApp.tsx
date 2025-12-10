@@ -62,26 +62,35 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
     if (!job) return;
     
     const columnId = job.columnId || 'PREPARE';
+    // Pobierz zlecenia z tej kolumny i nadaj im indeksy jako order jeśli brak
     const columnJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === columnId && j.status !== JobStatus.ARCHIVED)
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
+      .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
     
-    const currentIndex = columnJobs.findIndex(j => j.id === jobId);
+    // Przypisz indeksy jako order (dla spójności)
+    const jobsWithOrder = columnJobs.map((j, idx) => ({ ...j, order: j.order ?? idx }));
+    
+    const currentIndex = jobsWithOrder.findIndex(j => j.id === jobId);
     if (currentIndex <= 0) return;
     
-    const jobAbove = columnJobs[currentIndex - 1];
-    const currentOrder = job.order || currentIndex;
-    const aboveOrder = jobAbove.order || (currentIndex - 1);
+    const currentJob = jobsWithOrder[currentIndex];
+    const jobAbove = jobsWithOrder[currentIndex - 1];
     
+    // Zamień order
+    const newOrderForCurrent = jobAbove.order;
+    const newOrderForAbove = currentJob.order;
+    
+    // Aktualizuj lokalny stan
     setJobs(prev => prev.map(j => {
-      if (j.id === jobId) return { ...j, order: aboveOrder };
-      if (j.id === jobAbove.id) return { ...j, order: currentOrder };
+      if (j.id === jobId) return { ...j, order: newOrderForCurrent };
+      if (j.id === jobAbove.id) return { ...j, order: newOrderForAbove };
       return j;
     }));
     
+    // Zapisz do API
     try {
-      await jobsService.updateJobColumn(jobId, columnId, aboveOrder);
-      await jobsService.updateJobColumn(jobAbove.id, columnId, currentOrder);
+      await jobsService.updateJobColumn(jobId, columnId, newOrderForCurrent);
+      await jobsService.updateJobColumn(jobAbove.id, columnId, newOrderForAbove);
     } catch (err) {
       loadJobs();
     }
@@ -92,26 +101,35 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
     if (!job) return;
     
     const columnId = job.columnId || 'PREPARE';
+    // Pobierz zlecenia z tej kolumny i nadaj im indeksy jako order jeśli brak
     const columnJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === columnId && j.status !== JobStatus.ARCHIVED)
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
+      .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
     
-    const currentIndex = columnJobs.findIndex(j => j.id === jobId);
-    if (currentIndex >= columnJobs.length - 1) return;
+    // Przypisz indeksy jako order (dla spójności)
+    const jobsWithOrder = columnJobs.map((j, idx) => ({ ...j, order: j.order ?? idx }));
     
-    const jobBelow = columnJobs[currentIndex + 1];
-    const currentOrder = job.order || currentIndex;
-    const belowOrder = jobBelow.order || (currentIndex + 1);
+    const currentIndex = jobsWithOrder.findIndex(j => j.id === jobId);
+    if (currentIndex < 0 || currentIndex >= jobsWithOrder.length - 1) return;
     
+    const currentJob = jobsWithOrder[currentIndex];
+    const jobBelow = jobsWithOrder[currentIndex + 1];
+    
+    // Zamień order
+    const newOrderForCurrent = jobBelow.order;
+    const newOrderForBelow = currentJob.order;
+    
+    // Aktualizuj lokalny stan
     setJobs(prev => prev.map(j => {
-      if (j.id === jobId) return { ...j, order: belowOrder };
-      if (j.id === jobBelow.id) return { ...j, order: currentOrder };
+      if (j.id === jobId) return { ...j, order: newOrderForCurrent };
+      if (j.id === jobBelow.id) return { ...j, order: newOrderForBelow };
       return j;
     }));
     
+    // Zapisz do API
     try {
-      await jobsService.updateJobColumn(jobId, columnId, belowOrder);
-      await jobsService.updateJobColumn(jobBelow.id, columnId, currentOrder);
+      await jobsService.updateJobColumn(jobId, columnId, newOrderForCurrent);
+      await jobsService.updateJobColumn(jobBelow.id, columnId, newOrderForBelow);
     } catch (err) {
       loadJobs();
     }
@@ -201,6 +219,23 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
     }
   }, [jobs, selectedJob]);
 
+  const handlePaymentStatusChange = useCallback(async (jobId: string, status: PaymentStatus) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    
+    const jobType = job.type === 'simple' ? 'simple' : 'ai';
+    
+    // Optimistic update
+    setJobs(prev => prev.map(j => j.id === jobId ? { ...j, paymentStatus: status } : j));
+    
+    try {
+      await jobsService.updateJob(jobId, { paymentStatus: status }, jobType);
+    } catch (err) {
+      console.error('Failed to update payment status:', err);
+      loadJobs(); // Rollback on error
+    }
+  }, [jobs, loadJobs]);
+
   // Loading state
   if (loading) {
     return (
@@ -231,6 +266,7 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
           onMoveUp={handleMoveUp}
           onMoveDown={handleMoveDown}
           onMoveToColumn={handleMoveToColumn}
+          onPaymentStatusChange={handlePaymentStatusChange}
           onDelete={handleDelete}
           onDuplicate={handleDuplicate}
           onArchive={handleArchive}
