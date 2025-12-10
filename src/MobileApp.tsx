@@ -62,21 +62,23 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
     if (!job) return;
     
     const columnId = job.columnId || 'PREPARE';
-    // Pobierz zlecenia z tej kolumny i posortuj po order
+    // Pobierz zlecenia z tej kolumny i nadaj im indeksy jako order jeśli brak
     const columnJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === columnId && j.status !== JobStatus.ARCHIVED)
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
     
-    // Znajdź pozycję aktualnego zlecenia
-    const currentIndex = columnJobs.findIndex(j => j.id === jobId);
-    if (currentIndex <= 0) return; // Już na górze
+    // Przypisz indeksy jako order (dla spójności)
+    const jobsWithOrder = columnJobs.map((j, idx) => ({ ...j, order: j.order ?? idx }));
     
-    // Zamień miejscami z poprzednim
-    const jobAbove = columnJobs[currentIndex - 1];
+    const currentIndex = jobsWithOrder.findIndex(j => j.id === jobId);
+    if (currentIndex <= 0) return;
     
-    // Użyj indeksów jako nowych orderów (gwarantuje poprawną kolejność)
-    const newOrderForCurrent = currentIndex - 1;
-    const newOrderForAbove = currentIndex;
+    const currentJob = jobsWithOrder[currentIndex];
+    const jobAbove = jobsWithOrder[currentIndex - 1];
+    
+    // Zamień order
+    const newOrderForCurrent = jobAbove.order;
+    const newOrderForAbove = currentJob.order;
     
     // Aktualizuj lokalny stan
     setJobs(prev => prev.map(j => {
@@ -99,21 +101,23 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
     if (!job) return;
     
     const columnId = job.columnId || 'PREPARE';
-    // Pobierz zlecenia z tej kolumny i posortuj po order
+    // Pobierz zlecenia z tej kolumny i nadaj im indeksy jako order jeśli brak
     const columnJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === columnId && j.status !== JobStatus.ARCHIVED)
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
     
-    // Znajdź pozycję aktualnego zlecenia
-    const currentIndex = columnJobs.findIndex(j => j.id === jobId);
-    if (currentIndex < 0 || currentIndex >= columnJobs.length - 1) return; // Już na dole
+    // Przypisz indeksy jako order (dla spójności)
+    const jobsWithOrder = columnJobs.map((j, idx) => ({ ...j, order: j.order ?? idx }));
     
-    // Zamień miejscami z następnym
-    const jobBelow = columnJobs[currentIndex + 1];
+    const currentIndex = jobsWithOrder.findIndex(j => j.id === jobId);
+    if (currentIndex < 0 || currentIndex >= jobsWithOrder.length - 1) return;
     
-    // Użyj indeksów jako nowych orderów (gwarantuje poprawną kolejność)
-    const newOrderForCurrent = currentIndex + 1;
-    const newOrderForBelow = currentIndex;
+    const currentJob = jobsWithOrder[currentIndex];
+    const jobBelow = jobsWithOrder[currentIndex + 1];
+    
+    // Zamień order
+    const newOrderForCurrent = jobBelow.order;
+    const newOrderForBelow = currentJob.order;
     
     // Aktualizuj lokalny stan
     setJobs(prev => prev.map(j => {
