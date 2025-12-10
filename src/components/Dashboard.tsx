@@ -289,7 +289,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           {...attributes}
           onClick={handleCardClick}
           onDoubleClick={handleCardDoubleClick}
-          className={`theme-card min-w-[160px] w-40 cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group relative flex flex-col overflow-hidden touch-none ${showDropIndicator ? 'ring-2 ring-blue-400' : ''}`}
+          className={`theme-card min-w-[160px] w-40 cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group relative flex flex-col overflow-visible touch-none ${showDropIndicator ? 'ring-2 ring-blue-400' : ''}`}
         >
           {/* Click hint tooltip */}
           {showClickHint && (
