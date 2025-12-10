@@ -232,7 +232,7 @@ const MobileMapView: React.FC<MobileMapViewProps> = ({ jobs, onBack, onOpenJob }
             <div className="flex gap-3 mb-3" onClick={() => onOpenJob(selectedJob)}>
               <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0">
                 {selectedJob.projectImages?.[0] ? (
-                  <img src={selectedJob.projectImages[0]} className="w-full h-full object-cover" alt="" />
+                  <img src={selectedJob.projectImages[0]} className="w-full h-full object-cover" alt="" loading="lazy" />
                 ) : (
                   <JobPlaceholder job={selectedJob} size="small" />
                 )}

@@ -268,7 +268,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           )}
           
           {job.projectImages?.[0] ? (
-            <img src={job.projectImages[0]} className="w-full h-full object-cover pointer-events-none" alt="preview" />
+            <img src={job.projectImages[0]} className="w-full h-full object-cover pointer-events-none" alt="preview" loading="lazy" />
           ) : (
             <div className="w-full h-full flex items-center justify-center" style={{ color: 'var(--text-muted)' }}>
               <Box className="w-10 h-10" />
@@ -519,7 +519,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
         {/* Thumbnail */}
         <div className="aspect-square relative overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
           {job.projectImages?.[0] ? (
-            <img src={job.projectImages[0]} className="w-full h-full object-cover pointer-events-none" alt="" />
+            <img src={job.projectImages[0]} className="w-full h-full object-cover pointer-events-none" alt="" loading="lazy" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Box className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
@@ -609,7 +609,16 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   useEffect(() => {
     localStorage.setItem('dashboard_view_mode', viewMode);
   }, [viewMode]);
-  const [mapProvider, setMapProvider] = useState<'GOOGLE' | 'OSM'>('GOOGLE'); // Wybór mapy
+  
+  // Map provider - domyślnie OSM, zapamiętuje wybór
+  const [mapProvider, setMapProvider] = useState<'GOOGLE' | 'OSM'>(() => {
+    return (localStorage.getItem('dashboard_map_provider') as 'GOOGLE' | 'OSM') || 'OSM';
+  });
+  
+  // Persist map provider
+  useEffect(() => {
+    localStorage.setItem('dashboard_map_provider', mapProvider);
+  }, [mapProvider]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -1364,7 +1373,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                 <div className="theme-card shadow-2xl rotate-2 opacity-95 p-2" style={{ width: '120px' }}>
                   <div className="aspect-square rounded overflow-hidden mb-2" style={{ background: 'var(--bg-surface)' }}>
                     {activeJob.projectImages?.[0] ? (
-                      <img src={activeJob.projectImages[0]} className="w-full h-full object-cover" alt="" />
+                      <img src={activeJob.projectImages[0]} className="w-full h-full object-cover" alt="" loading="lazy" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Box className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
@@ -1440,7 +1449,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                 <div className="theme-card w-40 shadow-2xl rotate-2 opacity-95">
                   <div className="aspect-square relative overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
                     {activeJob.projectImages?.[0] ? (
-                      <img src={activeJob.projectImages[0]} className="w-full h-full object-cover" alt="" />
+                      <img src={activeJob.projectImages[0]} className="w-full h-full object-cover" alt="" loading="lazy" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Box className="w-10 h-10" style={{ color: 'var(--text-muted)' }} />
@@ -1579,7 +1588,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                 <div className="theme-card shadow-2xl rotate-2 opacity-95 p-2" style={{ width: '120px' }}>
                   <div className="aspect-square rounded overflow-hidden mb-2" style={{ background: 'var(--bg-surface)' }}>
                     {activeJob.projectImages?.[0] ? (
-                      <img src={activeJob.projectImages[0]} className="w-full h-full object-cover" alt="" />
+                      <img src={activeJob.projectImages[0]} className="w-full h-full object-cover" alt="" loading="lazy" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Box className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />

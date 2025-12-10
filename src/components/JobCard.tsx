@@ -560,7 +560,8 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
               : <img 
                   src={lightboxImage} 
                   className="max-h-[90vh] max-w-[95vw] object-contain rounded-lg shadow-2xl pointer-events-auto animate-fade-in" 
-                  alt="view" 
+                  alt="view"
+                  loading="lazy"
                 />
             }
           </div>
@@ -1044,7 +1045,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                           <span className="text-[10px] font-bold bg-white px-2 py-1 rounded-lg shadow-sm">PDF</span>
                         </div>
                       ) : (
-                        <img src={img} className="w-full h-full object-cover" alt="attachment" />
+                        <img src={img} className="w-full h-full object-cover" alt="attachment" loading="lazy" />
                       )}
                     </div>
 
@@ -1162,7 +1163,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
             {completionImages.length > 0 && (
               <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
                 {completionImages.map((img, i) => (
-                  <img key={i} src={img} className="w-16 h-16 rounded-lg object-cover border" alt="done" />
+                  <img key={i} src={img} className="w-16 h-16 rounded-lg object-cover border" alt="done" loading="lazy" />
                 ))}
               </div>
             )}

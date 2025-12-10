@@ -315,7 +315,7 @@ Montaż Reklam 24`;
           <div className="flex flex-wrap gap-2">
             {completionImages.map((img, index) => (
               <div key={index} className="relative w-20 h-20 rounded-lg overflow-hidden border-2 border-emerald-300 shadow-sm">
-                <img src={img} alt={`Zdjęcie ${index + 1}`} className="w-full h-full object-cover" />
+                <img src={img} alt={`Zdjęcie ${index + 1}`} className="w-full h-full object-cover" loading="lazy" />
                 <button
                   onClick={() => removeImage(index)}
                   className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors"

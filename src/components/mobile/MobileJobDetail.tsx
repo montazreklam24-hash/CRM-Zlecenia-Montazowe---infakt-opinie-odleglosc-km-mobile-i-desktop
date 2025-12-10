@@ -318,6 +318,7 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
             src={images[currentImageIndex]}
             alt={`Zdjęcie ${currentImageIndex + 1}`}
             className="w-full h-64 object-contain"
+            loading="lazy"
           />
           {images.length > 1 && (
             <>
@@ -569,7 +570,7 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
                   <div className="flex flex-wrap gap-2 mb-2">
                     {completionImages.map((img, index) => (
                       <div key={index} className="relative w-20 h-20 rounded-xl overflow-hidden border-2 border-emerald-300">
-                        <img src={img} alt={`Zdjęcie ${index + 1}`} className="w-full h-full object-cover" />
+                        <img src={img} alt={`Zdjęcie ${index + 1}`} className="w-full h-full object-cover" loading="lazy" />
                         <button
                           onClick={() => setCompletionImages(prev => prev.filter((_, i) => i !== index))}
                           className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs shadow"

@@ -279,7 +279,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing, onSwitchT
                         <span className="text-[8px] font-bold text-slate-500">PDF</span>
                       </div>
                     ) : (
-                      <img src={img} alt="preview" className="w-full h-full object-cover" />
+                      <img src={img} alt="preview" className="w-full h-full object-cover" loading="lazy" />
                     )}
                     
                     <button 

@@ -501,6 +501,7 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
                     src={img}
                     alt={`Zdjęcie ${idx + 1}`}
                     className="w-24 h-24 object-cover rounded-lg border-2 border-slate-200"
+                    loading="lazy"
                   />
                   <button
                     onClick={() => setProjectImages(prev => prev.filter((_, i) => i !== idx))}
