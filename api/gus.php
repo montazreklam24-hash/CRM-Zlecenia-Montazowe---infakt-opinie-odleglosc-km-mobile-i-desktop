@@ -1,7 +1,7 @@
 <?php
 /**
  * API GUS - Pobieranie danych firm po NIP
- * Używa zewnętrznego API (rejestr.io) jako prostszej alternatywy dla REGON
+ * Używa oficjalnych API: CEIDG, KRS, MF (biała lista)
  * 
  * Endpoints:
  *   GET /api/gus/nip/{nip} - Pobierz dane firmy po NIP
@@ -12,8 +12,8 @@ require_once __DIR__ . '/config.php';
 handleCORS();
 
 /**
- * Pobierz dane firmy z zewnętrznego API
- * Używamy rejestr.io (darmowy, bez klucza do 100 zapytań/dzień)
+ * Pobierz dane firmy z zewnętrznych API
+ * Kolejność: 1. CEIDG (JDG), 2. KRS (spółki), 3. regon.io (fallback), 4. MF (biała lista)
  */
 function lookupNipExternal($nip) {
     // Wyczyść NIP
@@ -28,28 +28,41 @@ function lookupNipExternal($nip) {
         return array('error' => 'Nieprawidłowy NIP (błędna suma kontrolna)');
     }
     
-    // 1. Spróbuj KRS (spółki) z rejestr.io
-    $result = fetchFromRejestrIoKRS($nip);
-    if ($result && !isset($result['error'])) {
-        $result['source'] = 'KRS';
-        return $result;
-    }
+    error_log("[GUS] Szukam NIP: $nip");
     
-    // 2. Spróbuj CEIDG (jednoosobowe działalności) z rejestr.io
-    $result = fetchFromRejestrIoCEIDG($nip);
-    if ($result && !isset($result['error'])) {
+    // 1. Spróbuj CEIDG (jednoosobowe działalności gospodarcze)
+    $result = fetchFromCEIDG($nip);
+    if ($result && !isset($result['error']) && !empty($result['company']['name'])) {
         $result['source'] = 'CEIDG';
+        error_log("[GUS] Znaleziono w CEIDG: " . $result['company']['name']);
         return $result;
     }
     
-    // 3. Fallback: API mf.gov.pl (Ministerstwo Finansów - biała lista VAT)
+    // 2. Spróbuj KRS (spółki)
+    $result = fetchFromKRS($nip);
+    if ($result && !isset($result['error']) && !empty($result['company']['name'])) {
+        $result['source'] = 'KRS';
+        error_log("[GUS] Znaleziono w KRS: " . $result['company']['name']);
+        return $result;
+    }
+    
+    // 3. Fallback: regon.io (uniwersalne)
+    $result = fetchFromRegonIO($nip);
+    if ($result && !isset($result['error']) && !empty($result['company']['name'])) {
+        $result['source'] = 'REGON';
+        error_log("[GUS] Znaleziono w regon.io: " . $result['company']['name']);
+        return $result;
+    }
+    
+    // 4. Ostateczny fallback: API mf.gov.pl (Ministerstwo Finansów - biała lista VAT)
     $result = fetchFromMF($nip);
-    if ($result && !isset($result['error'])) {
+    if ($result && !isset($result['error']) && !empty($result['company']['name'])) {
         $result['source'] = 'MF';
+        error_log("[GUS] Znaleziono w MF: " . $result['company']['name']);
         return $result;
     }
     
-    return array('error' => 'Nie znaleziono firmy o podanym NIP w KRS, CEIDG ani białej liście VAT');
+    return array('error' => 'Nie znaleziono firmy o podanym NIP w CEIDG, KRS ani białej liście VAT');
 }
 
 /**
@@ -70,10 +83,14 @@ function validateNipChecksum($nip) {
 }
 
 /**
- * Pobierz dane SPÓŁKI z rejestr.io (KRS)
+ * Pobierz dane z CEIDG (Centralna Ewidencja Działalności Gospodarczej)
+ * Dla: jednoosobowe działalności gospodarcze
+ * API: https://dane.biznes.gov.pl/api/ceidg/v1/companies?nip={nip}
  */
-function fetchFromRejestrIoKRS($nip) {
-    $url = "https://rejestr.io/api/v1/krs?nip=" . $nip;
+function fetchFromCEIDG($nip) {
+    $url = "https://dane.biznes.gov.pl/api/ceidg/v1/companies?nip=" . $nip;
+    
+    error_log("[CEIDG] Wywołuję: $url");
     
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
@@ -82,12 +99,20 @@ function fetchFromRejestrIoKRS($nip) {
     curl_setopt($ch, CURLOPT_TIMEOUT, 10);
     curl_setopt($ch, CURLOPT_HTTPHEADER, array(
         'Accept: application/json',
-        'User-Agent: CRM-MontazReklam24'
+        'User-Agent: CRM-MontazReklam24/1.0'
     ));
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
     curl_close($ch);
+    
+    error_log("[CEIDG] HTTP $httpCode, response length: " . strlen($response));
+    
+    if ($curlError) {
+        error_log("[CEIDG] Curl error: $curlError");
+        return null;
+    }
     
     if ($httpCode !== 200 || !$response) {
         return null;
@@ -95,105 +120,37 @@ function fetchFromRejestrIoKRS($nip) {
     
     $data = json_decode($response, true);
     
-    if (empty($data) || !isset($data[0])) {
+    if (empty($data) || !is_array($data) || !isset($data[0])) {
+        error_log("[CEIDG] Pusta odpowiedź lub brak danych");
         return null;
     }
     
     $company = $data[0];
     
-    // Pobierz nazwę spółki
-    $name = isset($company['nazwa']) ? $company['nazwa'] : '';
+    error_log("[CEIDG] Klucze odpowiedzi: " . implode(', ', array_keys($company)));
     
-    // Debug log
-    error_log("[GUS KRS] NIP: $nip, Found name: '$name'");
+    // Nazwa firmy z CEIDG - pole 'nazwa'
+    $name = isset($company['nazwa']) ? trim($company['nazwa']) : '';
     
-    return array(
-        'success' => true,
-        'company' => array(
-            'name' => $name,
-            'nip' => $nip,
-            'regon' => isset($company['regon']) ? $company['regon'] : '',
-            'krs' => isset($company['krs']) ? $company['krs'] : '',
-            'street' => isset($company['adres']['ulica']) ? $company['adres']['ulica'] : '',
-            'city' => isset($company['adres']['miejscowosc']) ? $company['adres']['miejscowosc'] : '',
-            'postCode' => isset($company['adres']['kodPocztowy']) ? $company['adres']['kodPocztowy'] : '',
-            'country' => 'Polska'
-        )
-    );
-}
-
-/**
- * Pobierz dane DZIAŁALNOŚCI GOSPODARCZEJ z rejestr.io (CEIDG)
- */
-function fetchFromRejestrIoCEIDG($nip) {
-    $url = "https://rejestr.io/api/v1/ceidg?nip=" . $nip;
-    
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-        'Accept: application/json',
-        'User-Agent: CRM-MontazReklam24'
-    ));
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode !== 200 || !$response) {
-        return null;
-    }
-    
-    $data = json_decode($response, true);
-    
-    if (empty($data) || !isset($data[0])) {
-        return null;
-    }
-    
-    $company = $data[0];
-    
-    // CEIDG - nazwa firmy (różne możliwe pola)
-    $name = '';
-    
-    // Spróbuj różne pola dla nazwy firmy
-    $nameFields = array('firma', 'nazwaFirmy', 'nazwaPelna', 'nazwa', 'name');
-    foreach ($nameFields as $field) {
-        if (isset($company[$field]) && !empty($company[$field])) {
-            $name = $company[$field];
-            break;
-        }
-    }
-    
-    // Fallback: imię + nazwisko (dla JDG bez nazwy handlowej)
-    if (empty($name)) {
-        $firstName = isset($company['imie']) ? $company['imie'] : '';
-        $lastName = isset($company['nazwisko']) ? $company['nazwisko'] : '';
-        if (!empty($firstName) || !empty($lastName)) {
-            $name = trim($firstName . ' ' . $lastName);
-        }
-    }
-    
-    // Debug log
-    error_log("[GUS CEIDG] NIP: $nip, Found name: '$name', Raw response keys: " . implode(', ', array_keys($company)));
-    
-    // Adres w CEIDG
+    // Adres - bezpośrednio z pól głównych
     $street = '';
-    $city = '';
-    $postCode = '';
+    if (isset($company['ulica'])) {
+        $street = $company['ulica'];
+        if (isset($company['nrNieruchomosci'])) {
+            $street .= ' ' . $company['nrNieruchomosci'];
+        }
+        if (isset($company['nrLokalu']) && !empty($company['nrLokalu'])) {
+            $street .= '/' . $company['nrLokalu'];
+        }
+    }
     
-    if (isset($company['adresGlownejDzialalnosci'])) {
-        $addr = $company['adresGlownejDzialalnosci'];
-        $street = isset($addr['ulica']) ? $addr['ulica'] : '';
-        if (isset($addr['nrDomu'])) {
-            $street .= ' ' . $addr['nrDomu'];
-        }
-        if (isset($addr['nrLokalu'])) {
-            $street .= '/' . $addr['nrLokalu'];
-        }
-        $city = isset($addr['miejscowosc']) ? $addr['miejscowosc'] : '';
-        $postCode = isset($addr['kodPocztowy']) ? $addr['kodPocztowy'] : '';
+    $city = isset($company['miejscowosc']) ? $company['miejscowosc'] : '';
+    $postCode = isset($company['kodPocztowy']) ? $company['kodPocztowy'] : '';
+    
+    error_log("[CEIDG] Pobrano: nazwa='$name', ulica='$street', miasto='$city', kod='$postCode'");
+    
+    if (empty($name)) {
+        return null;
     }
     
     return array(
@@ -211,11 +168,183 @@ function fetchFromRejestrIoCEIDG($nip) {
 }
 
 /**
+ * Pobierz dane z KRS (Krajowy Rejestr Sądowy)
+ * Dla: spółki (Sp. z o.o., S.A., itp.)
+ * API: https://api-krs.ms.gov.pl/api/krs/OdpisAktualny/{nip}?rejestr=P&format=json
+ */
+function fetchFromKRS($nip) {
+    $url = "https://api-krs.ms.gov.pl/api/krs/OdpisAktualny/" . $nip . "?rejestr=P&format=json";
+    
+    error_log("[KRS] Wywołuję: $url");
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+        'Accept: application/json',
+        'User-Agent: CRM-MontazReklam24/1.0'
+    ));
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+    
+    error_log("[KRS] HTTP $httpCode, response length: " . strlen($response));
+    
+    if ($curlError) {
+        error_log("[KRS] Curl error: $curlError");
+        return null;
+    }
+    
+    if ($httpCode !== 200 || !$response) {
+        return null;
+    }
+    
+    $data = json_decode($response, true);
+    
+    // KRS ma specyficzną strukturę odpowiedzi
+    if (!isset($data['odpis']['dane']['dzial1'])) {
+        error_log("[KRS] Brak struktury odpis/dane/dzial1");
+        return null;
+    }
+    
+    $dzial1 = $data['odpis']['dane']['dzial1'];
+    
+    // Nazwa spółki
+    $name = '';
+    if (isset($dzial1['danePodmiotu']['nazwa'])) {
+        $name = $dzial1['danePodmiotu']['nazwa'];
+    }
+    
+    // Adres siedziby
+    $street = '';
+    $city = '';
+    $postCode = '';
+    
+    if (isset($dzial1['siedzibaIAdres'])) {
+        $addr = $dzial1['siedzibaIAdres'];
+        
+        if (isset($addr['ulica'])) {
+            $street = $addr['ulica'];
+            if (isset($addr['nrDomu'])) {
+                $street .= ' ' . $addr['nrDomu'];
+            }
+            if (isset($addr['nrLokalu']) && !empty($addr['nrLokalu'])) {
+                $street .= '/' . $addr['nrLokalu'];
+            }
+        }
+        
+        $city = isset($addr['miejscowosc']) ? $addr['miejscowosc'] : '';
+        $postCode = isset($addr['kodPocztowy']) ? $addr['kodPocztowy'] : '';
+    }
+    
+    // REGON i KRS
+    $regon = isset($dzial1['danePodmiotu']['regon']) ? $dzial1['danePodmiotu']['regon'] : '';
+    $krs = isset($dzial1['danePodmiotu']['krs']) ? $dzial1['danePodmiotu']['krs'] : '';
+    
+    error_log("[KRS] Pobrano: nazwa='$name', ulica='$street', miasto='$city'");
+    
+    if (empty($name)) {
+        return null;
+    }
+    
+    return array(
+        'success' => true,
+        'company' => array(
+            'name' => $name,
+            'nip' => $nip,
+            'regon' => $regon,
+            'krs' => $krs,
+            'street' => trim($street),
+            'city' => $city,
+            'postCode' => $postCode,
+            'country' => 'Polska'
+        )
+    );
+}
+
+/**
+ * Pobierz dane z regon.io (darmowe API - fallback)
+ * Dla: wszystkie typy firm
+ * API: https://api.regon.io/nip/{nip}
+ */
+function fetchFromRegonIO($nip) {
+    $url = "https://api.regon.io/nip/" . $nip;
+    
+    error_log("[REGON.IO] Wywołuję: $url");
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+        'Accept: application/json',
+        'User-Agent: CRM-MontazReklam24/1.0'
+    ));
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+    
+    error_log("[REGON.IO] HTTP $httpCode");
+    
+    if ($curlError) {
+        error_log("[REGON.IO] Curl error: $curlError");
+        return null;
+    }
+    
+    if ($httpCode !== 200 || !$response) {
+        return null;
+    }
+    
+    $company = json_decode($response, true);
+    
+    if (empty($company) || !isset($company['nazwa'])) {
+        return null;
+    }
+    
+    // Adres
+    $street = '';
+    if (isset($company['ulica'])) {
+        $street = $company['ulica'];
+        if (isset($company['nrNieruchomosci'])) {
+            $street .= ' ' . $company['nrNieruchomosci'];
+        }
+    }
+    
+    $city = isset($company['miejscowosc']) ? $company['miejscowosc'] : '';
+    $postCode = isset($company['kodPocztowy']) ? $company['kodPocztowy'] : '';
+    
+    error_log("[REGON.IO] Pobrano: nazwa='" . $company['nazwa'] . "'");
+    
+    return array(
+        'success' => true,
+        'company' => array(
+            'name' => $company['nazwa'],
+            'nip' => $nip,
+            'regon' => isset($company['regon']) ? $company['regon'] : '',
+            'street' => trim($street),
+            'city' => $city,
+            'postCode' => $postCode,
+            'country' => 'Polska'
+        )
+    );
+}
+
+/**
  * Pobierz dane z API Ministerstwa Finansów (biała lista VAT)
+ * Ostateczny fallback - zawiera podstawowe dane
  */
 function fetchFromMF($nip) {
     $date = date('Y-m-d');
     $url = "https://wl-api.mf.gov.pl/api/search/nip/{$nip}?date={$date}";
+    
+    error_log("[MF] Wywołuję: $url");
     
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
@@ -229,6 +358,8 @@ function fetchFromMF($nip) {
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
+    
+    error_log("[MF] HTTP $httpCode");
     
     if ($httpCode !== 200 || !$response) {
         return null;
@@ -245,11 +376,10 @@ function fetchFromMF($nip) {
     // Pobierz nazwę firmy
     $name = isset($subject['name']) ? $subject['name'] : '';
     
-    // Debug log
-    error_log("[GUS MF] NIP: $nip, Found name: '$name'");
-    
     // Parsuj adres (format: "ul. Nazwa 1, 00-000 Miasto")
     $addressParts = parseAddress(isset($subject['workingAddress']) ? $subject['workingAddress'] : '');
+    
+    error_log("[MF] Pobrano: nazwa='$name'");
     
     return array(
         'success' => true,
