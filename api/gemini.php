@@ -13,6 +13,45 @@ handleCORS();
 
 // TEST endpoint - GET /api/gemini zwraca status
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $action = isset($_GET['action']) ? $_GET['action'] : 'status';
+    
+    if ($action === 'test') {
+        // Test połączenia z Gemini API
+        $apiKey = GEMINI_API_KEY;
+        $model = GEMINI_MODEL;
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+        
+        $testBody = json_encode(array(
+            'contents' => array(
+                array('parts' => array(array('text' => 'Odpowiedz jednym slowem: OK')))
+            )
+        ));
+        
+        $ch = curl_init($url);
+        curl_setopt_array($ch, array(
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $testBody,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => array('Content-Type: application/json'),
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_SSL_VERIFYPEER => false
+        ));
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        jsonResponse(array(
+            'test' => 'gemini_connection',
+            'http_code' => $httpCode,
+            'curl_error' => $error ?: null,
+            'response_preview' => substr($response, 0, 300),
+            'success' => $httpCode === 200
+        ));
+    }
+    
+    // Default: status
     jsonResponse(array(
         'status' => 'ok',
         'model' => GEMINI_MODEL,
@@ -21,7 +60,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         'memory_limit' => ini_get('memory_limit'),
         'max_execution_time' => ini_get('max_execution_time'),
         'post_max_size' => ini_get('post_max_size'),
-        'upload_max_filesize' => ini_get('upload_max_filesize')
+        'upload_max_filesize' => ini_get('upload_max_filesize'),
+        'test_url' => '/api/gemini?action=test'
     ));
 }
 
@@ -203,12 +243,16 @@ DANE WEJŚCIOWE:
     error_log("Gemini API call - HTTP: {$httpCode}, Error: {$error}, URL: {$url}");
     
     if ($error) {
+        error_log('[Gemini] cURL error: ' . $error);
         throw new Exception('cURL error: ' . $error);
     }
     
+    error_log('[Gemini] Response HTTP ' . $httpCode . ': ' . substr($response, 0, 500));
+    
     if ($httpCode !== 200) {
         $errorData = json_decode($response, true);
-        $errorMessage = isset($errorData['error']['message']) ? $errorData['error']['message'] : 'Unknown API error';
+        $errorMessage = isset($errorData['error']['message']) ? $errorData['error']['message'] : $response;
+        error_log('[Gemini] API Error: ' . $errorMessage);
         throw new Exception('Gemini API error (' . $httpCode . '): ' . $errorMessage);
     }
     
