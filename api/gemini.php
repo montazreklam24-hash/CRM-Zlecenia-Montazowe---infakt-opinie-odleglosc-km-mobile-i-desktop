@@ -42,8 +42,23 @@ function handleGemini() {
         $result = callGeminiAPI($text, $images);
         jsonResponse(array('success' => true, 'data' => $result));
     } catch (Exception $e) {
-        logError('Gemini API error: ' . $e->getMessage());
-        jsonResponse(array('error' => 'AI processing failed', 'message' => $e->getMessage()), 500);
+        $errorMsg = $e->getMessage();
+        error_log('[Gemini Error] ' . $errorMsg . ' | Text length: ' . strlen($text) . ' | Images: ' . count($images));
+        
+        // Zwróć więcej szczegółów w trybie dev
+        if (defined('DEV_MODE') && DEV_MODE) {
+            jsonResponse(array(
+                'error' => 'AI processing failed', 
+                'message' => $errorMsg,
+                'debug' => array(
+                    'model' => GEMINI_MODEL,
+                    'textLength' => strlen($text),
+                    'imagesCount' => count($images)
+                )
+            ), 500);
+        } else {
+            jsonResponse(array('error' => 'AI processing failed', 'message' => $errorMsg), 500);
+        }
     }
 }
 
@@ -150,14 +165,21 @@ DANE WEJŚCIOWE:
         CURLOPT_HTTPHEADER => array(
             'Content-Type: application/json'
         ),
-        CURLOPT_TIMEOUT => 60,
-        CURLOPT_SSL_VERIFYPEER => true
+        CURLOPT_TIMEOUT => 120,
+        CURLOPT_CONNECTTIMEOUT => 30,
+        CURLOPT_SSL_VERIFYPEER => false, // Niektóre hostingi nie mają aktualnych certyfikatów CA
+        CURLOPT_SSL_VERIFYHOST => 0,
+        CURLOPT_FOLLOWLOCATION => true
     ));
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $error = curl_error($ch);
+    $curlInfo = curl_getinfo($ch);
     curl_close($ch);
+    
+    // Debug log
+    error_log("Gemini API call - HTTP: {$httpCode}, Error: {$error}, URL: {$url}");
     
     if ($error) {
         throw new Exception('cURL error: ' . $error);
