@@ -325,12 +325,29 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
     setIsProcessing(true);
     try {
       if (job) {
-        await jobsService.updateJob(job.id, { 
+        // ZABEZPIECZENIE: Nie wysyłaj projectImages jeśli:
+        // - Lokalna tablica jest pusta
+        // - ALE oryginalne zlecenie miało zdjęcia
+        // To zapobiega przypadkowemu usunięciu zdjęć przy innych aktualizacjach
+        const updates: any = { 
           data: data, 
           adminNotes, 
-          checklist, 
-          projectImages 
-        });
+          checklist
+        };
+        
+        // Tylko wysyłaj projectImages jeśli:
+        // 1. Mamy zdjęcia do zapisania, LUB
+        // 2. Świadomie usuwamy (oryginał był pusty lub użytkownik faktycznie usunął)
+        const originalHadImages = (job.projectImages?.length || 0) > 0;
+        const localHasImages = projectImages.length > 0;
+        
+        if (localHasImages || !originalHadImages) {
+          updates.projectImages = projectImages;
+        } else {
+          console.warn('⚠️ Pomijam wysyłanie pustych projectImages - oryginał miał zdjęcia');
+        }
+        
+        await jobsService.updateJob(job.id, updates);
         alert('Zapisano!');
         setIsEditing(false);
       } else {

@@ -226,14 +226,18 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
   job, isAdmin, onSelectJob, onDelete, onDuplicate, onArchive,
   onMoveLeft, onMoveRight, canMoveLeft, canMoveRight, onPaymentStatusChange, onMoveToColumn, onContextMenu
 }) => {
+  // Unikalne ID dla DnD - kombinacja id + createdAt zabezpiecza przed duplikatami
+  const uniqueDragId = `${job.id}-${job.createdAt}`;
+  
   // Draggable
   const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
-    id: job.id,
+    id: uniqueDragId,
+    data: { jobId: job.id } // Prawdziwe ID do operacji
   });
   
   // Also droppable (for dropping other cards on this one)
   const { setNodeRef: setDropRef, isOver: isDropOver } = useDroppable({
-    id: `card-${job.id}`,
+    id: `card-${uniqueDragId}`,
     data: { type: 'card', jobId: job.id }
   });
 
@@ -633,14 +637,18 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
   job, isAdmin, onSelectJob, onDelete, onDuplicate, onArchive,
   onMoveUp, onMoveDown, canMoveUp, canMoveDown, onContextMenu, onPaymentStatusChange, onMoveToColumn
 }) => {
+  // Unikalne ID dla DnD - kombinacja id + createdAt zabezpiecza przed duplikatami
+  const uniqueDragId = `${job.id}-${job.createdAt}`;
+  
   // Draggable
   const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
-    id: job.id,
+    id: uniqueDragId,
+    data: { jobId: job.id } // Prawdziwe ID do operacji
   });
   
   // Also droppable (for dropping other cards on this one)
   const { setNodeRef: setDropRef, isOver: isDropOver } = useDroppable({
-    id: `card-${job.id}`,
+    id: `card-${uniqueDragId}`,
     data: { type: 'card', jobId: job.id }
   });
 
@@ -1007,7 +1015,23 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     if (!silent) setLoading(true);
     try {
       const data = await jobsService.getJobs();
-      setJobs(data);
+      
+      // ZABEZPIECZENIE: Usuń duplikaty po ID (zostaw tylko pierwszy wystąpienie)
+      const seenIds = new Set<string>();
+      const uniqueJobs = data.filter(job => {
+        if (seenIds.has(job.id)) {
+          console.warn(`⚠️ DUPLIKAT: Znaleziono zduplikowane ID "${job.id}" - "${job.data?.jobTitle || job.friendlyId}"`);
+          return false;
+        }
+        seenIds.add(job.id);
+        return true;
+      });
+      
+      if (uniqueJobs.length !== data.length) {
+        console.error(`🔴 UWAGA: Usunięto ${data.length - uniqueJobs.length} duplikatów ID z widoku!`);
+      }
+      
+      setJobs(uniqueJobs);
     } catch (error) {
       console.error('Failed to load jobs:', error);
     } finally {
@@ -1304,39 +1328,41 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
 
   // DnD start handler
   const handleDragStart = (event: DragStartEvent) => {
-    const id = event.active.id as string;
-    const job = jobs.find(j => j.id === id);
+    // Pobierz prawdziwe ID zlecenia z data (bo event.active.id to teraz uniqueDragId)
+    const jobId = (event.active.data?.current as any)?.jobId || event.active.id.toString().split('-')[0];
+    const job = jobs.find(j => j.id === jobId);
     console.log('🟢 DRAG START:', {
-      jobId: id,
+      jobId: jobId,
       jobTitle: job?.data.jobTitle,
       currentColumn: job?.columnId || 'PREPARE'
     });
-    setActiveId(id);
+    setActiveId(jobId); // Używamy prawdziwego ID
     setOverId(null);
   };
 
   // DnD over handler - just tracks which item we're over for visual feedback
   const handleDragOver = (event: DragOverEvent) => {
-    let overId = event.over?.id as string || null;
+    let overIdValue = event.over?.id as string || null;
     
-    // Extract job ID if it's a card drop target
-    if (overId && overId.startsWith('card-')) {
-      overId = overId.replace('card-', '');
+    // Extract job ID if it's a card drop target (format: "card-{jobId}-{createdAt}")
+    if (overIdValue && overIdValue.startsWith('card-')) {
+      // Pobierz jobId z data lub wyciągnij z uniqueDragId
+      overIdValue = (event.over?.data?.current as any)?.jobId || overIdValue.replace('card-', '').split('-')[0];
     }
     
     const allColumnIds = ['PREPARE', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'COMPLETED'];
     
-    if (overId && overId !== event.active.id) {
-      const isColumn = allColumnIds.includes(overId);
-      const overJob = !isColumn ? jobs.find(j => j.id === overId) : null;
+    if (overIdValue && overIdValue !== activeId) {
+      const isColumn = allColumnIds.includes(overIdValue);
+      const overJob = !isColumn ? jobs.find(j => j.id === overIdValue) : null;
       console.log('🟡 DRAG OVER:', {
-        overId,
+        overId: overIdValue,
         isColumn,
         overJobTitle: overJob?.data.jobTitle,
-        overJobColumn: overJob?.columnId || (isColumn ? overId : 'PREPARE')
+        overJobColumn: overJob?.columnId || (isColumn ? overIdValue : 'PREPARE')
       });
     }
-    setOverId(overId);
+    setOverId(overIdValue);
   };
 
   // DnD Kit handler - handles column changes and reordering
@@ -1349,13 +1375,16 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
 
     if (!over) return;
 
-    const draggedId = active.id as string;
+    // Pobierz prawdziwe ID zlecenia z data (bo active.id to teraz uniqueDragId)
+    const draggedId = (active.data?.current as any)?.jobId || active.id.toString().split('-')[0];
     let droppedOnId = over.id as string;
     
-    // Extract job ID if dropped on a card (format: "card-{jobId}")
+    // Extract job ID if dropped on a card (format: "card-{uniqueDragId}")
     const isCardDrop = droppedOnId.startsWith('card-');
     if (isCardDrop) {
-      droppedOnId = droppedOnId.replace('card-', '');
+      // Format: "card-{jobId}-{createdAt}" -> wyciągnij jobId
+      const withoutPrefix = droppedOnId.replace('card-', '');
+      droppedOnId = (over.data?.current as any)?.jobId || withoutPrefix.split('-')[0];
     }
     
     // Don't do anything if dropped on itself
