@@ -569,34 +569,18 @@ interface DroppableColumnProps {
   activeId?: string | null;
 }
 
-// Drop zone placeholder - wykrywany jako cel upuszczenia dla kolumny (tylko widoczny gdy przeciągamy)
-const ColumnDropZone: React.FC<{ columnId: string; isActivelyDragging?: boolean }> = ({ columnId, isActivelyDragging }) => {
-  const { setNodeRef, isOver } = useDroppable({ id: columnId });
-  
-  // Nie renderuj w ogóle jeśli nie przeciągamy
-  if (!isActivelyDragging) return null;
+// Droppable for horizontal board (row layout)
+const DroppableRow: React.FC<DroppableColumnProps> = ({ id, children, activeId }) => {
+  const { setNodeRef, isOver } = useDroppable({ id });
   
   return (
     <div 
       ref={setNodeRef}
-      className={`w-full h-12 mt-2 rounded-lg border-2 border-dashed transition-all flex items-center justify-center ${
-        isOver 
-          ? 'border-blue-500 bg-blue-100/50 scale-105' 
-          : 'border-gray-300/50 bg-gray-50/30'
+      className={`p-5 transition-all overflow-visible ${
+        isOver && activeId ? 'ring-2 ring-blue-400 ring-offset-2' : ''
       }`}
-    >
-      {isOver && <span className="text-xs text-blue-500 font-medium">Upuść tutaj</span>}
-    </div>
-  );
-};
-
-// Droppable for horizontal board (row layout)
-const DroppableRow: React.FC<DroppableColumnProps> = ({ id, children, activeId }) => {
-  return (
-    <div 
-      className="p-5 transition-all overflow-visible"
       style={{ 
-        background: 'var(--bg-surface)', 
+        background: isOver && activeId ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-surface)', 
         backdropFilter: 'var(--blur)', 
         WebkitBackdropFilter: 'var(--blur)'
       }}
@@ -610,24 +594,27 @@ const DroppableRow: React.FC<DroppableColumnProps> = ({ id, children, activeId }
       >
         {children}
       </div>
-      <ColumnDropZone columnId={id} isActivelyDragging={!!activeId} />
     </div>
   );
 };
 
 // Droppable for vertical kanban (column layout)
 const DroppableColumn: React.FC<DroppableColumnProps> = ({ id, children, activeId }) => {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  
   return (
     <div 
-      className="p-3 min-h-[400px] flex-1 transition-all flex flex-col overflow-visible"
+      ref={setNodeRef}
+      className={`p-3 min-h-[400px] flex-1 transition-all flex flex-col overflow-visible ${
+        isOver && activeId ? 'ring-2 ring-blue-400 ring-offset-2' : ''
+      }`}
       style={{ 
-        background: 'var(--bg-surface)', 
+        background: isOver && activeId ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-surface)', 
         backdropFilter: 'var(--blur)', 
         WebkitBackdropFilter: 'var(--blur)' 
       }}
     >
       {children}
-      <ColumnDropZone columnId={id} isActivelyDragging={!!activeId} />
     </div>
   );
 };
