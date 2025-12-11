@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Upload, FileText, Loader2, X, Type, Sparkles, Mic, MicOff } from 'lucide-react';
+import { Upload, FileText, Loader2, X, Type, Sparkles, Mic, MicOff, RotateCw } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { useVoiceInput } from '../hooks/useVoiceInput';
-import { processImageFile } from '../utils/imageUtils';
+import { processImageFile, rotateImage90 } from '../utils/imageUtils';
 
 // PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
@@ -161,6 +161,14 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing, onSwitchT
     setImages(prev => prev.filter((_, i) => i !== index));
   };
 
+  const rotateImageAtIndex = async (index: number) => {
+    const img = images[index];
+    if (!img || img.startsWith('data:application/pdf')) return; // Nie obracaj PDF
+    
+    const rotated = await rotateImage90(img);
+    setImages(prev => prev.map((item, i) => i === index ? rotated : item));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const finalTitle = title.trim() || "Do analizy...";
@@ -291,13 +299,29 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing, onSwitchT
                       <img src={img} alt="preview" className="w-full h-full object-cover" loading="lazy" />
                     )}
                     
-                    <button 
-                      type="button" 
-                      onClick={() => removeImage(idx)} 
-                      className="absolute top-1 right-1 p-1.5 bg-red-500 rounded-lg text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
+                    {/* Przyciski akcji - widoczne na hover */}
+                    <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* Obróć o 90° - tylko dla obrazów, nie PDF */}
+                      {!isPdf(img) && (
+                        <button 
+                          type="button" 
+                          onClick={() => rotateImageAtIndex(idx)} 
+                          className="p-1.5 bg-blue-500 rounded-lg text-white shadow-lg hover:bg-blue-600"
+                          title="Obróć o 90°"
+                        >
+                          <RotateCw className="w-3 h-3" />
+                        </button>
+                      )}
+                      {/* Usuń */}
+                      <button 
+                        type="button" 
+                        onClick={() => removeImage(idx)} 
+                        className="p-1.5 bg-red-500 rounded-lg text-white shadow-lg hover:bg-red-600"
+                        title="Usuń"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
                     
                     <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] text-center py-1 font-medium">
                       {idx + 1}

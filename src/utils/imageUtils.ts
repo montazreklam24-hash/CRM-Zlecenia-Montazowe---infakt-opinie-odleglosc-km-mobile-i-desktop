@@ -189,3 +189,28 @@ export async function processImageFile(file: File): Promise<string> {
   return fixImageOrientation(file, 1600, 0.85);
 }
 
+/**
+ * Obraca obraz base64 o 90° w prawo
+ */
+export function rotateImage90(base64: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+      
+      // Zamień wymiary (szerokość ↔ wysokość)
+      canvas.width = img.height;
+      canvas.height = img.width;
+      
+      // Obróć o 90° w prawo
+      ctx.translate(canvas.width, 0);
+      ctx.rotate(Math.PI / 2);
+      ctx.drawImage(img, 0, 0);
+      
+      resolve(canvas.toDataURL('image/jpeg', 0.9));
+    };
+    img.src = base64;
+  });
+}
+
