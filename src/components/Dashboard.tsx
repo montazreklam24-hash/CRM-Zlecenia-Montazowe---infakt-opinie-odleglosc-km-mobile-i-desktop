@@ -6,7 +6,7 @@ import {
   Download, Copy, RefreshCw, Search, StretchHorizontal, ExternalLink,
   ChevronUp, ChevronDown, Map as MapIcon, Layers, LayoutDashboard,
   ChevronLeft, ChevronRight, Archive, Calendar, Star, MessageSquare, 
-  CreditCard, Image as ImageIcon
+  CreditCard, Image as ImageIcon, ThumbsUp, ThumbsDown
 } from 'lucide-react';
 import MapBoardGoogle from './MapBoardGoogle';
 import MapBoardOSM from './MapBoardOSM';
@@ -1104,6 +1104,24 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
 
   const closeContextMenu = () => setContextMenu(null);
 
+  // Toggle review request status (kciuk w górę/dół)
+  const handleToggleReviewRequest = async (e: React.MouseEvent, jobId: string) => {
+    e.stopPropagation(); // Nie otwieraj karty
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    
+    const currentlySent = !!job.reviewRequestSentAt;
+    const newStatus = currentlySent ? undefined : Date.now();
+    
+    try {
+      await jobsService.updateJob(jobId, { reviewRequestSentAt: newStatus });
+      loadJobs();
+    } catch (err) {
+      console.error('Błąd zmiany statusu opinii:', err);
+      alert('Nie udało się zmienić statusu opinii.');
+    }
+  };
+
   // Move job up in the same column
   const handleMoveUp = async (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
@@ -1698,110 +1716,115 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
         </div>
       </div>
 
-      {/* ARCHIVED LIST VIEW - Special view for archived jobs */}
-      {activeTab === 'ARCHIVED' && (
-        <div className="space-y-3">
-          {filteredJobs.length === 0 ? (
+      {/* ARCHIVED LIST VIEW - Lista podzielona na dni */}
+      {activeTab === 'ARCHIVED' && (() => {
+        if (filteredJobs.length === 0) {
+          return (
             <div className="theme-card p-12 text-center" style={{ borderRadius: 'var(--radius-lg)' }}>
               <Archive className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
               <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Archiwum jest puste</h3>
               <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Zakończone zlecenia pojawią się tutaj</p>
             </div>
-          ) : (
-            filteredJobs
-              .sort((a, b) => new Date(b.completedAt || b.createdAt).getTime() - new Date(a.completedAt || a.createdAt).getTime())
-              .map(job => {
-                const imgUrl = job.projectImages?.[0] || job.completionImages?.[0];
-                const completedDate = job.completedAt ? new Date(job.completedAt) : new Date(job.createdAt);
-                const hasReview = job.hasClientReview || false;
-                const isPaid = job.paymentStatus === PaymentStatus.PAID || job.paymentStatus === PaymentStatus.CASH;
+          );
+        }
+
+        // Grupuj zlecenia po dniach (najnowsze na górze)
+        const jobsByDate = filteredJobs
+          .sort((a, b) => new Date(b.completedAt || b.createdAt).getTime() - new Date(a.completedAt || a.createdAt).getTime())
+          .reduce((acc, job) => {
+            const date = new Date(job.completedAt || job.createdAt);
+            const dateKey = date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
+            if (!acc[dateKey]) acc[dateKey] = [];
+            acc[dateKey].push(job);
+            return acc;
+          }, {} as Record<string, Job[]>);
+
+        return (
+          <div className="space-y-6">
+            {Object.entries(jobsByDate).map(([dateKey, dayJobs]) => (
+              <div key={dateKey}>
+                {/* Nagłówek dnia */}
+                <h3 className="text-lg font-bold mb-3 px-2" style={{ color: 'var(--text-primary)' }}>
+                  {dateKey}
+                </h3>
                 
-                return (
-                  <div 
-                    key={job.id}
-                    onClick={() => onSelectJob(job, true)}
-                    className="theme-card flex gap-4 p-3 cursor-pointer hover:shadow-lg transition-all group"
-                    style={{ borderRadius: 'var(--radius-lg)' }}
-                  >
-                    {/* Thumbnail */}
-                    <div 
-                      className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden border"
-                      style={{ borderColor: 'var(--border-light)', background: 'var(--bg-surface)' }}
-                    >
-                      {imgUrl ? (
-                        <img src={imgUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <ImageIcon className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
-                        </div>
-                      )}
-                    </div>
+                {/* Lista zleceń z tego dnia */}
+                <div className="space-y-2">
+                  {dayJobs.map(job => {
+                    const imgUrl = job.projectImages?.[0] || job.completionImages?.[0];
+                    const reviewRequestSent = !!job.reviewRequestSentAt;
+                    const paymentStatus = job.paymentStatus || PaymentStatus.NONE;
                     
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      {/* Header row */}
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <h3 className="font-bold text-sm truncate group-hover:text-blue-600 transition-colors" style={{ color: 'var(--text-primary)' }}>
-                          {job.data.jobTitle || 'Bez nazwy'}
-                        </h3>
-                        <span className="text-xs font-medium flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
-                          {job.friendlyId}
-                        </span>
-                      </div>
-                      
-                      {/* Date */}
-                      <div className="flex items-center gap-1 text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>
-                        <Calendar className="w-3 h-3" />
-                        {completedDate.toLocaleDateString('pl-PL', { 
-                          day: 'numeric', 
-                          month: 'long', 
-                          year: 'numeric' 
-                        })}
-                      </div>
-                      
-                      {/* Description */}
-                      <p className="text-xs line-clamp-2 mb-2" style={{ color: 'var(--text-secondary)' }}>
-                        {job.data.scopeWorkText || job.data.address || 'Brak opisu'}
-                      </p>
-                      
-                      {/* Status badges */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {/* Review status */}
-                        <span 
-                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full ${
-                            hasReview 
-                              ? 'bg-amber-100 text-amber-700' 
-                              : 'bg-slate-100 text-slate-500'
-                          }`}
+                    return (
+                      <div 
+                        key={job.id}
+                        className="theme-card flex gap-4 p-4 hover:shadow-lg transition-all group"
+                        style={{ borderRadius: 'var(--radius-lg)' }}
+                      >
+                        {/* Miniaturka kwadratowa po lewej */}
+                        <div 
+                          className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden border cursor-pointer"
+                          style={{ borderColor: 'var(--border-light)', background: 'var(--bg-surface)' }}
+                          onClick={() => onSelectJob(job, true)}
                         >
-                          <Star className={`w-3 h-3 ${hasReview ? 'fill-current' : ''}`} />
-                          {hasReview ? 'Opinia' : 'Brak opinii'}
-                        </span>
+                          {imgUrl ? (
+                            <img src={imgUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <ImageIcon className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
+                            </div>
+                          )}
+                        </div>
                         
-                        {/* Payment status */}
-                        <span 
-                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full ${
-                            isPaid 
-                              ? 'bg-green-100 text-green-700' 
-                              : 'bg-red-100 text-red-600'
-                          }`}
-                        >
-                          <CreditCard className="w-3 h-3" />
-                          {isPaid ? 'Opłacone' : 'Nieopłacone'}
-                        </span>
+                        {/* Dane zlecenia w środku */}
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onSelectJob(job, true)}>
+                          <h4 className="font-bold text-sm mb-1 group-hover:text-blue-600 transition-colors" style={{ color: 'var(--text-primary)' }}>
+                            {job.data.jobTitle || 'Bez nazwy'}
+                          </h4>
+                          <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
+                            <strong>Klient:</strong> {job.data.clientName || 'Brak'}
+                          </p>
+                          <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
+                            <strong>Adres:</strong> {job.data.address || 'Brak'}
+                          </p>
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            {job.friendlyId}
+                          </p>
+                        </div>
                         
-                        {/* Payment status badge from component */}
-                        {job.paymentStatus && job.paymentStatus !== PaymentStatus.NONE && (
-                          <PaymentStatusBadge status={job.paymentStatus} size="sm" />
-                        )}
+                        {/* Przyciski po prawej */}
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          {/* Kciuk w górę/dół - status opinii */}
+                          <button
+                            onClick={(e) => handleToggleReviewRequest(e, job.id)}
+                            className={`p-2 rounded-lg transition-all hover:scale-110 ${
+                              reviewRequestSent 
+                                ? 'bg-green-100 text-green-600 hover:bg-green-200' 
+                                : 'bg-red-100 text-red-600 hover:bg-red-200'
+                            }`}
+                            title={reviewRequestSent ? 'Prośba o opinię wysłana (kliknij aby odznaczyć)' : 'Prośba o opinię nie wysłana (kliknij aby oznaczyć)'}
+                          >
+                            {reviewRequestSent ? (
+                              <ThumbsUp className="w-5 h-5 fill-current" />
+                            ) : (
+                              <ThumbsDown className="w-5 h-5 fill-current" />
+                            )}
+                          </button>
+                          
+                          {/* Status opłacenia */}
+                          <div className="flex flex-col items-end">
+                            <PaymentStatusBadge status={paymentStatus} size="sm" />
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })
-          )}
-        </div>
-      )}
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* MIXED VIEW (New Layout) */}
       {activeTab === 'ACTIVE' && viewMode === 'MIXED' && (
