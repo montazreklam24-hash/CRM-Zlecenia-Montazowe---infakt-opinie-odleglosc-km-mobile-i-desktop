@@ -5,10 +5,10 @@
 
 📌 GEMINI API (Google AI Studio)
 --------------------------------
-Klucz: AIzaSyBx-YEN1NUhYoOk8AEEWFCQDN87T3PrSek
+Klucz: AIzaSyBvUirdacHvXNW4Q4_2xak2ljtxYHjYmLQ
 Model: gemini-1.5-flash
-Projekt: CRM Zlecenia Montażowe - Cursor
-Project ID: 1053543300292
+Projekt: (nowy klucz - 2025-12-11)
+Poprzedni klucz: AIzaSyBx-YEN1NUhYoOk8AEEWFCQDN87T3PrSek
 Gdzie używany: api/config.php
 Panel: https://aistudio.google.com/app/apikey
 
