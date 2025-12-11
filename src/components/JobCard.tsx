@@ -1416,21 +1416,22 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
               {isProcessing ? <Loader2 className="animate-spin" /> : <Save />} 
               ZAPISZ
             </button>
-            {job && job.status !== JobStatus.ARCHIVED && (
-              <button 
-                onClick={() => setShowCompletionSection(!showCompletionSection)} 
-                disabled={isProcessing}
-                className="flex-1 py-4 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold rounded-xl shadow-xl flex items-center justify-center gap-3 transition-colors text-lg disabled:opacity-50"
-              >
-                <CheckCircle2 className="w-5 h-5" />
-                ZAKOŃCZ ZLECENIE
-              </button>
-            )}
           </div>
         )}
         
         {isAdmin && !isEditing && (
           <div className="space-y-3">
+            {/* Przycisk "Zakończ zlecenie" - widoczny w trybie bez edycji */}
+            {job && job.status !== JobStatus.ARCHIVED && (
+              <button 
+                onClick={() => setShowCompletionSection(!showCompletionSection)} 
+                disabled={isProcessing}
+                className="w-full py-4 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold rounded-xl shadow-xl flex items-center justify-center gap-3 transition-colors text-lg disabled:opacity-50"
+              >
+                <CheckCircle2 className="w-5 h-5" />
+                {showCompletionSection ? 'UKRYJ SEKCJĘ ZAKOŃCZENIA' : 'ZAKOŃCZ ZLECENIE'}
+              </button>
+            )}
             {/* 1. WhatsApp - linki */}
             <button 
               onClick={handleShareLinks}
