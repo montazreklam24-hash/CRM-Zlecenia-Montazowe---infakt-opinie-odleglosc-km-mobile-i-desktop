@@ -5,6 +5,13 @@
 - Używaj konwencji: fix:, feat:, refactor:, chore:
 - Wiadomości commitów opisowe (po polsku lub angielsku)
 - Nie czekaj na koniec sesji z commitami
+- ZAWSZE rób git push po commitach!
+
+## Backup
+- npm run build automatycznie robi backup ZIP przed buildem
+- Backupy w folderze ../CRM-Backups/ (max 20 ostatnich)
+- Można też ręcznie: npm run backup
+- build:fast pomija backup (tylko gdy pilne)
 
 ## Stack
 - Frontend: React + TypeScript + Vite

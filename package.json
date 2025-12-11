@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && node scripts/copy-api.js",
+    "backup": "node scripts/backup.js",
+    "build": "npm run backup && tsc && vite build && node scripts/copy-api.js",
+    "build:fast": "tsc && vite build && node scripts/copy-api.js",
     "preview": "vite preview",
     "lint": "eslint src --ext ts,tsx",
     "clean": "node -e \"import('fs').then(fs=>{if(fs.existsSync('dist')){fs.rmSync('dist',{recursive:true});console.log('✓ Wyczyszczono folder dist/')}})\""
