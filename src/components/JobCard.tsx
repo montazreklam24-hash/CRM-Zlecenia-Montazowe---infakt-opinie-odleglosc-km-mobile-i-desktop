@@ -7,7 +7,8 @@ import {
   Mic, MicOff, RotateCw, Calendar, Archive, ChevronDown, Clock
 } from 'lucide-react';
 import { Job, JobOrderData, JobStatus, UserRole, ChecklistItem, PaymentStatus, JobColumnId } from '../types';
-import { jobsService, compressImage, geminiService } from '../services/apiService';
+import { jobsService, geminiService } from '../services/apiService';
+import { rotateImage90 } from '../utils/imageUtils';
 import InvoiceModule from './InvoiceModule';
 import CompletionSection from './CompletionSection';
 import { useVoiceInput } from '../hooks/useVoiceInput';
@@ -537,6 +538,21 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
     if (!window.confirm("Usunąć to zdjęcie?")) return;
     const newImages = projectImages.filter((_, i) => i !== index);
     setProjectImages(newImages);
+    if (!isEditing && job) {
+      try { await jobsService.updateJob(job.id, { projectImages: newImages }); } catch {}
+    }
+  };
+
+  const rotateProjectImage = async (index: number) => {
+    const img = projectImages[index];
+    if (!img || img.startsWith('data:application/pdf')) return; // Nie obracaj PDF
+    
+    const rotated = await rotateImage90(img);
+    const newImages = [...projectImages];
+    newImages[index] = rotated;
+    setProjectImages(newImages);
+    
+    // Zapisz od razu jeśli nie w trybie edycji
     if (!isEditing && job) {
       try { await jobsService.updateJob(job.id, { projectImages: newImages }); } catch {}
     }
@@ -1193,7 +1209,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
 
                     {(isEditing || isAdmin) && (
                       <div className={`absolute inset-0 flex flex-col justify-between p-2 pointer-events-none transition-all duration-200 ${
-                        isEditing ? 'bg-black/10' : 'bg-black/40 opacity-0 group-hover:opacity-100'
+                        isEditing ? 'bg-black/10' : 'bg-black/40'
                       }`}>
                         <div className="flex justify-between pointer-events-auto">
                           <button 
@@ -1205,13 +1221,25 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                           >
                             <Star className={`w-5 h-5 ${idx === 0 ? 'fill-current' : ''}`} />
                           </button>
-                          <button 
-                            onClick={(e) => {e.stopPropagation(); removeProjectImage(idx)}} 
-                            className="p-2 bg-red-500 text-white rounded-lg shadow-md hover:bg-red-600"
-                            title="Usuń"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
+                          <div className="flex gap-1">
+                            {/* Obróć - tylko dla obrazów, nie PDF */}
+                            {!isPdf(img) && (
+                              <button 
+                                onClick={(e) => {e.stopPropagation(); rotateProjectImage(idx)}} 
+                                className="p-2 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600"
+                                title="Obróć o 90°"
+                              >
+                                <RotateCw className="w-5 h-5" />
+                              </button>
+                            )}
+                            <button 
+                              onClick={(e) => {e.stopPropagation(); removeProjectImage(idx)}} 
+                              className="p-2 bg-red-500 text-white rounded-lg shadow-md hover:bg-red-600"
+                              title="Usuń"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
                         </div>
                         {idx === 0 && <span className="bg-amber-400 text-amber-900 text-[10px] font-black text-center py-1.5 rounded-lg shadow-sm uppercase tracking-wider">Okładka</span>}
                       </div>
