@@ -482,7 +482,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
               )}
             </div>
             {isAdmin && (
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex gap-1">
                 <button 
                   onClick={(e) => { e.stopPropagation(); onDuplicate(job.id, e); }} 
                   className="p-1 hover:bg-slate-100 rounded"
@@ -813,7 +813,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
             
             {/* Delete/Duplicate buttons */}
             {isAdmin && (
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex gap-1">
                 <button 
                   onClick={(e) => { e.stopPropagation(); onDuplicate(job.id, e); }} 
                   className="p-0.5 rounded hover:bg-slate-100"
