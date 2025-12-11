@@ -1377,61 +1377,76 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
             )}
           </div>
 
-          {/* Completion Section - rozwija się po kliknięciu "Zakończ zlecenie" */}
-          {job && job.status !== JobStatus.ARCHIVED && showCompletionSection && (
-            <CompletionSection
-              job={job}
-              isAdmin={isAdmin}
-              onComplete={async (completionData) => {
-                try {
-                  await jobsService.completeJob(job.id, {
-                    completionImages: completionData.completionImages,
-                    completionNotes: completionData.completionNotes,
-                    clientEmail: completionData.clientEmail,
-                    sendEmail: completionData.sendEmail,
-                    archiveJob: completionData.archiveJob !== false,
-                  });
-                  setShowCompletionSection(false);
-                  onJobSaved?.();
-                  onBack();
-                } catch (error) {
-                  console.error('Błąd zakończenia zlecenia:', error);
-                  throw error;
-                }
-              }}
-            />
-          )}
         </div>
       </div>
 
       {/* Footer Actions */}
       <div className="mt-6 space-y-4">
-        {isAdmin && isEditing && (
-          <div className="flex gap-3">
-            <button 
-              onClick={handleSave} 
-              disabled={isProcessing}
-              className="flex-1 py-4 bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-white font-bold rounded-xl shadow-xl flex items-center justify-center gap-3 transition-colors text-lg disabled:opacity-50"
-            >
-              {isProcessing ? <Loader2 className="animate-spin" /> : <Save />} 
-              ZAPISZ
-            </button>
-          </div>
-        )}
-        
-        {isAdmin && !isEditing && (
+        {/* Przycisk "Zakończ zlecenie" - widoczny w obu trybach (edycja i normalny) oraz dla zleceń z archiwum */}
+        {isAdmin && job && (
           <div className="space-y-3">
-            {/* Przycisk "Zakończ zlecenie" - widoczny w trybie bez edycji */}
-            {job && job.status !== JobStatus.ARCHIVED && (
+            {isEditing ? (
+              <div className="flex gap-3">
+                <button 
+                  onClick={handleSave} 
+                  disabled={isProcessing}
+                  className="flex-1 py-4 bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-white font-bold rounded-xl shadow-xl flex items-center justify-center gap-3 transition-colors text-lg disabled:opacity-50"
+                >
+                  {isProcessing ? <Loader2 className="animate-spin" /> : <Save />} 
+                  ZAPISZ
+                </button>
+                <button 
+                  onClick={() => setShowCompletionSection(!showCompletionSection)} 
+                  disabled={isProcessing}
+                  className="flex-1 py-4 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold rounded-xl shadow-xl flex items-center justify-center gap-3 transition-colors text-lg disabled:opacity-50"
+                >
+                  <CheckCircle2 className="w-5 h-5" />
+                  {showCompletionSection ? 'UKRYJ' : (job.status === JobStatus.ARCHIVED ? 'OPINIA' : 'ZAKOŃCZ')}
+                </button>
+              </div>
+            ) : (
               <button 
                 onClick={() => setShowCompletionSection(!showCompletionSection)} 
                 disabled={isProcessing}
                 className="w-full py-4 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold rounded-xl shadow-xl flex items-center justify-center gap-3 transition-colors text-lg disabled:opacity-50"
               >
                 <CheckCircle2 className="w-5 h-5" />
-                {showCompletionSection ? 'UKRYJ SEKCJĘ ZAKOŃCZENIA' : 'ZAKOŃCZ ZLECENIE'}
+                {showCompletionSection 
+                  ? 'UKRYJ SEKCJĘ ZAKOŃCZENIA' 
+                  : (job.status === JobStatus.ARCHIVED ? 'WYŚLIJ PROŚBĘ O OPINIĘ' : 'ZAKOŃCZ ZLECENIE')
+                }
               </button>
             )}
+            
+            {/* Completion Section - rozwija się pod przyciskiem po kliknięciu */}
+            {showCompletionSection && (
+              <CompletionSection
+                job={job}
+                isAdmin={isAdmin}
+                onComplete={async (completionData) => {
+                  try {
+                    await jobsService.completeJob(job.id, {
+                      completionImages: completionData.completionImages,
+                      completionNotes: completionData.completionNotes,
+                      clientEmail: completionData.clientEmail,
+                      sendEmail: completionData.sendEmail,
+                      archiveJob: completionData.archiveJob !== false,
+                    });
+                    setShowCompletionSection(false);
+                    onJobSaved?.();
+                    onBack();
+                  } catch (error) {
+                    console.error('Błąd zakończenia zlecenia:', error);
+                    throw error;
+                  }
+                }}
+              />
+            )}
+          </div>
+        )}
+        
+        {isAdmin && !isEditing && (
+          <div className="space-y-3">
             {/* 1. WhatsApp - linki */}
             <button 
               onClick={handleShareLinks}
