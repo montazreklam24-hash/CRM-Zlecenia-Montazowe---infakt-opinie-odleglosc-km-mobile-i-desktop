@@ -15,6 +15,42 @@ handleCORS();
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $action = isset($_GET['action']) ? $_GET['action'] : 'status';
     
+    if ($action === 'models') {
+        // Lista dostępnych modeli
+        $apiKey = GEMINI_API_KEY;
+        $url = "https://generativelanguage.googleapis.com/v1beta/models?key={$apiKey}";
+        
+        $ch = curl_init($url);
+        curl_setopt_array($ch, array(
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_SSL_VERIFYPEER => false
+        ));
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        $data = json_decode($response, true);
+        $models = array();
+        if (isset($data['models'])) {
+            foreach ($data['models'] as $m) {
+                $models[] = array(
+                    'name' => $m['name'],
+                    'displayName' => isset($m['displayName']) ? $m['displayName'] : '',
+                    'supportedMethods' => isset($m['supportedGenerationMethods']) ? $m['supportedGenerationMethods'] : array()
+                );
+            }
+        }
+        
+        jsonResponse(array(
+            'http_code' => $httpCode,
+            'models_count' => count($models),
+            'models' => $models,
+            'raw_error' => $httpCode !== 200 ? $response : null
+        ));
+    }
+    
     if ($action === 'test') {
         // Test połączenia z Gemini API
         $apiKey = GEMINI_API_KEY;
