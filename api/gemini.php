@@ -8,11 +8,32 @@
 
 require_once __DIR__ . '/config.php';
 
+// Obsługa CORS
+handleCORS();
+
+// TEST endpoint - GET /api/gemini zwraca status
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    jsonResponse(array(
+        'status' => 'ok',
+        'model' => GEMINI_MODEL,
+        'key_prefix' => substr(GEMINI_API_KEY, 0, 10) . '...',
+        'php_version' => PHP_VERSION,
+        'memory_limit' => ini_get('memory_limit'),
+        'max_execution_time' => ini_get('max_execution_time'),
+        'post_max_size' => ini_get('post_max_size'),
+        'upload_max_filesize' => ini_get('upload_max_filesize')
+    ));
+}
+
 /**
  * POST /api/gemini
  * Body: { "text": "treść maila", "images": ["base64...", ...] }
  */
 function handleGemini() {
+    // Zwiększ limity dla dużych requestów
+    ini_set('memory_limit', '256M');
+    ini_set('max_execution_time', 120);
+    
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         jsonResponse(array('error' => 'Method not allowed'), 405);
     }
