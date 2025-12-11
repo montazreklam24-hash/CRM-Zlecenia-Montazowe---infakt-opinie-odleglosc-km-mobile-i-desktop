@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Upload, FileText, Loader2, X, Type, Sparkles, Mic, MicOff } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { useVoiceInput } from '../hooks/useVoiceInput';
+import { processImageFile } from '../utils/imageUtils';
 
 // PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
@@ -114,14 +115,22 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing, onSwitchT
           });
         }
       } else if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        await new Promise<void>((resolve) => {
-          reader.onloadend = () => {
-            newImages.push(reader.result as string);
-            resolve();
-          };
-          reader.readAsDataURL(file);
-        });
+        // Napraw orientację EXIF (obrócone zdjęcia z telefonu) i kompresuj
+        try {
+          const processedImage = await processImageFile(file);
+          newImages.push(processedImage);
+        } catch (err) {
+          console.error('Błąd przetwarzania obrazu:', err);
+          // Fallback - bez naprawy orientacji
+          const reader = new FileReader();
+          await new Promise<void>((resolve) => {
+            reader.onloadend = () => {
+              newImages.push(reader.result as string);
+              resolve();
+            };
+            reader.readAsDataURL(file);
+          });
+        }
       }
     }
 

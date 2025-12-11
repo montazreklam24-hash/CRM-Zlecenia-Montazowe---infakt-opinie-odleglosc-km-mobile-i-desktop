@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Job } from '../types';
 import { Camera, X, Send, CheckCircle, Upload, AlertCircle } from 'lucide-react';
+import { processImageFile, compressImage } from '../utils/imageUtils';
 
 interface CompletionSectionProps {
   job: Job;
@@ -30,7 +31,7 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
   // Handle image upload
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
@@ -38,19 +39,15 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
     const remainingSlots = 10 - completionImages.length;
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
 
-    filesToProcess.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        if (result) {
-          // Compress image before adding
-          compressImage(result, 1200, 0.8).then(compressed => {
-            setCompletionImages(prev => [...prev, compressed]);
-          });
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    for (const file of filesToProcess) {
+      try {
+        // Napraw orientację EXIF i kompresuj
+        const processed = await processImageFile(file);
+        setCompletionImages(prev => [...prev, processed]);
+      } catch (err) {
+        console.error('Błąd przetwarzania obrazu:', err);
+      }
+    }
 
     // Reset input
     if (fileInputRef.current) {
@@ -58,51 +55,24 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
     }
   };
 
-  // Compress image
-  const compressImage = (base64: string, maxWidth: number, quality: number): Promise<string> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-
-        if (width > maxWidth) {
-          height = (height * maxWidth) / width;
-          width = maxWidth;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.src = base64;
-    });
-  };
+  // compressImage jest teraz importowana z ../utils/imageUtils
 
   // Process files (shared by upload, paste, and drag-drop)
-  const processFiles = useCallback((files: FileList | File[]) => {
+  const processFiles = useCallback(async (files: FileList | File[]) => {
     const remainingSlots = 10 - completionImages.length;
     const filesToProcess = Array.from(files)
       .filter(file => file.type.startsWith('image/'))
       .slice(0, remainingSlots);
 
-    filesToProcess.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        if (result) {
-          compressImage(result, 1200, 0.8).then(compressed => {
-            setCompletionImages(prev => [...prev, compressed]);
-          });
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    for (const file of filesToProcess) {
+      try {
+        // Napraw orientację EXIF i kompresuj
+        const processed = await processImageFile(file);
+        setCompletionImages(prev => [...prev, processed]);
+      } catch (err) {
+        console.error('Błąd przetwarzania obrazu:', err);
+      }
+    }
   }, [completionImages.length]);
 
   // Handle paste (Ctrl+V)

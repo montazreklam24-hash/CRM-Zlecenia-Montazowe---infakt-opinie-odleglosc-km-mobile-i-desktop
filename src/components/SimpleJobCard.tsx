@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Job, JobAttachment, JobStatus } from '../types';
-import { compressImage } from '../services/apiService';
+import { processImageFile } from '../utils/imageUtils';
 
 declare global {
   interface Window {
@@ -69,12 +69,13 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
     
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const compressed = await compressImage(reader.result as string);
-        setProjectImages(prev => [...prev, compressed]);
-      };
-      reader.readAsDataURL(file);
+      try {
+        // Napraw orientację EXIF (obrócone zdjęcia z telefonu) i kompresuj
+        const processed = await processImageFile(file);
+        setProjectImages(prev => [...prev, processed]);
+      } catch (err) {
+        console.error('Błąd przetwarzania obrazu:', err);
+      }
     }
   };
   
@@ -105,12 +106,13 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
         if (item.type.indexOf('image') !== -1) {
           const blob = item.getAsFile();
           if (blob) {
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-              const compressed = await compressImage(reader.result as string);
-              setProjectImages(prev => [...prev, compressed]);
-            };
-            reader.readAsDataURL(blob);
+            try {
+              // Napraw orientację EXIF i kompresuj
+              const processed = await processImageFile(blob);
+              setProjectImages(prev => [...prev, processed]);
+            } catch (err) {
+              console.error('Błąd przetwarzania obrazu:', err);
+            }
           }
         }
       }
