@@ -1044,6 +1044,22 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     }
   };
 
+  const handleArchive = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const job = jobs.find(j => j.id === id);
+    const jobName = job?.data.jobTitle || job?.friendlyId || 'to zlecenie';
+    if (window.confirm(`📦 Czy na pewno chcesz zarchiwizować zlecenie?\n\n"${jobName}"`)) {
+      try {
+        await jobsService.updateJob(id, { status: JobStatus.ARCHIVED });
+        loadJobs();
+        console.log('✅ Zlecenie zarchiwizowane:', id);
+      } catch (err) {
+        console.error('❌ Błąd archiwizacji:', err);
+        alert('Nie udało się zarchiwizować zlecenia.');
+      }
+    }
+  };
+
   // Context Menu handler - prawy klik na kafelku
   const handleContextMenu = (e: React.MouseEvent, job: Job) => {
     e.preventDefault();
@@ -1785,6 +1801,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             onSelectJob={onSelectJob}
                             onDelete={handleDelete}
                             onDuplicate={handleDuplicate}
+                            onArchive={handleArchive}
                             onPaymentStatusChange={handlePaymentStatusChange}
                             onMoveToColumn={handleMoveToColumn}
                             onMoveLeft={handleMoveLeft}
@@ -1826,6 +1843,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                                     onSelectJob={onSelectJob}
                                     onDelete={handleDelete}
                                     onDuplicate={handleDuplicate}
+                                    onArchive={handleArchive}
                                     onMoveUp={handleMoveUp}
                                     onMoveDown={handleMoveDown}
                                     canMoveUp={canMoveUp}
@@ -2004,6 +2022,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             onSelectJob={onSelectJob}
                             onDelete={handleDelete}
                             onDuplicate={handleDuplicate}
+                            onArchive={handleArchive}
                             onPaymentStatusChange={handlePaymentStatusChange}
                             onMoveToColumn={handleMoveToColumn}
                             onMoveLeft={handleMoveLeft}
@@ -2146,6 +2165,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             onSelectJob={onSelectJob}
                             onDelete={handleDelete}
                             onDuplicate={handleDuplicate}
+                            onArchive={handleArchive}
                             onMoveUp={handleMoveUp}
                             onMoveDown={handleMoveDown}
                             canMoveUp={canMoveUp}

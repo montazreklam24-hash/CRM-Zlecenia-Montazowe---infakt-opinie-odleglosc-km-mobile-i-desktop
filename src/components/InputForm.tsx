@@ -299,8 +299,8 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing, onSwitchT
                       <img src={img} alt="preview" className="w-full h-full object-cover" loading="lazy" />
                     )}
                     
-                    {/* Przyciski akcji - widoczne na hover */}
-                    <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Przyciski akcji - ZAWSZE widoczne */}
+                    <div className="absolute top-1 right-1 flex gap-1">
                       {/* Obróć o 90° - tylko dla obrazów, nie PDF */}
                       {!isPdf(img) && (
                         <button 
