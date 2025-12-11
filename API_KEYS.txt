@@ -1,0 +1,35 @@
+====================================================
+ CRM ZLECENIA MONTAŻOWE - KLUCZE API
+ Ostatnia aktualizacja: 2025-12-11
+====================================================
+
+📌 GEMINI API (Google AI Studio)
+--------------------------------
+Klucz: AIzaSyBx-YEN1NUhYoOk8AEEWFCQDN87T3PrSek
+Model: gemini-1.5-flash
+Projekt: CRM Zlecenia Montażowe - Cursor
+Project ID: 1053543300292
+Gdzie używany: api/config.php
+Panel: https://aistudio.google.com/app/apikey
+
+
+📌 GOOGLE MAPS API
+--------------------------------
+Klucz: AIzaSyApo2EdL3zan9j5aCv_4rKcQvjBcyljJkY
+Gdzie używany: api/config.php, geocode.php
+Panel: https://console.cloud.google.com/apis/credentials
+
+
+📌 INFAKT API
+--------------------------------
+Klucz: 4a21f1a475ec06c7613fa47ae1553fe4974a800e
+API URL: https://api.infakt.pl/v3
+Gdzie używany: api/config.php, InfaktClient.php
+Panel: https://app.infakt.pl/app/ustawienia/api
+
+
+====================================================
+⚠️ UWAGA: Nie wrzucaj tego pliku na publiczny GitHub!
+   Dodaj API_KEYS.txt do .gitignore
+====================================================
+
