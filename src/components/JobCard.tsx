@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { Job, JobOrderData, JobStatus, UserRole, ChecklistItem, PaymentStatus, JobColumnId } from '../types';
 import { jobsService, geminiService } from '../services/apiService';
-import { rotateImage90 } from '../utils/imageUtils';
+import { rotateImage90, compressImage } from '../utils/imageUtils';
 import InvoiceModule from './InvoiceModule';
 import CompletionSection from './CompletionSection';
 import { useVoiceInput } from '../hooks/useVoiceInput';
