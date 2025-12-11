@@ -385,7 +385,7 @@ export const jobsService = {
     
     const body: any = { columnId };
     if (orderIndex !== undefined) {
-      body.order = orderIndex;
+      body.columnOrder = orderIndex; // Backend oczekuje columnOrder, nie order
     }
     
     await apiRequest(`/jobs/${id}`, {
@@ -409,7 +409,7 @@ export const jobsService = {
     
     await apiRequest(`/jobs/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ columnId, order }),
+      body: JSON.stringify({ columnId, columnOrder: order }), // Backend oczekuje columnOrder
     });
   },
   
