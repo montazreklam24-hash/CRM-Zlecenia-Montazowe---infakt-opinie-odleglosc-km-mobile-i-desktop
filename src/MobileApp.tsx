@@ -62,37 +62,32 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
     if (!job) return;
     
     const columnId = job.columnId || 'PREPARE';
-    // Pobierz zlecenia z tej kolumny i nadaj im indeksy jako order jeśli brak
     const columnJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === columnId && j.status !== JobStatus.ARCHIVED)
-      .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
     
-    // Przypisz indeksy jako order (dla spójności)
-    const jobsWithOrder = columnJobs.map((j, idx) => ({ ...j, order: j.order ?? idx }));
+    const currentIndex = columnJobs.findIndex(j => j.id === jobId);
+    if (currentIndex <= 0) return; // Already at top
     
-    const currentIndex = jobsWithOrder.findIndex(j => j.id === jobId);
-    if (currentIndex <= 0) return;
+    // Swap with the job above
+    const jobAbove = columnJobs[currentIndex - 1];
+    const currentOrder = job.order || currentIndex;
+    const aboveOrder = jobAbove.order || (currentIndex - 1);
     
-    const currentJob = jobsWithOrder[currentIndex];
-    const jobAbove = jobsWithOrder[currentIndex - 1];
-    
-    // Zamień order
-    const newOrderForCurrent = jobAbove.order;
-    const newOrderForAbove = currentJob.order;
-    
-    // Aktualizuj lokalny stan
+    // Update orders
     setJobs(prev => prev.map(j => {
-      if (j.id === jobId) return { ...j, order: newOrderForCurrent };
-      if (j.id === jobAbove.id) return { ...j, order: newOrderForAbove };
+      if (j.id === jobId) return { ...j, order: aboveOrder };
+      if (j.id === jobAbove.id) return { ...j, order: currentOrder };
       return j;
     }));
     
-    // Zapisz do API
+    // Save to backend
     try {
-      await jobsService.updateJobColumn(jobId, columnId, newOrderForCurrent);
-      await jobsService.updateJobColumn(jobAbove.id, columnId, newOrderForAbove);
+      await jobsService.updateJobColumn(jobId, columnId, aboveOrder);
+      await jobsService.updateJobColumn(jobAbove.id, columnId, currentOrder);
     } catch (err) {
-      loadJobs();
+      console.error('Failed to save order:', err);
+      loadJobs(); // Reload on error
     }
   }, [jobs, loadJobs]);
 
@@ -101,37 +96,32 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
     if (!job) return;
     
     const columnId = job.columnId || 'PREPARE';
-    // Pobierz zlecenia z tej kolumny i nadaj im indeksy jako order jeśli brak
     const columnJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === columnId && j.status !== JobStatus.ARCHIVED)
-      .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
     
-    // Przypisz indeksy jako order (dla spójności)
-    const jobsWithOrder = columnJobs.map((j, idx) => ({ ...j, order: j.order ?? idx }));
+    const currentIndex = columnJobs.findIndex(j => j.id === jobId);
+    if (currentIndex < 0 || currentIndex >= columnJobs.length - 1) return; // Already at bottom
     
-    const currentIndex = jobsWithOrder.findIndex(j => j.id === jobId);
-    if (currentIndex < 0 || currentIndex >= jobsWithOrder.length - 1) return;
+    // Swap with the job below
+    const jobBelow = columnJobs[currentIndex + 1];
+    const currentOrder = job.order || currentIndex;
+    const belowOrder = jobBelow.order || (currentIndex + 1);
     
-    const currentJob = jobsWithOrder[currentIndex];
-    const jobBelow = jobsWithOrder[currentIndex + 1];
-    
-    // Zamień order
-    const newOrderForCurrent = jobBelow.order;
-    const newOrderForBelow = currentJob.order;
-    
-    // Aktualizuj lokalny stan
+    // Update orders
     setJobs(prev => prev.map(j => {
-      if (j.id === jobId) return { ...j, order: newOrderForCurrent };
-      if (j.id === jobBelow.id) return { ...j, order: newOrderForBelow };
+      if (j.id === jobId) return { ...j, order: belowOrder };
+      if (j.id === jobBelow.id) return { ...j, order: currentOrder };
       return j;
     }));
     
-    // Zapisz do API
+    // Save to backend
     try {
-      await jobsService.updateJobColumn(jobId, columnId, newOrderForCurrent);
-      await jobsService.updateJobColumn(jobBelow.id, columnId, newOrderForBelow);
+      await jobsService.updateJobColumn(jobId, columnId, belowOrder);
+      await jobsService.updateJobColumn(jobBelow.id, columnId, currentOrder);
     } catch (err) {
-      loadJobs();
+      console.error('Failed to save order:', err);
+      loadJobs(); // Reload on error
     }
   }, [jobs, loadJobs]);
 
