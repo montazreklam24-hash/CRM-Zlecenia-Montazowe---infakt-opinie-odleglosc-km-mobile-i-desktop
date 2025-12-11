@@ -7,8 +7,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    // Wyczyść dist przed buildem
-    emptyOutDir: true,
+    // Wyczyść dist przed buildem (wyłączone - może powodować EPERM na Windows)
+    emptyOutDir: false,
     rollupOptions: {
       output: {
         // Hashe z małymi literami (hex: 0-9, a-f)
