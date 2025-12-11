@@ -20,6 +20,7 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
   onComplete,
   isAdmin = false,
 }) => {
+  const [isExpanded, setIsExpanded] = useState(false); // Domyślnie zwinięte
   const [completionImages, setCompletionImages] = useState<string[]>([]);
   const [completionNotes, setCompletionNotes] = useState('');
   const [clientEmail, setClientEmail] = useState(job.data.email || '');
@@ -75,9 +76,17 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
     }
   }, [completionImages.length]);
 
-  // Handle paste (Ctrl+V)
+  // Handle paste (Ctrl+V) - TYLKO gdy sekcja jest rozwinięta
   useEffect(() => {
+    if (!isExpanded) return; // Nie aktywuj paste gdy sekcja jest zwinięta
+    
     const handlePaste = (e: ClipboardEvent) => {
+      // Sprawdź czy focus jest w sekcji completion
+      const activeElement = document.activeElement;
+      if (!dropZoneRef.current || !dropZoneRef.current.contains(activeElement as Node)) {
+        return; // Paste nie jest dla tej sekcji
+      }
+      
       const items = e.clipboardData?.items;
       if (!items) return;
 
@@ -91,13 +100,14 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
 
       if (imageFiles.length > 0) {
         e.preventDefault();
+        e.stopPropagation(); // Zatrzymaj propagację
         processFiles(imageFiles);
       }
     };
 
-    document.addEventListener('paste', handlePaste);
-    return () => document.removeEventListener('paste', handlePaste);
-  }, [processFiles]);
+    document.addEventListener('paste', handlePaste, true); // capture phase
+    return () => document.removeEventListener('paste', handlePaste, true);
+  }, [processFiles, isExpanded]);
 
   // Drag and drop handlers
   const handleDragEnter = (e: React.DragEvent) => {
@@ -222,22 +232,42 @@ Montaż Reklam 24`;
 
   return (
     <div className="bg-gradient-to-b from-emerald-50 to-white border-2 border-emerald-200 rounded-xl p-4 mt-4">
-      {/* Header with badge if review was sent */}
+      {/* Header with expand/collapse button */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-bold text-emerald-800 flex items-center gap-2">
           <CheckCircle className="w-5 h-5" />
           {isArchived ? 'Prośba o opinię' : 'Zakończenie zlecenia'}
         </h3>
         
-        {reviewAlreadySent && (
-          <div className="flex items-center gap-2 bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">
-            ✅ Prośba wysłana
-            <span className="text-blue-500 font-normal">
-              {new Date(job.reviewRequestSentAt!).toLocaleDateString('pl-PL')}
-            </span>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {reviewAlreadySent && (
+            <div className="flex items-center gap-2 bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">
+              ✅ Prośba wysłana
+              <span className="text-blue-500 font-normal">
+                {new Date(job.reviewRequestSentAt!).toLocaleDateString('pl-PL')}
+              </span>
+            </div>
+          )}
+          
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-bold flex items-center gap-2 transition-colors"
+            title={isExpanded ? "Zwiń sekcję" : "Rozwiń sekcję"}
+          >
+            {isExpanded ? '▼ Zwiń' : '▶ Rozwiń'}
+          </button>
+        </div>
       </div>
+      
+      {/* Sekcja rozwija się tylko gdy isExpanded === true */}
+      {!isExpanded && (
+        <div className="text-sm text-slate-600 italic mb-2">
+          Kliknij "Rozwiń" aby dodać zdjęcia z realizacji i zakończyć zlecenie
+        </div>
+      )}
+      
+      {isExpanded && (
+        <>
       
       {/* Warning if already sent */}
       {reviewAlreadySent && (
@@ -250,28 +280,28 @@ Montaż Reklam 24`;
         </div>
       )}
 
-      {/* Step 1: Photos - with drag & drop and paste support */}
-      <div className="mb-4">
-        <label className="block text-sm font-bold text-slate-700 mb-2">
-          📷 Zdjęcia z realizacji {!isAdmin && <span className="text-red-500">*</span>}
-          <span className="text-slate-400 font-normal ml-2">
-            ({completionImages.length}/10)
-          </span>
-        </label>
-        
-        {/* Drop zone */}
-        <div
-          ref={dropZoneRef}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          className={`relative border-2 border-dashed rounded-xl p-3 transition-all ${
-            isDragging 
-              ? 'border-emerald-500 bg-emerald-100' 
-              : 'border-emerald-300 bg-emerald-50/50'
-          }`}
-        >
+          {/* Step 1: Photos - with drag & drop and paste support */}
+          <div className="mb-4" data-completion-section>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              📷 Zdjęcia z realizacji {!isAdmin && <span className="text-red-500">*</span>}
+              <span className="text-slate-400 font-normal ml-2">
+                ({completionImages.length}/10)
+              </span>
+            </label>
+            
+            {/* Drop zone */}
+            <div
+              ref={dropZoneRef}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              className={`relative border-2 border-dashed rounded-xl p-3 transition-all ${
+                isDragging 
+                  ? 'border-emerald-500 bg-emerald-100' 
+                  : 'border-emerald-300 bg-emerald-50/50'
+              }`}
+            >
           {/* Drag overlay */}
           {isDragging && (
             <div className="absolute inset-0 bg-emerald-500/20 rounded-xl flex items-center justify-center z-10">
@@ -387,18 +417,18 @@ Montaż Reklam 24`;
         </div>
       )}
 
-      {/* Action Buttons */}
-      <div className="flex gap-2">
-        {!isArchived && (
-          <button
-            onClick={handleCompleteWithoutEmail}
-            disabled={isSubmitting}
-            className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-          >
-            <CheckCircle className="w-4 h-4" />
-            {isSubmitting ? 'Zapisywanie...' : 'Zakończ bez maila'}
-          </button>
-        )}
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            {!isArchived && (
+              <button
+                onClick={handleCompleteWithoutEmail}
+                disabled={isSubmitting}
+                className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+              >
+                <CheckCircle className="w-4 h-4" />
+                {isSubmitting ? 'Zapisywanie...' : 'Zakończ bez maila'}
+              </button>
+            )}
         
         <button
           onClick={handleCompleteWithEmail}
@@ -417,9 +447,11 @@ Montaż Reklam 24`;
       )}
       
       {isArchived && (
-        <p className="text-[10px] text-slate-400 text-center mt-3">
-          Zlecenie jest już w Archiwum • możesz wysłać prośbę o opinię
-        </p>
+          <p className="text-[10px] text-slate-400 text-center mt-3">
+            Zlecenie jest już w Archiwum • możesz wysłać prośbę o opinię
+          </p>
+        )}
+        </>
       )}
     </div>
   );

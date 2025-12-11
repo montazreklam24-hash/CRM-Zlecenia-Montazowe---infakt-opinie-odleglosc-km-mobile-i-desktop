@@ -22,8 +22,12 @@ function saveImageToFile($base64Data, $jobId, $type, $order) {
         return $base64Data;
     }
     
-    if (!is_dir(UPLOADS_DIR)) {
-        mkdir(UPLOADS_DIR, 0755, true);
+    // Dla completion images używamy osobnego folderu po_montazu/
+    $subfolder = ($type === 'completion') ? 'po_montazu' : '';
+    $targetDir = $subfolder ? UPLOADS_DIR . '/' . $subfolder : UPLOADS_DIR;
+    
+    if (!is_dir($targetDir)) {
+        mkdir($targetDir, 0755, true);
     }
     
     if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $matches)) {
@@ -38,14 +42,15 @@ function saveImageToFile($base64Data, $jobId, $type, $order) {
     if ($imageData === false) return null;
     
     $filename = sprintf('job_%d_%s_%d_%d.%s', $jobId, $type, $order, time(), $extension);
-    $filepath = UPLOADS_DIR . '/' . $filename;
+    $filepath = $targetDir . '/' . $filename;
     
     if (file_put_contents($filepath, $imageData) === false) {
         error_log("Nie można zapisać obrazu: $filepath");
         return null;
     }
     
-    return UPLOADS_URL . '/' . $filename;
+    // Zwróć ścieżkę z subfolderem jeśli jest
+    return $subfolder ? UPLOADS_URL . '/' . $subfolder . '/' . $filename : UPLOADS_URL . '/' . $filename;
 }
 
 /**
@@ -64,7 +69,10 @@ function saveJobImages($jobId, $images, $type = 'project', $jobType = 'ai') {
     // Usuń stare pliki
     foreach ($oldImages as $old) {
         if (!empty($old['file_path'])) {
-            $oldFile = UPLOADS_DIR . '/' . basename($old['file_path']);
+            // Sprawdź czy to ścieżka z po_montazu/ czy główny folder
+            $oldFile = strpos($old['file_path'], '/po_montazu/') !== false
+                ? UPLOADS_DIR . '/po_montazu/' . basename($old['file_path'])
+                : UPLOADS_DIR . '/' . basename($old['file_path']);
             if (file_exists($oldFile)) @unlink($oldFile);
         }
     }

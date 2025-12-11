@@ -124,12 +124,18 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
 
   // Obsługa Ctrl+V dla zdjęć projektu
   // Tylko gdy: tworzymy nowe zlecenie (!job) LUB jesteśmy w trybie edycji (isEditing)
-  // To zapobiega konfliktowi z CompletionSection który ma własny paste handler
+  // I tylko gdy focus jest w sekcji projektu (nie w CompletionSection)
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
       // Ogranicz paste do trybu edycji lub nowego zlecenia
-      // Gdy zlecenie istnieje i nie edytujemy - paste idzie do CompletionSection
       if (job && !isEditing) return;
+      
+      // Sprawdź czy focus jest w CompletionSection (jeśli istnieje)
+      const activeElement = document.activeElement;
+      const completionSection = document.querySelector('[data-completion-section]');
+      if (completionSection && completionSection.contains(activeElement as Node)) {
+        return; // Paste idzie do CompletionSection
+      }
       
       const items = e.clipboardData?.items;
       if (!items) return;
@@ -137,6 +143,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
       for (const item of Array.from(items)) {
         if (item.type.startsWith('image/')) {
           e.preventDefault();
+          e.stopPropagation(); // Zatrzymaj propagację
           const file = item.getAsFile();
           if (!file) continue;
           
@@ -151,8 +158,8 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
       }
     };
     
-    document.addEventListener('paste', handlePaste);
-    return () => document.removeEventListener('paste', handlePaste);
+    document.addEventListener('paste', handlePaste, true); // capture phase
+    return () => document.removeEventListener('paste', handlePaste, true);
   }, [job, isEditing]);
 
   useEffect(() => {
