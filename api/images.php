@@ -55,9 +55,10 @@ function saveImageToFile($base64Data, $jobId, $type, $order) {
 
 /**
  * Zapisuje obrazy do tabeli job_images
+ * UWAGA: Jeśli $images jest pustą tablicą [], usuwa wszystkie istniejące obrazy
  */
 function saveJobImages($jobId, $images, $type = 'project', $jobType = 'ai') {
-    if (empty($images) || !is_array($images)) return;
+    if (!is_array($images)) return; // Tylko sprawdź czy to tablica, nie czy jest pusta!
     
     $pdo = getDB();
     
@@ -80,6 +81,11 @@ function saveJobImages($jobId, $images, $type = 'project', $jobType = 'ai') {
     // Usuń stare rekordy
     $stmt = $pdo->prepare('DELETE FROM job_images WHERE job_id = ? AND type = ? AND job_type = ?');
     $stmt->execute(array($jobId, $type, $jobType));
+    
+    // Jeśli tablica jest pusta - tylko usuń stare obrazy (już zrobione powyżej)
+    if (empty($images)) {
+        return;
+    }
     
     // Wstaw nowe
     $stmt = $pdo->prepare('
