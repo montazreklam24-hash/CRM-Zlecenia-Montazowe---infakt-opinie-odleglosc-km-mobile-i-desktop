@@ -619,7 +619,7 @@ const DroppableRow: React.FC<DroppableColumnProps> = ({ id, children, activeId }
 const DroppableColumn: React.FC<DroppableColumnProps> = ({ id, children, activeId }) => {
   return (
     <div 
-      className="p-3 min-h-[400px] flex-1 transition-all flex flex-col"
+      className="p-3 min-h-[400px] flex-1 transition-all flex flex-col overflow-visible"
       style={{ 
         background: 'var(--bg-surface)', 
         backdropFilter: 'var(--blur)', 
@@ -2183,7 +2183,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
 
                   {/* Column Body - Droppable, stretches to bottom */}
                   <DroppableColumn id={row.id} activeId={activeId}>
-                    <div className="flex flex-col gap-4 w-full p-2">
+                    <div className="flex flex-col gap-5 w-full py-4 px-2 overflow-visible">
                       {rowJobs.map(job => {
                         const { canMoveUp, canMoveDown } = getJobMoveInfo(job.id);
                         return (
