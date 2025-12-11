@@ -404,8 +404,20 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           {job.projectImages?.[0] ? (
             <img src={job.projectImages[0]} className="w-full h-full object-cover pointer-events-none" alt="preview" loading="lazy" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center" style={{ color: 'var(--text-muted)' }}>
-              <Box className="w-10 h-10" />
+            <div className="w-full h-full flex flex-col items-center justify-center p-3" style={{ 
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white'
+            }}>
+              {job.data.scopeWorkText ? (
+                <>
+                  <div className="text-[10px] font-bold mb-1 opacity-90">OPIS ZLECENIA</div>
+                  <div className="text-[9px] leading-tight text-center line-clamp-4 opacity-95">
+                    {job.data.scopeWorkText}
+                  </div>
+                </>
+              ) : (
+                <Box className="w-10 h-10 opacity-50" />
+              )}
             </div>
           )}
 
@@ -791,8 +803,20 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
           {job.projectImages?.[0] ? (
             <img src={job.projectImages[0]} className="w-full h-full object-cover pointer-events-none" alt="" loading="lazy" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Box className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
+            <div className="w-full h-full flex flex-col items-center justify-center p-2" style={{ 
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white'
+            }}>
+              {job.data.scopeWorkText ? (
+                <>
+                  <div className="text-[8px] font-bold mb-0.5 opacity-90">OPIS</div>
+                  <div className="text-[7px] leading-tight text-center line-clamp-3 opacity-95">
+                    {job.data.scopeWorkText}
+                  </div>
+                </>
+              ) : (
+                <Box className="w-8 h-8 opacity-50" />
+              )}
             </div>
           )}
           {/* Job ID */}

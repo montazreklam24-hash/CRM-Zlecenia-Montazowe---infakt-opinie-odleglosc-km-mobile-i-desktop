@@ -179,12 +179,14 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing, onSwitchT
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const finalTitle = title.trim() || "Do analizy...";
-    if (!text.trim() && images.length === 0) return;
+    // Pozwól zapisać jeśli jest tytuł, tekst LUB obrazy
+    if (!title.trim() && !text.trim() && images.length === 0) return;
     onSubmit(finalTitle, text, images);
   };
 
   const isPdf = (dataUrl: string) => dataUrl.startsWith('data:application/pdf');
-  const canSubmit = (text.trim().length > 0 || images.length > 0) && !isConvertingPdf;
+  // Przycisk dostępny jeśli jest tytuł, tekst LUB obrazy
+  const canSubmit = (title.trim().length > 0 || text.trim().length > 0 || images.length > 0) && !isConvertingPdf;
 
   return (
     <div ref={containerRef} className="w-full max-w-3xl mx-auto">
