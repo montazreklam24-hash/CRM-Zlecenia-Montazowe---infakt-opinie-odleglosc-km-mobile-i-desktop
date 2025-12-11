@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import MapBoardGoogle from './MapBoardGoogle';
 import MapBoardOSM from './MapBoardOSM';
-import PaymentStatusBadge, { PaymentStatusBar, PaymentStatusIcon } from './PaymentStatusBadge';
+import PaymentStatusBadge, { PaymentStatusBar, PaymentStatusIcon, PaymentStatusMiniMenu } from './PaymentStatusBadge';
 import JobContextMenu from './JobContextMenu';
 
 import {
@@ -211,6 +211,17 @@ const getPaymentStatusLabel = (status: PaymentStatus): string => {
   }
 };
 
+// Kolumny dostępne do przenoszenia (do sekcji "Przenieś do" na kafelku)
+const MOVE_COLUMNS: { id: JobColumnId; label: string; shortLabel: string; icon: string }[] = [
+  { id: 'PREPARE', label: 'Przygot.', shortLabel: 'P', icon: '📋' },
+  { id: 'MON', label: 'Pon', shortLabel: 'Pn', icon: '🔴' },
+  { id: 'TUE', label: 'Wt', shortLabel: 'Wt', icon: '🟢' },
+  { id: 'WED', label: 'Śr', shortLabel: 'Śr', icon: '🟣' },
+  { id: 'THU', label: 'Czw', shortLabel: 'Cz', icon: '🟡' },
+  { id: 'FRI', label: 'Pt', shortLabel: 'Pt', icon: '🔵' },
+  { id: 'COMPLETED', label: 'OK', shortLabel: '✓', icon: '✅' },
+];
+
 const DraggableJobCard: React.FC<DraggableJobCardProps> = ({ 
   job, isAdmin, onSelectJob, onDelete, onDuplicate, onArchive,
   onMoveLeft, onMoveRight, canMoveLeft, canMoveRight, onPaymentStatusChange, onMoveToColumn, onContextMenu
@@ -252,6 +263,10 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
 
   const [showClickHint, setShowClickHint] = useState(false);
   const [showArrows, setShowArrows] = useState(false);
+  // Stan mini-menu statusu płatności
+  const [showPaymentMenu, setShowPaymentMenu] = useState(false);
+  // Stan rozwinięcia sekcji "Przenieś do"
+  const [showMoveMenu, setShowMoveMenu] = useState(false);
 
   // Address & Distance for Navigation Button
   const distance = job.data.coordinates 
@@ -271,6 +286,8 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
     setShowClickHint(false);
     onSelectJob(job);
   };
+
+  const currentColumnId = job.columnId || 'PREPARE';
 
   return (
     <>
@@ -338,13 +355,48 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
               👆 Kliknij dwukrotnie aby otworzyć
             </div>
           )}
-        {/* Image with payment status bar on top */}
-        <div className="aspect-square relative overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
-          {/* Payment Status Bar - PPM otwiera menu kontekstowe */}
-          <div className="absolute top-0 left-0 right-0 z-10">
-            <PaymentStatusBar status={job.paymentStatus || PaymentStatus.NONE} />
-          </div>
+        {/* PAYMENT STATUS BAR - na samej górze kafelka, kliknięcie otwiera mini-menu */}
+        <div className="relative">
+          {job.paymentStatus && job.paymentStatus !== PaymentStatus.NONE ? (
+            <div 
+              className="flex items-center justify-center cursor-pointer hover:brightness-110 transition-all rounded-t-xl"
+              style={{ 
+                height: '18px',
+                background: paymentColor,
+                color: 'white',
+                fontSize: '9px',
+                fontWeight: 700,
+                letterSpacing: '0.5px'
+              }}
+              onClick={(e) => { e.stopPropagation(); setShowPaymentMenu(!showPaymentMenu); }}
+              title="Kliknij aby zmienić status płatności"
+            >
+              {paymentLabel}
+            </div>
+          ) : (
+            <div 
+              className="flex items-center justify-center cursor-pointer bg-slate-400 hover:bg-slate-500 transition-all rounded-t-xl"
+              style={{ height: '18px', fontSize: '9px', fontWeight: 700, color: 'white', letterSpacing: '0.5px' }}
+              onClick={(e) => { e.stopPropagation(); setShowPaymentMenu(!showPaymentMenu); }}
+              title="Kliknij aby ustawić status płatności"
+            >
+              BRAK
+            </div>
+          )}
           
+          {/* Mini-menu statusu płatności */}
+          {showPaymentMenu && (
+            <PaymentStatusMiniMenu
+              currentStatus={job.paymentStatus || PaymentStatus.NONE}
+              onSelect={(status) => onPaymentStatusChange?.(job.id, status)}
+              onClose={() => setShowPaymentMenu(false)}
+              position="bottom"
+            />
+          )}
+        </div>
+
+        {/* Image */}
+        <div className="aspect-square relative overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
           {job.projectImages?.[0] ? (
             <img src={job.projectImages[0]} className="w-full h-full object-cover pointer-events-none" alt="preview" loading="lazy" />
           ) : (
@@ -352,19 +404,6 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
               <Box className="w-10 h-10" />
             </div>
           )}
-          
-          {/* Menu button - przycisk ⋮ */}
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onContextMenu?.(e, job);
-            }}
-            className="absolute top-2 right-2 z-20 w-7 h-7 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-            title="Menu"
-          >
-            ⋮
-          </button>
 
           {/* Job ID - more subtle */}
           <div 
@@ -472,9 +511,45 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
             )}
           </div>
           
-          {/* PPM otwiera menu z opcją przenoszenia */}
-          <div className="w-full py-1 text-[9px] text-center text-slate-400 border-t" style={{ borderColor: 'var(--border-light)' }}>
-            PPM → opcje
+          {/* SEKCJA "PRZENIEŚ DO" - na dole kafelka */}
+          <div className="pt-2 mt-1" style={{ borderTop: '1px solid var(--border-light)' }}>
+            <div 
+              className="flex items-center justify-between cursor-pointer hover:bg-slate-50 rounded px-1 py-0.5 transition-colors"
+              onClick={(e) => { e.stopPropagation(); setShowMoveMenu(!showMoveMenu); }}
+            >
+              <span className="text-[9px] font-bold text-slate-400 uppercase">Przenieś do</span>
+              <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${showMoveMenu ? 'rotate-180' : ''}`} />
+            </div>
+            
+            {showMoveMenu && (
+              <div className="grid grid-cols-4 gap-1 mt-1">
+                {MOVE_COLUMNS.map((col) => {
+                  const isActive = currentColumnId === col.id;
+                  return (
+                    <button
+                      key={col.id}
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        if (!isActive) {
+                          onMoveToColumn?.(job.id, col.id);
+                        }
+                        setShowMoveMenu(false);
+                      }}
+                      disabled={isActive}
+                      className={`px-1 py-1 rounded text-[8px] font-bold transition-all flex flex-col items-center ${
+                        isActive 
+                          ? 'bg-green-100 text-green-700 ring-1 ring-green-400' 
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                      }`}
+                      title={col.label}
+                    >
+                      <span className="text-[10px]">{col.icon}</span>
+                      <span>{col.shortLabel}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -556,7 +631,7 @@ const DroppableColumn: React.FC<DroppableColumnProps> = ({ id, children, activeI
 // Small Kanban Card (for narrow vertical columns)
 const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({ 
   job, isAdmin, onSelectJob, onDelete, onDuplicate, onArchive,
-  onMoveUp, onMoveDown, canMoveUp, canMoveDown, onContextMenu
+  onMoveUp, onMoveDown, canMoveUp, canMoveDown, onContextMenu, onPaymentStatusChange, onMoveToColumn
 }) => {
   // Draggable
   const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
@@ -577,6 +652,10 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
 
   const [showClickHint, setShowClickHint] = useState(false);
   const [showArrows, setShowArrows] = useState(false);
+  // Stan mini-menu statusu płatności
+  const [showPaymentMenu, setShowPaymentMenu] = useState(false);
+  // Stan rozwinięcia sekcji "Przenieś do"
+  const [showMoveMenu, setShowMoveMenu] = useState(false);
 
   // Address & Distance for Navigation Button
   const distance = job.data.coordinates 
@@ -600,6 +679,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
 
   const paymentColor = getPaymentStatusColor(job.paymentStatus || PaymentStatus.NONE);
   const paymentLabel = getPaymentStatusLabel(job.paymentStatus || PaymentStatus.NONE);
+  const currentColumnId = job.columnId || 'PREPARE';
 
   return (
     <>
@@ -645,29 +725,47 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
           {...listeners}
           {...attributes}
           onDoubleClick={handleCardDoubleClick}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onContextMenu?.(e, job);
-          }}
           className={`theme-card cursor-grab active:cursor-grabbing transition-all hover:shadow-md relative overflow-hidden touch-none ${showDropIndicator ? 'ring-2 ring-blue-400' : ''}`}
         >
-        {/* Payment status bar on top */}
-        {job.paymentStatus && job.paymentStatus !== PaymentStatus.NONE && (
-          <div 
-            className="flex items-center justify-center"
-            style={{ 
-              height: '14px',
-              background: paymentColor,
-              color: 'white',
-              fontSize: '7px',
-              fontWeight: 700,
-              letterSpacing: '0.3px'
-            }}
-          >
-            {paymentLabel}
-          </div>
-        )}
+        {/* PAYMENT STATUS BAR - na samej górze, kliknięcie otwiera mini-menu */}
+        <div className="relative">
+          {job.paymentStatus && job.paymentStatus !== PaymentStatus.NONE ? (
+            <div 
+              className="flex items-center justify-center cursor-pointer hover:brightness-110 transition-all rounded-t-xl"
+              style={{ 
+                height: '14px',
+                background: paymentColor,
+                color: 'white',
+                fontSize: '7px',
+                fontWeight: 700,
+                letterSpacing: '0.3px'
+              }}
+              onClick={(e) => { e.stopPropagation(); setShowPaymentMenu(!showPaymentMenu); }}
+              title="Kliknij aby zmienić status płatności"
+            >
+              {paymentLabel}
+            </div>
+          ) : (
+            <div 
+              className="flex items-center justify-center cursor-pointer bg-slate-400 hover:bg-slate-500 transition-all rounded-t-xl"
+              style={{ height: '14px', fontSize: '7px', fontWeight: 700, color: 'white', letterSpacing: '0.3px' }}
+              onClick={(e) => { e.stopPropagation(); setShowPaymentMenu(!showPaymentMenu); }}
+              title="Kliknij aby ustawić status płatności"
+            >
+              BRAK
+            </div>
+          )}
+          
+          {/* Mini-menu statusu płatności */}
+          {showPaymentMenu && (
+            <PaymentStatusMiniMenu
+              currentStatus={job.paymentStatus || PaymentStatus.NONE}
+              onSelect={(status) => onPaymentStatusChange?.(job.id, status)}
+              onClose={() => setShowPaymentMenu(false)}
+              position="bottom"
+            />
+          )}
+        </div>
 
         {/* Thumbnail */}
         <div className="aspect-square relative overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
@@ -678,18 +776,6 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
               <Box className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
             </div>
           )}
-          {/* Menu button - przycisk ⋮ */}
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onContextMenu?.(e, job);
-            }}
-            className="absolute top-1 right-1 z-20 w-5 h-5 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-            title="Menu"
-          >
-            ⋮
-          </button>
           {/* Job ID */}
           <div 
             className="absolute bottom-1 right-1 text-[7px] font-medium px-1 py-0.5 backdrop-blur-sm" 
@@ -699,59 +785,99 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
           </div>
         </div>
 
-        {/* Content - compact, fixed height */}
-        <div className="p-3 flex flex-col" style={{ minHeight: '100px' }}>
-          <h4 className="font-bold text-xs leading-snug mb-2 line-clamp-3" style={{ color: 'var(--text-primary)' }}>
+        {/* Content - compact */}
+        <div className="p-2 flex flex-col" style={{ minHeight: '90px' }}>
+          <h4 className="font-bold text-[11px] leading-snug mb-1 line-clamp-2" style={{ color: 'var(--text-primary)' }}>
             {job.data.jobTitle}
           </h4>
           
           {/* Address - one line */}
-          <div className="text-[10px] truncate mb-1 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
+          <div className="text-[9px] truncate mb-1 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
             <span className="flex-shrink-0">📍</span> {job.data.address?.split(',')[0] || 'Brak'}
           </div>
           
           {/* Phone */}
           {job.data.phoneNumber && (
-            <div className="text-[10px] font-bold truncate mb-2" style={{ color: 'var(--text-primary)' }}>
+            <div className="text-[9px] font-bold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
               📞 {job.data.phoneNumber}
             </div>
           )}
 
           {/* Bottom row: Amount + Actions */}
-          <div className="flex justify-between items-center mt-auto pt-2 border-t border-slate-100">
+          <div className="flex justify-between items-center mt-auto pt-1 border-t border-slate-100">
             {job.totalGross && job.totalGross > 0 ? (
-              <span className="text-[10px] font-bold" style={{ color: 'var(--accent-primary)' }}>
+              <span className="text-[9px] font-bold" style={{ color: 'var(--accent-primary)' }}>
                 {job.totalGross.toFixed(0)} zł
               </span>
             ) : <span />}
             
             {/* Delete/Duplicate buttons */}
             {isAdmin && (
-              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button 
                   onClick={(e) => { e.stopPropagation(); onDuplicate(job.id, e); }} 
-                  className="p-1 rounded hover:bg-slate-100"
+                  className="p-0.5 rounded hover:bg-slate-100"
                   style={{ color: 'var(--accent-primary)' }}
                   title="Duplikuj"
                 >
-                  <Copy className="w-3.5 h-3.5" />
+                  <Copy className="w-3 h-3" />
                 </button>
                 <button 
                   onClick={(e) => { e.stopPropagation(); onArchive?.(job.id, e); }} 
-                  className="p-1 hover:bg-slate-100 rounded"
+                  className="p-0.5 hover:bg-slate-100 rounded"
                   style={{ color: 'var(--text-secondary)' }}
                   title="Archiwizuj"
                 >
-                  <Archive className="w-3.5 h-3.5" />
+                  <Archive className="w-3 h-3" />
                 </button>
                 <button 
                   onClick={(e) => { e.stopPropagation(); onDelete(job.id, e); }} 
-                  className="p-1 rounded hover:bg-slate-100 hover:text-red-500"
+                  className="p-0.5 rounded hover:bg-slate-100 hover:text-red-500"
                   style={{ color: 'var(--text-muted)' }}
                   title="Usuń"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-3 h-3" />
                 </button>
+              </div>
+            )}
+          </div>
+          
+          {/* SEKCJA "PRZENIEŚ DO" - na dole kafelka */}
+          <div className="pt-1 mt-1" style={{ borderTop: '1px solid var(--border-light)' }}>
+            <div 
+              className="flex items-center justify-between cursor-pointer hover:bg-slate-50 rounded px-1 py-0.5 transition-colors"
+              onClick={(e) => { e.stopPropagation(); setShowMoveMenu(!showMoveMenu); }}
+            >
+              <span className="text-[8px] font-bold text-slate-400 uppercase">Przenieś</span>
+              <ChevronDown className={`w-2.5 h-2.5 text-slate-400 transition-transform ${showMoveMenu ? 'rotate-180' : ''}`} />
+            </div>
+            
+            {showMoveMenu && (
+              <div className="grid grid-cols-4 gap-0.5 mt-1">
+                {MOVE_COLUMNS.map((col) => {
+                  const isActive = currentColumnId === col.id;
+                  return (
+                    <button
+                      key={col.id}
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        if (!isActive) {
+                          onMoveToColumn?.(job.id, col.id);
+                        }
+                        setShowMoveMenu(false);
+                      }}
+                      disabled={isActive}
+                      className={`px-0.5 py-0.5 rounded text-[7px] font-bold transition-all flex flex-col items-center ${
+                        isActive 
+                          ? 'bg-green-100 text-green-700 ring-1 ring-green-400' 
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                      }`}
+                      title={col.label}
+                    >
+                      <span className="text-[9px]">{col.icon}</span>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -894,8 +1020,19 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const job = jobs.find(j => j.id === id);
     const jobName = job?.data.jobTitle || job?.friendlyId || 'to zlecenie';
     if (window.confirm(`🗑️ Czy na pewno chcesz USUNĄĆ zlecenie?\n\n"${jobName}"\n\nTej operacji nie można cofnąć!`)) {
-      await jobsService.deleteJob(id);
-      loadJobs();
+      // Optymistyczna aktualizacja UI - usuń od razu z listy
+      const previousJobs = [...jobs];
+      setJobs(prevJobs => prevJobs.filter(j => j.id !== id));
+      
+      try {
+        await jobsService.deleteJob(id);
+        console.log('✅ Zlecenie usunięte:', id);
+      } catch (err) {
+        console.error('❌ Błąd usuwania zlecenia:', err);
+        // Przywróć stan jeśli błąd
+        setJobs(previousJobs);
+        alert('Nie udało się usunąć zlecenia. Spróbuj ponownie.');
+      }
     }
   };
 
@@ -1087,19 +1224,46 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     }
   };
 
-  // Przeniesienie zlecenia do innej kolumny (z dropdownu)
+  // Przeniesienie zlecenia do innej kolumny (z dropdownu / sekcji "Przenieś do")
+  // NAPRAWIONE: Teraz oblicza prawidłowy order na podstawie istniejących zleceń w docelowej kolumnie
   const handleMoveToColumn = async (jobId: string, targetColumnId: JobColumnId) => {
-    // Optymistyczna aktualizacja UI
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    
+    const sourceColumnId = job.columnId || 'PREPARE';
+    
+    // Jeśli to ta sama kolumna - nie rób nic
+    if (sourceColumnId === targetColumnId) return;
+    
+    // Oblicz nowy order: pobierz wszystkie zlecenia w docelowej kolumnie i ustaw na końcu
+    const targetColumnJobs = jobs.filter(j => 
+      (j.columnId || 'PREPARE') === targetColumnId && j.id !== jobId
+    );
+    const maxOrder = targetColumnJobs.length > 0 
+      ? Math.max(...targetColumnJobs.map(j => j.order || 0)) + 1 
+      : 0;
+    
+    console.log('📦 handleMoveToColumn:', {
+      jobId,
+      jobTitle: job.data.jobTitle,
+      from: sourceColumnId,
+      to: targetColumnId,
+      newOrder: maxOrder,
+      targetColumnJobsCount: targetColumnJobs.length
+    });
+    
+    // Optymistyczna aktualizacja UI - ustaw zarówno columnId JAK I order
     setJobs(prevJobs => prevJobs.map(j => 
-      j.id === jobId ? { ...j, columnId: targetColumnId } : j
+      j.id === jobId ? { ...j, columnId: targetColumnId, order: maxOrder } : j
     ));
     
-    // Zapisz do backendu
+    // Zapisz do backendu z prawidłowym order
     try {
-      await jobsService.updateJobColumn(jobId, targetColumnId, 0);
+      await jobsService.updateJobColumn(jobId, targetColumnId, maxOrder);
+      console.log('✅ handleMoveToColumn: zapisano pomyślnie');
     } catch (err) {
-      console.error('Failed to move job to column:', err);
-      loadJobs(); // Reload on error
+      console.error('❌ Failed to move job to column:', err);
+      loadJobs(); // Reload on error - przywróć stan z backendu
     }
   };
 
@@ -1667,6 +1831,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                                     canMoveUp={canMoveUp}
                                     canMoveDown={canMoveDown}
                                     onContextMenu={handleContextMenu}
+                                    onPaymentStatusChange={handlePaymentStatusChange}
+                                    onMoveToColumn={handleMoveToColumn}
                                   />
                                );
                             })}
@@ -1984,6 +2150,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             onMoveDown={handleMoveDown}
                             canMoveUp={canMoveUp}
                             canMoveDown={canMoveDown}
+                            onPaymentStatusChange={handlePaymentStatusChange}
+                            onMoveToColumn={handleMoveToColumn}
                           />
                         );
                       })}
@@ -2143,11 +2311,23 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             await jobsService.updateJob(id, { status: JobStatus.ARCHIVED });
             loadJobs();
           }}
-          onDelete={(id) => {
+          onDelete={async (id) => {
             const job = jobs.find(j => j.id === id);
             const jobName = job?.data.jobTitle || job?.friendlyId || 'to zlecenie';
             if (window.confirm(`🗑️ Czy na pewno chcesz USUNĄĆ zlecenie?\n\n"${jobName}"\n\nTej operacji nie można cofnąć!`)) {
-              jobsService.deleteJob(id).then(() => loadJobs());
+              // Optymistyczna aktualizacja UI
+              const previousJobs = [...jobs];
+              setJobs(prevJobs => prevJobs.filter(j => j.id !== id));
+              setContextMenu(null); // Zamknij menu
+              
+              try {
+                await jobsService.deleteJob(id);
+                console.log('✅ Zlecenie usunięte:', id);
+              } catch (err) {
+                console.error('❌ Błąd usuwania:', err);
+                setJobs(previousJobs);
+                alert('Nie udało się usunąć zlecenia.');
+              }
             }
           }}
           isAdmin={isAdmin}

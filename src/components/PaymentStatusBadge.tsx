@@ -106,23 +106,47 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
   );
 };
 
-// Wersja jako pasek na górze karty Kanban
-export const PaymentStatusBar: React.FC<{ status: PaymentStatus }> = ({ status }) => {
-  const colors: Record<PaymentStatus, string> = {
-    [PaymentStatus.NONE]: '',
-    [PaymentStatus.PROFORMA]: 'bg-gradient-to-r from-orange-400 to-orange-500',
-    [PaymentStatus.PARTIAL]: 'bg-gradient-to-r from-purple-400 to-purple-500',
-    [PaymentStatus.PAID]: 'bg-gradient-to-r from-green-400 to-green-500',
-    [PaymentStatus.CASH]: 'bg-gradient-to-r from-yellow-400 to-yellow-500',
-    [PaymentStatus.OVERDUE]: 'bg-gradient-to-r from-red-400 to-red-500'
+// Wersja jako WYRAŹNY pasek na górze karty Kanban (jak w starej wersji)
+// Pasek zajmuje ~8% wysokości i pokazuje etykietę statusu
+export const PaymentStatusBar: React.FC<{ 
+  status: PaymentStatus; 
+  onClick?: (e: React.MouseEvent) => void;
+  showLabel?: boolean;
+}> = ({ status, onClick, showLabel = true }) => {
+  const config: Record<PaymentStatus, { bg: string; label: string }> = {
+    [PaymentStatus.NONE]: { bg: '', label: '' },
+    [PaymentStatus.PROFORMA]: { bg: 'bg-gradient-to-r from-orange-400 to-orange-500', label: 'PROFORMA' },
+    [PaymentStatus.PARTIAL]: { bg: 'bg-gradient-to-r from-purple-400 to-purple-500', label: 'ZALICZKA' },
+    [PaymentStatus.PAID]: { bg: 'bg-gradient-to-r from-green-400 to-green-500', label: 'OPŁACONE' },
+    [PaymentStatus.CASH]: { bg: 'bg-gradient-to-r from-yellow-400 to-yellow-500', label: 'GOTÓWKA' },
+    [PaymentStatus.OVERDUE]: { bg: 'bg-gradient-to-r from-red-400 to-red-500', label: 'DO ZAPŁATY' }
   };
+
+  const cfg = config[status] || config[PaymentStatus.NONE];
 
   if (status === PaymentStatus.NONE) {
     return null;
   }
 
   return (
-    <div className={`absolute top-0 left-0 right-0 h-1 ${colors[status]} rounded-t-xl`} />
+    <div 
+      className={`${cfg.bg} flex items-center justify-center cursor-pointer hover:brightness-110 transition-all`}
+      style={{ 
+        height: showLabel ? '16px' : '4px',
+        minHeight: showLabel ? '14px' : '4px'
+      }}
+      onClick={onClick}
+      title="Kliknij aby zmienić status płatności"
+    >
+      {showLabel && (
+        <span 
+          className="text-white font-bold uppercase tracking-wide"
+          style={{ fontSize: '8px', letterSpacing: '0.5px' }}
+        >
+          {cfg.label}
+        </span>
+      )}
+    </div>
   );
 };
 
@@ -145,6 +169,53 @@ export const PaymentStatusIcon: React.FC<{ status: PaymentStatus; className?: st
   }
 
   return <span className={className}>{icons[status]}</span>;
+};
+
+// Mini-popup do szybkiej zmiany statusu płatności (wyświetla się przy kafelku)
+export const PaymentStatusMiniMenu: React.FC<{
+  currentStatus: PaymentStatus;
+  onSelect: (status: PaymentStatus) => void;
+  onClose: () => void;
+  position?: 'top' | 'bottom';
+}> = ({ currentStatus, onSelect, onClose, position = 'bottom' }) => {
+  const statuses: { value: PaymentStatus; label: string; bg: string }[] = [
+    { value: PaymentStatus.NONE, label: 'Brak', bg: 'bg-slate-400' },
+    { value: PaymentStatus.PROFORMA, label: 'Proforma', bg: 'bg-orange-500' },
+    { value: PaymentStatus.PARTIAL, label: 'Zaliczka', bg: 'bg-purple-500' },
+    { value: PaymentStatus.PAID, label: 'Opłacone', bg: 'bg-green-500' },
+    { value: PaymentStatus.CASH, label: 'Gotówka', bg: 'bg-yellow-500' },
+    { value: PaymentStatus.OVERDUE, label: 'Do zapłaty', bg: 'bg-red-500' },
+  ];
+
+  return (
+    <>
+      {/* Backdrop - kliknięcie zamyka */}
+      <div 
+        className="fixed inset-0 z-40" 
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+      />
+      {/* Menu */}
+      <div 
+        className={`absolute ${position === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'} left-0 right-0 z-50 bg-white rounded-lg shadow-xl border border-slate-200 p-1 animate-fade-in`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-[9px] font-bold text-slate-400 uppercase px-2 py-1">Status płatności</div>
+        <div className="grid grid-cols-2 gap-1">
+          {statuses.map((s) => (
+            <button
+              key={s.value}
+              onClick={(e) => { e.stopPropagation(); onSelect(s.value); onClose(); }}
+              className={`px-2 py-1.5 rounded text-[10px] font-bold text-white transition-all ${s.bg} ${
+                currentStatus === s.value ? 'ring-2 ring-offset-1 ring-slate-600 scale-105' : 'opacity-80 hover:opacity-100'
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
+  );
 };
 
 export default PaymentStatusBadge;

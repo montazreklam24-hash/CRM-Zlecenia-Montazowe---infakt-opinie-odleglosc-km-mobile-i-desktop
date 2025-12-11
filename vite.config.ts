@@ -27,9 +27,10 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost/crm-api',
+        target: 'http://localhost',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
+        // Proxy przekierowuje /api/jobs.php na http://localhost/api/jobs.php
+        // Nie przepisuj ścieżki - zostaw /api
       }
     }
   }

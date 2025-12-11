@@ -128,10 +128,18 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob }) => {
       `;
 
       popupContent.querySelector('.btn-open')?.addEventListener('click', () => onSelectJob(job));
+      
+      // Blokuj wheel events na popupie, żeby nie powiększał strony
+      popupContent.addEventListener('wheel', (e) => {
+        e.stopPropagation();
+      }, { passive: true });
 
-      marker.bindPopup(popupContent);
+      marker.bindPopup(popupContent, {
+        closeOnClick: false,
+        autoPan: false  // Nie przesuwa mapy przy otwarciu
+      });
       marker.on('mouseover', function (this: L.Marker) { this.openPopup(); });
-      // marker.on('mouseout', function (e) { this.closePopup(); }); // Opcjonalnie: zamykanie po zjechaniu
+      marker.on('mouseout', function (this: L.Marker) { this.closePopup(); }); // Zamknij po zjechaniu myszką
 
       markersLayerRef.current?.addLayer(marker);
       bounds.extend([lat, lng]);

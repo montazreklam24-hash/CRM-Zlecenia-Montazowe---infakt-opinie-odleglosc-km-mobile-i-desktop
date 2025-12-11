@@ -1,17 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Job, JobColumnId, PaymentStatus } from '../types';
-import { Trash2, Archive, X, Check } from 'lucide-react';
+import { Trash2, Archive, X, Check, ExternalLink, Copy } from 'lucide-react';
 
 interface JobContextMenuProps {
   job: Job;
-  x: number; // nie używane - zachowujemy dla kompatybilności
-  y: number; // nie używane - zachowujemy dla kompatybilności
+  x: number; // współrzędna X kliknięcia - UŻYWANA do pozycjonowania
+  y: number; // współrzędna Y kliknięcia - UŻYWANA do pozycjonowania
   onClose: () => void;
   onPaymentStatusChange?: (jobId: string, status: PaymentStatus) => void;
   onMoveToColumn?: (jobId: string, columnId: JobColumnId) => void;
   onArchive?: (jobId: string) => void;
   onDelete?: (jobId: string) => void;
+  onDuplicate?: (jobId: string) => void;
+  onOpenJob?: (job: Job) => void;
   isAdmin?: boolean;
 }
 
@@ -21,33 +23,74 @@ const PAYMENT_STATUSES: { value: PaymentStatus; label: string; bgColor: string; 
   { value: PaymentStatus.PROFORMA, label: 'Proforma', bgColor: '#f97316', textColor: '#fff' },
   { value: PaymentStatus.PARTIAL, label: 'Zaliczka', bgColor: '#a855f7', textColor: '#fff' },
   { value: PaymentStatus.PAID, label: 'Opłacone', bgColor: '#22c55e', textColor: '#fff' },
-  { value: PaymentStatus.CASH, label: 'Barter', bgColor: '#eab308', textColor: '#fff' },
+  { value: PaymentStatus.CASH, label: 'Gotówka', bgColor: '#eab308', textColor: '#fff' },
   { value: PaymentStatus.OVERDUE, label: 'Do zapłaty', bgColor: '#ef4444', textColor: '#fff' },
 ];
 
 // Kolumny/dni
-const COLUMNS: { id: JobColumnId; label: string; shortLabel: string; icon: string; color: string }[] = [
-  { id: 'PREPARE', label: 'Do przygotowania', shortLabel: 'Przyg.', icon: '📋', color: '#64748b' },
-  { id: 'MON', label: 'Poniedziałek', shortLabel: 'Pon', icon: '🔴', color: '#dc2626' },
-  { id: 'TUE', label: 'Wtorek', shortLabel: 'Wt', icon: '🟢', color: '#16a34a' },
-  { id: 'WED', label: 'Środa', shortLabel: 'Śr', icon: '🟣', color: '#9333ea' },
-  { id: 'THU', label: 'Czwartek', shortLabel: 'Czw', icon: '🟡', color: '#ca8a04' },
-  { id: 'FRI', label: 'Piątek', shortLabel: 'Pt', icon: '🔵', color: '#2563eb' },
-  { id: 'SAT', label: 'Sobota', shortLabel: 'Sob', icon: '⚪', color: '#6b7280' },
-  { id: 'SUN', label: 'Niedziela', shortLabel: 'Nd', icon: '⚫', color: '#1f2937' },
-  { id: 'COMPLETED', label: 'Wykonane', shortLabel: 'OK', icon: '✅', color: '#059669' },
+const COLUMNS: { id: JobColumnId; label: string; shortLabel: string; icon: string }[] = [
+  { id: 'PREPARE', label: 'Do przygotowania', shortLabel: 'Przyg.', icon: '📋' },
+  { id: 'MON', label: 'Poniedziałek', shortLabel: 'Pon', icon: '🔴' },
+  { id: 'TUE', label: 'Wtorek', shortLabel: 'Wt', icon: '🟢' },
+  { id: 'WED', label: 'Środa', shortLabel: 'Śr', icon: '🟣' },
+  { id: 'THU', label: 'Czwartek', shortLabel: 'Czw', icon: '🟡' },
+  { id: 'FRI', label: 'Piątek', shortLabel: 'Pt', icon: '🔵' },
+  { id: 'COMPLETED', label: 'Wykonane', shortLabel: 'OK', icon: '✅' },
 ];
 
+/**
+ * JobContextMenu - małe menu kontekstowe pozycjonowane przy kliknięciu (PPM lub przycisk ⋮)
+ * 
+ * POPRAWIONE: Teraz naprawdę używa współrzędnych x, y do pozycjonowania,
+ * zamiast renderować pełnoekranowy modal na środku ekranu.
+ * 
+ * Menu jest pozycjonowane względem viewport i automatycznie dostosowuje
+ * pozycję jeśli wychodzi poza ekran.
+ */
 const JobContextMenu: React.FC<JobContextMenuProps> = ({
   job,
+  x,
+  y,
   onClose,
   onPaymentStatusChange,
   onMoveToColumn,
   onArchive,
   onDelete,
+  onDuplicate,
+  onOpenJob,
   isAdmin = false
 }) => {
-  const modalRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = useState({ x, y });
+
+  // Oblicz pozycję menu tak, żeby nie wychodziło poza viewport
+  useEffect(() => {
+    if (!menuRef.current) return;
+    
+    const menu = menuRef.current;
+    const rect = menu.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    let newX = x;
+    let newY = y;
+    
+    // Sprawdź czy menu wychodzi poza prawą krawędź
+    if (x + rect.width > viewportWidth - 10) {
+      newX = viewportWidth - rect.width - 10;
+    }
+    
+    // Sprawdź czy menu wychodzi poza dolną krawędź
+    if (y + rect.height > viewportHeight - 10) {
+      newY = viewportHeight - rect.height - 10;
+    }
+    
+    // Nie pozwól na ujemne wartości
+    newX = Math.max(10, newX);
+    newY = Math.max(10, newY);
+    
+    setMenuPosition({ x: newX, y: newY });
+  }, [x, y]);
 
   // Zamknij na Escape
   useEffect(() => {
@@ -56,6 +99,23 @@ const JobContextMenu: React.FC<JobContextMenuProps> = ({
     };
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
+
+  // Zamknij przy kliknięciu poza menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    // Dodaj listener z małym opóźnieniem, żeby nie zamknęło się od razu
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, [onClose]);
 
   const handlePaymentChange = (status: PaymentStatus) => {
@@ -72,51 +132,70 @@ const JobContextMenu: React.FC<JobContextMenuProps> = ({
   const currentPayment = job.paymentStatus || PaymentStatus.NONE;
 
   return createPortal(
-    // Tło - kliknięcie zamyka modal
-    <div 
-      className="fixed inset-0 z-[99998] bg-black/40 flex items-center justify-center p-4"
-      onClick={onClose}
-      style={{ backdropFilter: 'blur(2px)' }}
-    >
-      {/* Modal na środku */}
+    <>
+      {/* Przezroczyste tło - kliknięcie zamyka menu */}
+      <div 
+        className="fixed inset-0 z-[99997]"
+        onClick={onClose}
+      />
+      
+      {/* Menu pozycjonowane przy kliknięciu */}
       <div
-        ref={modalRef}
-        className="bg-white rounded-xl shadow-2xl w-full max-w-[320px] overflow-hidden"
+        ref={menuRef}
+        className="fixed z-[99998] bg-white rounded-xl shadow-2xl overflow-hidden"
+        style={{ 
+          left: `${menuPosition.x}px`,
+          top: `${menuPosition.y}px`,
+          width: '280px',
+          maxHeight: 'calc(100vh - 40px)',
+          overflowY: 'auto',
+          animation: 'contextMenuFadeIn 0.1s ease-out',
+          boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.05)'
+        }}
         onClick={(e) => e.stopPropagation()}
         onContextMenu={(e) => e.preventDefault()}
-        style={{ 
-          animation: 'modalFadeIn 0.15s ease-out',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
-        }}
       >
         {/* Nagłówek */}
-        <div className="px-4 py-3 bg-gradient-to-r from-slate-700 to-slate-800 text-white flex items-center justify-between">
+        <div className="px-3 py-2 bg-gradient-to-r from-slate-700 to-slate-800 text-white flex items-center justify-between">
           <div className="flex-1 min-w-0">
-            <div className="text-xs opacity-70">{job.friendlyId}</div>
-            <div className="text-sm font-bold truncate">
+            <div className="text-[10px] opacity-70">{job.friendlyId}</div>
+            <div className="text-xs font-bold truncate">
               {job.data?.jobTitle || 'Zlecenie'}
             </div>
           </div>
           <button 
             onClick={onClose} 
-            className="ml-2 p-1.5 hover:bg-white/20 rounded-full transition-colors flex-shrink-0"
+            className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors flex-shrink-0"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
+        {/* Otwórz zlecenie */}
+        {onOpenJob && (
+          <div className="p-2 border-b border-gray-100">
+            <button 
+              onClick={() => { onOpenJob(job); onClose(); }}
+              className="w-full py-2 px-3 rounded-lg text-sm font-medium bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors flex items-center justify-center gap-2"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Otwórz szczegóły
+            </button>
+          </div>
+        )}
+
         {/* Status płatności */}
         {isAdmin && (
-          <div className="p-3 border-b border-gray-100">
-            <div className="text-[10px] uppercase text-slate-400 font-bold mb-2">Status płatności</div>
-            <div className="flex flex-wrap gap-1.5">
+          <div className="p-2 border-b border-gray-100">
+            <div className="text-[9px] uppercase text-slate-400 font-bold mb-1.5 px-1">Status płatności</div>
+            <div className="flex flex-wrap gap-1">
               {PAYMENT_STATUSES.map((status) => {
                 const isActive = currentPayment === status.value;
                 return (
                   <button
                     key={status.value}
                     onClick={() => handlePaymentChange(status.value)}
-                    className={`px-2.5 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${
+                    className={`px-2 py-1 rounded text-[10px] font-bold transition-all flex items-center gap-1 ${
                       isActive ? 'ring-2 ring-offset-1 ring-slate-600 scale-105' : 'opacity-80 hover:opacity-100'
                     }`}
                     style={{ 
@@ -134,9 +213,9 @@ const JobContextMenu: React.FC<JobContextMenuProps> = ({
         )}
 
         {/* Przenieś do kolumny */}
-        <div className="p-3 border-b border-gray-100">
-          <div className="text-[10px] uppercase text-slate-400 font-bold mb-2">Przenieś do</div>
-          <div className="grid grid-cols-3 gap-1.5">
+        <div className="p-2 border-b border-gray-100">
+          <div className="text-[9px] uppercase text-slate-400 font-bold mb-1.5 px-1">Przenieś do</div>
+          <div className="grid grid-cols-4 gap-1">
             {COLUMNS.map((col) => {
               const isActive = currentColumn === col.id;
               return (
@@ -144,14 +223,14 @@ const JobContextMenu: React.FC<JobContextMenuProps> = ({
                   key={col.id}
                   onClick={() => handleMove(col.id)}
                   disabled={isActive}
-                  className={`px-2 py-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-0.5 ${
+                  className={`px-1.5 py-1.5 rounded-lg text-[10px] font-medium transition-all flex flex-col items-center gap-0.5 ${
                     isActive 
-                      ? 'bg-green-100 text-green-700 ring-2 ring-green-400' 
+                      ? 'bg-green-100 text-green-700 ring-1 ring-green-400' 
                       : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                   }`}
                 >
-                  <span className="text-base leading-none">{col.icon}</span>
-                  <span className="text-[10px] leading-tight">{col.shortLabel}</span>
+                  <span className="text-sm leading-none">{col.icon}</span>
+                  <span className="text-[8px] leading-tight">{col.shortLabel}</span>
                 </button>
               );
             })}
@@ -160,19 +239,28 @@ const JobContextMenu: React.FC<JobContextMenuProps> = ({
 
         {/* Akcje */}
         {isAdmin && (
-          <div className="p-2 flex gap-2">
+          <div className="p-2 flex gap-1.5">
+            {onDuplicate && (
+              <button 
+                onClick={() => { onDuplicate(job.id); onClose(); }}
+                className="flex-1 py-2 px-2 rounded-lg text-xs font-medium bg-violet-50 hover:bg-violet-100 text-violet-700 transition-colors flex items-center justify-center gap-1"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                Duplikuj
+              </button>
+            )}
             <button 
               onClick={() => { onArchive?.(job.id); onClose(); }}
-              className="flex-1 py-2.5 px-3 rounded-lg text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors flex items-center justify-center gap-2"
+              className="flex-1 py-2 px-2 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors flex items-center justify-center gap-1"
             >
-              <Archive className="w-4 h-4" />
-              Archiwizuj
+              <Archive className="w-3.5 h-3.5" />
+              Archiwum
             </button>
             <button 
               onClick={() => { onDelete?.(job.id); onClose(); }}
-              className="flex-1 py-2.5 px-3 rounded-lg text-sm font-medium bg-red-100 hover:bg-red-200 text-red-700 transition-colors flex items-center justify-center gap-2"
+              className="flex-1 py-2 px-2 rounded-lg text-xs font-medium bg-red-50 hover:bg-red-100 text-red-700 transition-colors flex items-center justify-center gap-1"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3.5 h-3.5" />
               Usuń
             </button>
           </div>
@@ -183,7 +271,7 @@ const JobContextMenu: React.FC<JobContextMenuProps> = ({
           <div className="p-2">
             <button 
               onClick={onClose}
-              className="w-full py-2.5 px-3 rounded-lg text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+              className="w-full py-2 px-3 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
             >
               Zamknij
             </button>
@@ -193,18 +281,18 @@ const JobContextMenu: React.FC<JobContextMenuProps> = ({
 
       {/* Animacja */}
       <style>{`
-        @keyframes modalFadeIn {
+        @keyframes contextMenuFadeIn {
           from { 
             opacity: 0; 
-            transform: scale(0.95) translateY(-10px); 
+            transform: scale(0.95); 
           }
           to { 
             opacity: 1; 
-            transform: scale(1) translateY(0); 
+            transform: scale(1); 
           }
         }
       `}</style>
-    </div>,
+    </>,
     document.body
   );
 };
