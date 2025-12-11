@@ -99,7 +99,16 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
     }
   };
   
+  // Ref do głównego kontenera - do sprawdzenia czy paste jest dla tego komponentu
+  const containerRef = useRef<HTMLDivElement>(null);
+  
   const handlePasteImage = async (e: ClipboardEvent) => {
+    // Sprawdź czy aktywny element jest wewnątrz tego komponentu
+    const activeElement = document.activeElement;
+    if (containerRef.current && !containerRef.current.contains(activeElement)) {
+      return; // Paste nie jest dla tego komponentu
+    }
+    
     const items = e.clipboardData?.items;
     if (items) {
       for (const item of Array.from(items)) {
@@ -246,7 +255,7 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
   
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div ref={containerRef} className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-6 flex items-center justify-between">
           <div className="flex items-center gap-3">

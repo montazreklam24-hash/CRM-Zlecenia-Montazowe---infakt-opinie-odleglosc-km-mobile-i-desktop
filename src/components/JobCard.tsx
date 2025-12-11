@@ -122,9 +122,15 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
   }, [isEditing]);
   */
 
-  // Obsługa Ctrl+V dla zdjęć
+  // Obsługa Ctrl+V dla zdjęć projektu
+  // Tylko gdy: tworzymy nowe zlecenie (!job) LUB jesteśmy w trybie edycji (isEditing)
+  // To zapobiega konfliktowi z CompletionSection który ma własny paste handler
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
+      // Ogranicz paste do trybu edycji lub nowego zlecenia
+      // Gdy zlecenie istnieje i nie edytujemy - paste idzie do CompletionSection
+      if (job && !isEditing) return;
+      
       const items = e.clipboardData?.items;
       if (!items) return;
       
@@ -146,7 +152,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
     
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
-  }, []);
+  }, [job, isEditing]);
 
   useEffect(() => {
     if (job) {
@@ -534,12 +540,25 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
     }
   };
 
+  // Stan dla modalu potwierdzenia usunięcia zdjęcia
+  const [deleteImageIndex, setDeleteImageIndex] = useState<number | null>(null);
+  
   const removeProjectImage = async (index: number) => {
-    if (!window.confirm("Usunąć to zdjęcie?")) return;
-    const newImages = projectImages.filter((_, i) => i !== index);
+    // Pokaż modal potwierdzenia zamiast window.confirm
+    setDeleteImageIndex(index);
+  };
+  
+  const confirmDeleteImage = async () => {
+    if (deleteImageIndex === null) return;
+    const newImages = projectImages.filter((_, i) => i !== deleteImageIndex);
     setProjectImages(newImages);
+    setDeleteImageIndex(null);
     if (!isEditing && job) {
-      try { await jobsService.updateJob(job.id, { projectImages: newImages }); } catch {}
+      try { 
+        await jobsService.updateJob(job.id, { projectImages: newImages }); 
+      } catch (err) {
+        console.error('Błąd usuwania zdjęcia:', err);
+      }
     }
   };
 
@@ -590,6 +609,49 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
         document.getElementById('modal-root') || document.body
       )}
 
+      {/* Modal potwierdzenia usunięcia zdjęcia */}
+      {deleteImageIndex !== null && createPortal(
+        <div 
+          className="fixed inset-0 z-[99999] bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setDeleteImageIndex(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-slate-800 mb-2">Usunąć zdjęcie?</h3>
+            <p className="text-slate-600 text-sm mb-4">Czy na pewno chcesz usunąć to zdjęcie z projektu?</p>
+            
+            {/* Miniatura zdjęcia */}
+            {projectImages[deleteImageIndex] && (
+              <div className="mb-4 flex justify-center">
+                <img 
+                  src={projectImages[deleteImageIndex]} 
+                  alt="Do usunięcia" 
+                  className="w-24 h-24 object-cover rounded-lg border-2 border-red-200"
+                />
+              </div>
+            )}
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteImageIndex(null)}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
+              >
+                Anuluj
+              </button>
+              <button
+                onClick={confirmDeleteImage}
+                className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Usuń
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.getElementById('modal-root') || document.body
+      )}
 
       {/* Nav Bar */}
       <div className="flex justify-between items-center mb-4 sticky top-16 z-30 py-3 bg-slate-100/90 backdrop-blur-sm border-b border-slate-200/50">

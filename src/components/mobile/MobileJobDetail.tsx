@@ -4,7 +4,7 @@ import {
   ChevronLeft, Navigation, Phone, MapPin, Edit, Save, X,
   Trash2, Copy, Archive, Image as ImageIcon, FileText, User,
   Building2, Mail, Calendar, DollarSign, CheckCircle2, AlertCircle,
-  Camera, Send, Upload
+  Camera, Send, Upload, ImagePlus, ZoomIn, ZoomOut
 } from 'lucide-react';
 import { jobsService } from '../../services/apiService';
 
@@ -89,7 +89,12 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
   const [clientEmail, setClientEmail] = useState(job.data.email || '');
   const [isCompleting, setIsCompleting] = useState(false);
   const [completionError, setCompletionError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);       // Kamera
+  const galleryInputRef = useRef<HTMLInputElement>(null);    // Galeria
+  
+  // Zoom state for lightbox
+  const [imageScale, setImageScale] = useState(1);
+  const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
   
   // Edit state
   const [editData, setEditData] = useState({
@@ -196,14 +201,38 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
     return () => document.removeEventListener('paste', handlePaste);
   }, [processImageFiles, showCompletion]);
 
-  // Handle completion image upload
+  // Handle completion image upload (shared by camera and gallery inputs)
   const handleCompletionImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
     processImageFiles(files);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    // Reset both inputs
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (galleryInputRef.current) galleryInputRef.current.value = '';
+  };
+  
+  // Reset zoom when changing image
+  const handleImageChange = (idx: number) => {
+    setCurrentImageIndex(idx);
+    setImageScale(1);
+    setImagePosition({ x: 0, y: 0 });
+  };
+  
+  // Zoom handlers for lightbox
+  const handleZoomIn = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setImageScale(prev => Math.min(prev + 0.5, 4));
+  };
+  
+  const handleZoomOut = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setImageScale(prev => Math.max(prev - 0.5, 1));
+    if (imageScale <= 1.5) setImagePosition({ x: 0, y: 0 });
+  };
+  
+  const handleResetZoom = () => {
+    setImageScale(1);
+    setImagePosition({ x: 0, y: 0 });
   };
 
   // Handle completion without email
@@ -532,29 +561,75 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
               ))}
             </div>
             
-            {/* Enlarged Image Modal */}
+            {/* Enlarged Image Modal with Zoom */}
             {currentImageIndex >= 0 && (
               <div 
-                className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-                onClick={() => setCurrentImageIndex(-1)}
+                className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+                onClick={() => { setCurrentImageIndex(-1); handleResetZoom(); }}
               >
+                {/* Close button */}
                 <button 
-                  className="absolute top-4 right-4 p-2 bg-white/20 rounded-full text-white"
-                  onClick={() => setCurrentImageIndex(-1)}
+                  className="absolute top-4 right-4 p-2 bg-white/20 rounded-full text-white z-10"
+                  onClick={() => { setCurrentImageIndex(-1); handleResetZoom(); }}
                 >
                   <X className="w-6 h-6" />
                 </button>
-                <img 
-                  src={images[currentImageIndex]} 
-                  alt="Powiększone zdjęcie"
-                  className="max-w-full max-h-full object-contain rounded-lg"
-                />
+                
+                {/* Zoom controls */}
+                <div className="absolute top-4 left-4 flex gap-2 z-10">
+                  <button 
+                    onClick={handleZoomOut}
+                    disabled={imageScale <= 1}
+                    className="p-2 bg-white/20 rounded-full text-white disabled:opacity-30"
+                  >
+                    <ZoomOut className="w-6 h-6" />
+                  </button>
+                  <button 
+                    onClick={handleZoomIn}
+                    disabled={imageScale >= 4}
+                    className="p-2 bg-white/20 rounded-full text-white disabled:opacity-30"
+                  >
+                    <ZoomIn className="w-6 h-6" />
+                  </button>
+                  {imageScale > 1 && (
+                    <span className="px-3 py-2 bg-white/20 rounded-full text-white text-sm font-medium">
+                      {Math.round(imageScale * 100)}%
+                    </span>
+                  )}
+                </div>
+                
+                {/* Image container with pinch-zoom support */}
+                <div 
+                  className="w-full h-full flex items-center justify-center overflow-hidden"
+                  style={{ touchAction: 'manipulation' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <img 
+                    src={images[currentImageIndex]} 
+                    alt="Powiększone zdjęcie"
+                    className="max-w-full max-h-full object-contain transition-transform duration-200"
+                    style={{ 
+                      transform: `scale(${imageScale}) translate(${imagePosition.x}px, ${imagePosition.y}px)`,
+                      touchAction: 'pinch-zoom'
+                    }}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      if (imageScale > 1) {
+                        handleResetZoom();
+                      } else {
+                        setImageScale(2);
+                      }
+                    }}
+                  />
+                </div>
+                
+                {/* Navigation dots */}
                 {images.length > 1 && (
-                  <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-3">
+                  <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-3 z-10">
                     {images.map((_, idx) => (
                       <button
                         key={idx}
-                        onClick={(e) => { e.stopPropagation(); setCurrentImageIndex(idx); }}
+                        onClick={(e) => { e.stopPropagation(); handleImageChange(idx); }}
                         className={`w-3 h-3 rounded-full transition-all ${
                           idx === currentImageIndex ? 'bg-white scale-125' : 'bg-white/50'
                         }`}
@@ -562,6 +637,11 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
                     ))}
                   </div>
                 )}
+                
+                {/* Hint */}
+                <div className="absolute bottom-16 left-0 right-0 text-center text-white/50 text-xs">
+                  Dotknij 2x aby powiększyć • Użyj przycisków +/- do zoomu
+                </div>
               </div>
             )}
           </div>
@@ -609,23 +689,43 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
                       </div>
                     ))}
                     
+                    {/* Dwa przyciski: Kamera i Galeria */}
                     {completionImages.length < 10 && (
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-20 h-20 border-2 border-dashed border-emerald-300 rounded-xl flex flex-col items-center justify-center text-emerald-600 active:bg-emerald-50"
-                      >
-                        <Camera className="w-6 h-6" />
-                        <span className="text-[10px] font-medium mt-1">Dodaj</span>
-                      </button>
+                      <>
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-20 h-20 border-2 border-dashed border-emerald-300 rounded-xl flex flex-col items-center justify-center text-emerald-600 active:bg-emerald-50 bg-emerald-50/50"
+                        >
+                          <Camera className="w-6 h-6" />
+                          <span className="text-[10px] font-medium mt-1">Aparat</span>
+                        </button>
+                        <button
+                          onClick={() => galleryInputRef.current?.click()}
+                          className="w-20 h-20 border-2 border-dashed border-blue-300 rounded-xl flex flex-col items-center justify-center text-blue-600 active:bg-blue-50 bg-blue-50/50"
+                        >
+                          <ImagePlus className="w-6 h-6" />
+                          <span className="text-[10px] font-medium mt-1">Galeria</span>
+                        </button>
+                      </>
                     )}
                   </div>
                   
+                  {/* Input dla kamery (z capture) */}
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
                     multiple
                     capture="environment"
+                    onChange={handleCompletionImageUpload}
+                    className="hidden"
+                  />
+                  {/* Input dla galerii (bez capture) */}
+                  <input
+                    ref={galleryInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
                     onChange={handleCompletionImageUpload}
                     className="hidden"
                   />

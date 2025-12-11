@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Upload, FileText, Loader2, X, Type, Sparkles, Mic, MicOff, RotateCw } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { useVoiceInput } from '../hooks/useVoiceInput';
@@ -20,6 +20,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing, onSwitchT
   const [dragActive, setDragActive] = useState(false);
   const [isConvertingPdf, setIsConvertingPdf] = useState(false);
   const { isListening, transcript, resetTranscript, startListening, stopListening, isSupported } = useVoiceInput();
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Update text with voice transcript
   useEffect(() => {
@@ -32,9 +33,15 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing, onSwitchT
     }
   }, [transcript, resetTranscript]);
 
-  // Paste support (Ctrl+V)
+  // Paste support (Ctrl+V) - tylko gdy focus jest wewnątrz tego komponentu
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
+      // Sprawdź czy aktywny element jest wewnątrz tego komponentu
+      const activeElement = document.activeElement;
+      if (containerRef.current && !containerRef.current.contains(activeElement)) {
+        return; // Paste nie jest dla tego komponentu
+      }
+      
       const items = e.clipboardData?.items;
       if (!items) return;
 
@@ -180,7 +187,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing, onSwitchT
   const canSubmit = (text.trim().length > 0 || images.length > 0) && !isConvertingPdf;
 
   return (
-    <div className="w-full max-w-3xl mx-auto">
+    <div ref={containerRef} className="w-full max-w-3xl mx-auto">
       <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl border border-slate-200/50 overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-5">
