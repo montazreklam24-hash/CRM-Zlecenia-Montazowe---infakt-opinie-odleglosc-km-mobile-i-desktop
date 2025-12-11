@@ -252,7 +252,7 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({
       const matchesPayment = paymentFilter === 'ALL' || j.paymentStatus === paymentFilter;
       return matchesColumn && notArchived && matchesSearch && matchesPayment;
     })
-    .sort((a, b) => (a.order || 0) - (b.order || 0));
+    .sort((a, b) => (a.order ?? 999999) - (b.order ?? 999999));
 
   // Get job count for a column
   const getCount = (colId: JobColumnId) => 

@@ -56,74 +56,108 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
     setView('MAP');
   };
 
-  // Job Actions
+  // Job Actions - PRZEPISANE OD NOWA z poprawną logiką
   const handleMoveUp = useCallback(async (jobId: string) => {
-    const job = jobs.find(j => j.id === jobId);
-    if (!job) return;
+    // Użyj funkcjonalnej aktualizacji stanu żeby mieć najnowsze dane
+    let newOrderForCurrent: number | undefined;
+    let newOrderForAbove: number | undefined;
+    let jobAboveId: string | undefined;
+    let columnId: JobColumnId | undefined;
     
-    const columnId = job.columnId || 'PREPARE';
-    const columnJobs = jobs
-      .filter(j => (j.columnId || 'PREPARE') === columnId && j.status !== JobStatus.ARCHIVED)
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
+    // Najpierw oblicz nowe wartości order
+    setJobs(prevJobs => {
+      const job = prevJobs.find(j => j.id === jobId);
+      if (!job) return prevJobs;
+      
+      columnId = job.columnId || 'PREPARE';
+      const columnJobs = prevJobs
+        .filter(j => (j.columnId || 'PREPARE') === columnId && j.status !== JobStatus.ARCHIVED)
+        .sort((a, b) => (a.order ?? 999999) - (b.order ?? 999999));
+      
+      const currentIndex = columnJobs.findIndex(j => j.id === jobId);
+      if (currentIndex <= 0) return prevJobs; // Already at top
+      
+      // Swap with the job above
+      const jobAbove = columnJobs[currentIndex - 1];
+      jobAboveId = jobAbove.id;
+      const currentOrder = job.order ?? currentIndex;
+      const aboveOrder = jobAbove.order ?? (currentIndex - 1);
+      
+      newOrderForCurrent = aboveOrder;
+      newOrderForAbove = currentOrder;
+      
+      // Zwróć zaktualizowany stan
+      return prevJobs.map(j => {
+        if (j.id === jobId) return { ...j, order: aboveOrder };
+        if (j.id === jobAbove.id) return { ...j, order: currentOrder };
+        return j;
+      });
+    });
     
-    const currentIndex = columnJobs.findIndex(j => j.id === jobId);
-    if (currentIndex <= 0) return; // Already at top
-    
-    // Swap with the job above
-    const jobAbove = columnJobs[currentIndex - 1];
-    const currentOrder = job.order || currentIndex;
-    const aboveOrder = jobAbove.order || (currentIndex - 1);
-    
-    // Update orders
-    setJobs(prev => prev.map(j => {
-      if (j.id === jobId) return { ...j, order: aboveOrder };
-      if (j.id === jobAbove.id) return { ...j, order: currentOrder };
-      return j;
-    }));
-    
-    // Save to backend
-    try {
-      await jobsService.updateJobColumn(jobId, columnId, aboveOrder);
-      await jobsService.updateJobColumn(jobAbove.id, columnId, currentOrder);
-    } catch (err) {
-      console.error('Failed to save order:', err);
-      loadJobs(); // Reload on error
+    // Zapisz do backendu (tylko jeśli były zmiany)
+    if (newOrderForCurrent !== undefined && newOrderForAbove !== undefined && jobAboveId && columnId) {
+      try {
+        await Promise.all([
+          jobsService.updateJobColumn(jobId, columnId, newOrderForCurrent),
+          jobsService.updateJobColumn(jobAboveId, columnId, newOrderForAbove)
+        ]);
+      } catch (err) {
+        console.error('Failed to save order:', err);
+        loadJobs(); // Reload on error
+      }
     }
-  }, [jobs, loadJobs]);
+  }, [loadJobs]);
 
   const handleMoveDown = useCallback(async (jobId: string) => {
-    const job = jobs.find(j => j.id === jobId);
-    if (!job) return;
+    // Użyj funkcjonalnej aktualizacji stanu żeby mieć najnowsze dane
+    let newOrderForCurrent: number | undefined;
+    let newOrderForBelow: number | undefined;
+    let jobBelowId: string | undefined;
+    let columnId: JobColumnId | undefined;
     
-    const columnId = job.columnId || 'PREPARE';
-    const columnJobs = jobs
-      .filter(j => (j.columnId || 'PREPARE') === columnId && j.status !== JobStatus.ARCHIVED)
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
+    // Najpierw oblicz nowe wartości order
+    setJobs(prevJobs => {
+      const job = prevJobs.find(j => j.id === jobId);
+      if (!job) return prevJobs;
+      
+      columnId = job.columnId || 'PREPARE';
+      const columnJobs = prevJobs
+        .filter(j => (j.columnId || 'PREPARE') === columnId && j.status !== JobStatus.ARCHIVED)
+        .sort((a, b) => (a.order ?? 999999) - (b.order ?? 999999));
+      
+      const currentIndex = columnJobs.findIndex(j => j.id === jobId);
+      if (currentIndex < 0 || currentIndex >= columnJobs.length - 1) return prevJobs; // Already at bottom
+      
+      // Swap with the job below
+      const jobBelow = columnJobs[currentIndex + 1];
+      jobBelowId = jobBelow.id;
+      const currentOrder = job.order ?? currentIndex;
+      const belowOrder = jobBelow.order ?? (currentIndex + 1);
+      
+      newOrderForCurrent = belowOrder;
+      newOrderForBelow = currentOrder;
+      
+      // Zwróć zaktualizowany stan
+      return prevJobs.map(j => {
+        if (j.id === jobId) return { ...j, order: belowOrder };
+        if (j.id === jobBelow.id) return { ...j, order: currentOrder };
+        return j;
+      });
+    });
     
-    const currentIndex = columnJobs.findIndex(j => j.id === jobId);
-    if (currentIndex < 0 || currentIndex >= columnJobs.length - 1) return; // Already at bottom
-    
-    // Swap with the job below
-    const jobBelow = columnJobs[currentIndex + 1];
-    const currentOrder = job.order || currentIndex;
-    const belowOrder = jobBelow.order || (currentIndex + 1);
-    
-    // Update orders
-    setJobs(prev => prev.map(j => {
-      if (j.id === jobId) return { ...j, order: belowOrder };
-      if (j.id === jobBelow.id) return { ...j, order: currentOrder };
-      return j;
-    }));
-    
-    // Save to backend
-    try {
-      await jobsService.updateJobColumn(jobId, columnId, belowOrder);
-      await jobsService.updateJobColumn(jobBelow.id, columnId, currentOrder);
-    } catch (err) {
-      console.error('Failed to save order:', err);
-      loadJobs(); // Reload on error
+    // Zapisz do backendu (tylko jeśli były zmiany)
+    if (newOrderForCurrent !== undefined && newOrderForBelow !== undefined && jobBelowId && columnId) {
+      try {
+        await Promise.all([
+          jobsService.updateJobColumn(jobId, columnId, newOrderForCurrent),
+          jobsService.updateJobColumn(jobBelowId, columnId, newOrderForBelow)
+        ]);
+      } catch (err) {
+        console.error('Failed to save order:', err);
+        loadJobs(); // Reload on error
+      }
     }
-  }, [jobs, loadJobs]);
+  }, [loadJobs]);
 
   const handleMoveToColumn = useCallback(async (jobId: string, targetColumnId: JobColumnId) => {
     const newOrder = jobs.filter(j => (j.columnId || 'PREPARE') === targetColumnId).length;
