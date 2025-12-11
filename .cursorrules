@@ -1,0 +1,29 @@
+# Reguły dla CRM Zlecenia Montażowe
+
+## Git
+- Po każdej zmianie lub grupie zmian rób git commit
+- Używaj konwencji: fix:, feat:, refactor:, chore:
+- Wiadomości commitów opisowe (po polsku lub angielsku)
+- Nie czekaj na koniec sesji z commitami
+
+## Stack
+- Frontend: React + TypeScript + Vite
+- Backend: PHP 5.6+ API (folder api/)
+- Baza: MySQL
+- UI: Tailwind CSS
+
+## Deploy
+- Build: npm run build
+- Folder dist/ wgrywać na FTP
+- NIE nadpisywać uploads/ na serwerze (zdjęcia klientów)
+
+## Konwencje kodu
+- Komponenty React w src/components/
+- Serwisy API w src/services/
+- Typy w src/types.ts
+- Polski język w UI, angielski w kodzie
+
+## API
+- Gemini: model gemini-1.5-flash
+- Klucze w api/config.php
+
