@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { Job, JobOrderData, JobStatus, UserRole, ChecklistItem, PaymentStatus, JobColumnId } from '../types';
 import { jobsService, geminiService } from '../services/apiService';
-import { rotateImage90, compressImage } from '../utils/imageUtils';
+import { rotateImage90, compressImage, processImageFile } from '../utils/imageUtils';
 import InvoiceModule from './InvoiceModule';
 import CompletionSection from './CompletionSection';
 import { useVoiceInput } from '../hooks/useVoiceInput';
@@ -140,12 +140,13 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
           const file = item.getAsFile();
           if (!file) continue;
           
-          const reader = new FileReader();
-          reader.onloadend = async () => {
-            const compressed = await compressImage(reader.result as string);
-            setProjectImages(prev => [...prev, compressed]);
-          };
-          reader.readAsDataURL(file);
+          try {
+            // Napraw orientację EXIF i kompresuj
+            const processed = await processImageFile(file);
+            setProjectImages(prev => [...prev, processed]);
+          } catch (err) {
+            console.error('Błąd przetwarzania obrazu:', err);
+          }
         }
       }
     };
@@ -415,16 +416,17 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'project' | 'completion') => {
     if (e.target.files) {
       for (const file of Array.from(e.target.files)) {
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const compressed = await compressImage(reader.result as string);
+        try {
+          // Napraw orientację EXIF i kompresuj
+          const processed = await processImageFile(file);
           if (type === 'project') {
-            setProjectImages(prev => [...prev, compressed]);
+            setProjectImages(prev => [...prev, processed]);
           } else {
-            setCompletionImages(prev => [...prev, compressed]);
+            setCompletionImages(prev => [...prev, processed]);
           }
-        };
-        reader.readAsDataURL(file);
+        } catch (err) {
+          console.error('Błąd przetwarzania obrazu:', err);
+        }
       }
     }
   };
@@ -1270,6 +1272,40 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                 </label>
               )}
             </div>
+            
+            {/* Drop zone dla drag & drop */}
+            {isEditing && (
+              <div
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const files = e.dataTransfer.files;
+                  if (files.length > 0) {
+                    for (const file of Array.from(files)) {
+                      if (file.type.startsWith('image/')) {
+                        try {
+                          const processed = await processImageFile(file);
+                          setProjectImages(prev => [...prev, processed]);
+                        } catch (err) {
+                          console.error('Błąd przetwarzania obrazu:', err);
+                        }
+                      } else if (file.type === 'application/pdf') {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setProjectImages(prev => [...prev, reader.result as string]);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }
+                  }
+                }}
+                className="mb-4 p-4 border-2 border-dashed border-slate-300 rounded-xl text-center text-sm text-slate-500 hover:border-blue-400 hover:bg-blue-50/50 transition-colors cursor-pointer"
+              >
+                <p className="mb-1">Przeciągnij i upuść zdjęcia tutaj</p>
+                <p className="text-xs text-slate-400">lub użyj Ctrl+V aby wkleić</p>
+              </div>
+            )}
 
             {projectImages.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
