@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { Job, JobColumnId } from '../types';
+import { Locate, Loader2 } from 'lucide-react';
 
 interface MapBoardProps {
   jobs: Job[];
@@ -176,6 +177,51 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
   const [popupPos, setPopupPos] = useState<{x: number, y: number} | null>(null);
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
 
+  const [isLocating, setIsLocating] = useState(false);
+
+  const handleLocateMe = () => {
+    if (!googleMapRef.current) return;
+    
+    setIsLocating(true);
+    if (!navigator.geolocation) {
+      alert('Twoja przeglądarka nie obsługuje geolokalizacji');
+      setIsLocating(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const pos = { lat: latitude, lng: longitude };
+        
+        googleMapRef.current.setCenter(pos);
+        googleMapRef.current.setZoom(14);
+        
+        // Add user marker
+        new window.google.maps.Marker({
+          position: pos,
+          map: googleMapRef.current,
+          title: 'Twoja lokalizacja',
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: '#3b82f6',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+          }
+        });
+        
+        setIsLocating(false);
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        alert('Nie udało się pobrać lokalizacji. Sprawdź uprawnienia GPS.');
+        setIsLocating(false);
+      }
+    );
+  };
+
   // Inicjalizacja mapy
   useEffect(() => {
     if (!mapRef.current || !window.google) return;
@@ -195,14 +241,8 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
 
       googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
 
-      // Ctrl + Scroll zoom
-      const mapDiv = mapRef.current;
-      mapDiv.addEventListener('wheel', (e: WheelEvent) => {
-        if (!e.ctrlKey) {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-      }, { passive: false });
+      // Custom wheel listener removed - let Google Maps 'cooperative' handling work
+      // This allows scrolling the page when not pressing Ctrl
 
       // Inicjalizacja OverlayView do konwersji LatLng -> Pixel
       const Overlay = new window.google.maps.OverlayView();
@@ -334,6 +374,20 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
       <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded-md pointer-events-none z-20">
         Ctrl + scroll = zoom
       </div>
+
+      {/* Locate Me Button */}
+      <button
+        onClick={handleLocateMe}
+        disabled={isLocating}
+        className="absolute bottom-6 right-14 z-10 p-3 bg-white text-slate-700 rounded-lg shadow-md hover:bg-slate-50 active:bg-slate-100 disabled:opacity-70 transition-colors"
+        title="Moja lokalizacja"
+      >
+        {isLocating ? (
+          <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+        ) : (
+          <Locate className="w-6 h-6" />
+        )}
+      </button>
     </div>
   );
 };

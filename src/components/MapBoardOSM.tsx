@@ -52,6 +52,7 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob }) => {
     const container = mapContainerRef.current;
     const handleWheel = (e: WheelEvent) => {
       if (e.ctrlKey) {
+        e.preventDefault(); // Prevent browser zoom
         map.scrollWheelZoom.enable();
       } else {
         map.scrollWheelZoom.disable();
@@ -62,7 +63,8 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob }) => {
       map.scrollWheelZoom.disable();
     };
     
-    container.addEventListener('wheel', handleWheel, { passive: true });
+    // Use passive: false to allow preventDefault
+    container.addEventListener('wheel', handleWheel, { passive: false });
     document.addEventListener('keyup', handleKeyUp);
     markersLayerRef.current = L.layerGroup().addTo(map);
 

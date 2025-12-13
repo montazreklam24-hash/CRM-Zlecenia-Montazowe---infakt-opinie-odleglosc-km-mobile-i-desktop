@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Job, JobStatus, PaymentStatus } from '../../types';
-import { ArrowLeft, Navigation, Phone, X } from 'lucide-react';
+import { ArrowLeft, Navigation, Phone, X, Locate, Loader2 } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import JobPlaceholder from '../JobPlaceholder';
@@ -65,8 +65,56 @@ const createMarkerIcon = (color: string, number: number) => {
 const MobileMapView: React.FC<MobileMapViewProps> = ({ jobs, onBack, onOpenJob }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const userMarkerRef = useRef<L.Marker | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLocating, setIsLocating] = useState(false);
+
+  const handleLocateMe = () => {
+    if (!mapRef.current) return;
+    
+    setIsLocating(true);
+    if (!navigator.geolocation) {
+      alert('Twoja przeglądarka nie obsługuje geolokalizacji');
+      setIsLocating(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const latLng = new L.LatLng(latitude, longitude);
+        
+        mapRef.current?.setView(latLng, 13);
+        
+        // Update or create user marker
+        if (userMarkerRef.current) {
+          userMarkerRef.current.setLatLng(latLng);
+        } else {
+          const userIcon = L.divIcon({
+            className: 'bg-transparent border-none',
+            html: `
+              <div class="relative flex items-center justify-center w-6 h-6">
+                <div class="absolute w-full h-full bg-blue-500/30 rounded-full animate-ping"></div>
+                <div class="relative w-3 h-3 bg-blue-500 border-2 border-white rounded-full shadow-sm"></div>
+              </div>
+            `,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+          });
+          
+          userMarkerRef.current = L.marker(latLng, { icon: userIcon, zIndexOffset: 1000 }).addTo(mapRef.current!);
+        }
+        setIsLocating(false);
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        alert('Nie udało się pobrać lokalizacji. Sprawdź uprawnienia GPS.');
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
+  };
 
   // Filter jobs with coordinates
   const jobsWithCoords = jobs.filter(j => 
@@ -187,6 +235,19 @@ const MobileMapView: React.FC<MobileMapViewProps> = ({ jobs, onBack, onOpenJob }
       <div className="flex-1 relative">
         <div ref={mapContainer} className="absolute inset-0" />
         
+        {/* Locate Me Button */}
+        <button
+          onClick={handleLocateMe}
+          disabled={isLocating}
+          className="absolute top-4 right-4 z-[400] p-3 bg-white text-slate-700 rounded-xl shadow-lg active:scale-95 disabled:opacity-70"
+        >
+          {isLocating ? (
+            <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+          ) : (
+            <Locate className="w-6 h-6" />
+          )}
+        </button>
+
         {/* Loading overlay */}
         {isLoading && (
           <div className="absolute inset-0 bg-slate-900/80 flex items-center justify-center z-10">
