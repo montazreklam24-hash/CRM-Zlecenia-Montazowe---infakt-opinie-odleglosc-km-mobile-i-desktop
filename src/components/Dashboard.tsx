@@ -1009,6 +1009,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             
             fixedCount++;
             console.log(`✅ Auto-Heal: Naprawiono ${job.friendlyId} (${bestMatch.formattedAddress})`);
+          } else {
+             console.warn(`⚠️ Auto-Heal: Nie udało się znaleźć współrzędnych dla ${job.friendlyId} ("${job.data.address}"). Google status: ${data.message || 'UNKNOWN'}`);
           }
         } catch (e) {
           console.error(`❌ Auto-Heal błąd dla ${job.friendlyId}:`, e);
@@ -1579,8 +1581,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
         return updated;
       });
       
-      const draggedJob = jobs.find(j => j.id === draggedId);
-      const jobType = draggedJob?.type || 'ai';
+      const draggedJobReordered = jobs.find(j => j.id === draggedId);
+      const jobType = draggedJobReordered?.type || 'ai';
       await jobsService.updateJobPosition(draggedId, targetColumn, orderMap.get(draggedId) || 0, jobType);
       console.log('✅ Reorder complete');
     } else {
@@ -1602,9 +1604,9 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       });
       
       setJobs(updatedJobs);
-      const draggedJob = jobs.find(j => j.id === draggedId);
-      const jobType = draggedJob?.type || 'ai';
-      await jobsService.updateJobPosition(draggedId, targetColumn, newOrder, jobType);
+      const draggedJobForMove = jobs.find(j => j.id === draggedId);
+      const jobTypeForMove = draggedJobForMove?.type || 'ai';
+      await jobsService.updateJobPosition(draggedId, targetColumn, newOrder, jobTypeForMove);
     }
   };
 
