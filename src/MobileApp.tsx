@@ -14,9 +14,10 @@ interface MobileAppProps {
   onCreateNew: () => void;
   onCreateNewSimple: () => void;
   role: UserRole;
+  refreshTrigger?: number; // Trigger do odświeżania listy zleceń
 }
 
-const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, role }) => {
+const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, role, refreshTrigger }) => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<MobileView>('DASHBOARD');
@@ -29,6 +30,15 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
     setLoading(true);
     try {
       const data = await jobsService.getJobs();
+      
+      // DEBUG: Loguj ile zleceń otrzymaliśmy i jakie typy
+      console.log('📱 MobileApp loadJobs:', {
+        total: data.length,
+        ai: data.filter(j => j.type === 'ai').length,
+        simple: data.filter(j => j.type === 'simple').length,
+        jobs: data.map(j => ({ id: j.id, type: j.type, title: j.data.jobTitle?.substring(0, 30) }))
+      });
+      
       setJobs(data);
     } catch (error) {
       console.error('Failed to load jobs:', error);
@@ -40,6 +50,13 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
   useEffect(() => {
     loadJobs();
   }, [loadJobs]);
+
+  // Odśwież listę zleceń gdy refreshTrigger się zmienia
+  useEffect(() => {
+    if (refreshTrigger !== undefined && refreshTrigger > 0) {
+      loadJobs();
+    }
+  }, [refreshTrigger, loadJobs]);
 
   // Navigation
   const handleOpenJob = (job: Job) => {

@@ -258,6 +258,7 @@ const App: React.FC = () => {
             role={userRole}
             onCreateNew={handleStartCreate}
             onCreateNewSimple={handleStartCreateSimple}
+            refreshTrigger={dashboardRefreshTrigger}
           />
         )}
       </Suspense>
