@@ -257,6 +257,18 @@ export const authService = {
   clearToken,
 };
 
+// Helper do parsowania ID (obsługa prefixów ai- i simple-)
+const parseJobId = (id: string): { realId: string; type: 'ai' | 'simple' } => {
+  if (id.startsWith('ai-')) {
+    return { realId: id.substring(3), type: 'ai' };
+  }
+  if (id.startsWith('simple-')) {
+    return { realId: id.substring(7), type: 'simple' };
+  }
+  // Fallback dla starych ID lub gdy prefix nie jest używany
+  return { realId: id, type: 'ai' }; 
+};
+
 // =====================================================
 // JOBS API
 // =====================================================
@@ -303,18 +315,24 @@ export const jobsService = {
       return job;
     }
     
-    // Spróbuj najpierw z jobs_ai, potem z jobs_simple
+    const { realId, type } = parseJobId(id);
+    const endpoint = type === 'simple' ? `/jobs-simple/${realId}` : `/jobs/${realId}`;
+    
+    // Spróbuj pobrać
     try {
-      const response = await apiRequest<{ success: boolean; job: Job }>(`/jobs/${id}`);
+      const response = await apiRequest<{ success: boolean; job: Job }>(endpoint);
       return response.job;
     } catch (e) {
-      // Jeśli nie znaleziono w jobs_ai, spróbuj jobs_simple
-      try {
-        const response = await apiRequest<{ success: boolean; job: Job }>(`/jobs-simple/${id}`);
-        return response.job;
-      } catch (e2) {
-        throw new Error('Zlecenie nie istnieje');
+      // Jeśli nie znaleziono i nie mieliśmy prefixu (type=ai), spróbujmy drugiego typu jako fallback
+      if (type === 'ai' && !id.startsWith('ai-')) {
+        try {
+          const response = await apiRequest<{ success: boolean; job: Job }>(`/jobs-simple/${realId}`);
+          return response.job;
+        } catch (e2) {
+          throw new Error('Zlecenie nie istnieje');
+        }
       }
+      throw e;
     }
   },
   
@@ -368,8 +386,11 @@ export const jobsService = {
       return updatedJob;
     }
     
-    // Użyj odpowiedniego endpointu w zależności od typu zlecenia
-    const endpoint = jobType === 'simple' ? `/jobs-simple/${id}` : `/jobs/${id}`;
+    // Użyj helpera do wyciągnięcia ID i typu
+    const { realId, type: parsedType } = parseJobId(id);
+    const type = jobType || parsedType; // Priorytet dla przekazanego typu, ale zazwyczaj ID wystarczy
+    
+    const endpoint = type === 'simple' ? `/jobs-simple/${realId}` : `/jobs/${realId}`;
     
     const response = await apiRequest<{ success: boolean; job: Job }>(endpoint, {
       method: 'PUT',
@@ -394,24 +415,16 @@ export const jobsService = {
       return;
     }
     
-    // Jeśli typ nie jest podany, spróbuj pobrać zlecenie aby sprawdzić typ
-    let type = jobType;
-    if (!type) {
-      try {
-        const job = await this.getJob(id);
-        type = job.type || 'ai';
-      } catch (e) {
-        // Fallback: użyj 'ai' jeśli nie można pobrać zlecenia
-        type = 'ai';
-      }
-    }
+    // Użyj helpera do wyciągnięcia ID i typu
+    const { realId, type: parsedType } = parseJobId(id);
+    const type = jobType || parsedType;
     
     const body: any = { columnId };
     if (orderIndex !== undefined) {
       body.columnOrder = orderIndex; // Backend oczekuje columnOrder, nie order
     }
     
-    const endpoint = type === 'simple' ? `/jobs-simple/${id}` : `/jobs/${id}`;
+    const endpoint = type === 'simple' ? `/jobs-simple/${realId}` : `/jobs/${realId}`;
     await apiRequest(endpoint, {
       method: 'PUT',
       body: JSON.stringify(body),
@@ -431,19 +444,11 @@ export const jobsService = {
       return;
     }
     
-    // Jeśli typ nie jest podany, spróbuj pobrać zlecenie aby sprawdzić typ
-    let type = jobType;
-    if (!type) {
-      try {
-        const job = await this.getJob(id);
-        type = job.type || 'ai';
-      } catch (e) {
-        // Fallback: użyj 'ai' jeśli nie można pobrać zlecenia
-        type = 'ai';
-      }
-    }
+    // Użyj helpera do wyciągnięcia ID i typu
+    const { realId, type: parsedType } = parseJobId(id);
+    const type = jobType || parsedType;
     
-    const endpoint = type === 'simple' ? `/jobs-simple/${id}` : `/jobs/${id}`;
+    const endpoint = type === 'simple' ? `/jobs-simple/${realId}` : `/jobs/${realId}`;
     await apiRequest(endpoint, {
       method: 'PUT',
       body: JSON.stringify({ columnId, columnOrder: order }), // Backend oczekuje columnOrder

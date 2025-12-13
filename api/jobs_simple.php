@@ -456,7 +456,8 @@ function mapJobSimpleToFrontend($job) {
     $jobId = $job['id'];
     
     return array(
-        'id' => strval($jobId),
+        'id' => 'simple-' . strval($jobId),
+        'original_id' => strval($jobId),
         'friendlyId' => $job['friendly_id'],
         'type' => 'simple',
         'createdAt' => strtotime($job['created_at']) * 1000,

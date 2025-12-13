@@ -94,12 +94,12 @@ const App: React.FC = () => {
   const handleSaveSimpleJob = async (jobData: Partial<Job>) => {
     try {
       if (jobData.id) {
-        // Update existing
-        await fetch('/api/jobs-simple/' + jobData.id, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(jobData)
-        });
+        // Update existing - use jobsService to handle prefixes automatically
+        const { realId } = jobData.id.startsWith('simple-') ? { realId: jobData.id.substring(7) } : { realId: jobData.id };
+        // We need to use updateJob but pass 'simple' explicitly if ID doesn't have prefix yet,
+        // OR rely on updateJob's parsing if we pass the prefixed ID.
+        // Let's rely on jobsService.updateJob handling prefixes.
+        await jobsService.updateJob(jobData.id, jobData, 'simple');
       } else {
         // Create new
         await fetch('/api/jobs-simple', {
