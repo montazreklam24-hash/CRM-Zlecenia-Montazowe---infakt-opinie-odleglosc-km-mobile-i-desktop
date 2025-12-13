@@ -1060,6 +1060,14 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     try {
       const data = await jobsService.getJobs();
       
+      // DEBUG: Loguj ile zleceń otrzymaliśmy i jakie typy
+      console.log('📊 Dashboard loadJobs:', {
+        total: data.length,
+        ai: data.filter(j => j.type === 'ai').length,
+        simple: data.filter(j => j.type === 'simple').length,
+        jobs: data.map(j => ({ id: j.id, type: j.type, title: j.data.jobTitle?.substring(0, 30) }))
+      });
+      
       // ZABEZPIECZENIE: Usuń duplikaty po ID (zostaw tylko pierwszy wystąpienie)
       const seenIds = new Set<string>();
       const uniqueJobs = data.filter(job => {
