@@ -177,7 +177,7 @@ interface MobileDashboardProps {
   jobs: Job[];
   onCreateNew: () => void;
   onOpenJob: (job: Job) => void;
-  onOpenMap: () => void;
+  onOpenMap: (provider: 'GOOGLE' | 'OSM') => void;
   onMoveUp: (jobId: string) => void;
   onMoveDown: (jobId: string) => void;
   onMoveToColumn: (jobId: string, columnId: JobColumnId) => void;
@@ -261,16 +261,6 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({
   // Get current column info
   const currentColumn = COLUMNS.find(c => c.id === selectedColumn) || COLUMNS[1];
 
-  // Open in-app map view (both buttons open the same map with pins)
-  const openMapView = () => {
-    onOpenMap();
-  };
-
-  // Alias for second button
-  const openMapViewOSM = () => {
-    onOpenMap();
-  };
-
   return (
     <div className="h-screen flex flex-col bg-slate-100 overflow-hidden">
       {/* ============ TOP MENU - sticky ============ */}
@@ -293,20 +283,20 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({
             DODAJ
           </button>
           
-          {/* Google Maps style button - opens in-app map */}
+          {/* Google Maps style button */}
           <button
-            onClick={openMapView}
+            onClick={() => onOpenMap('GOOGLE')}
             className="flex items-center gap-1 px-2 py-1.5 bg-blue-500 rounded-lg font-bold text-xs active:scale-95 transition-transform shadow"
-            title="Mapa (styl Google)"
+            title="Mapa Google"
           >
             <Map className="w-4 h-4" />
           </button>
           
-          {/* OSM style button - opens same in-app map */}
+          {/* OSM style button */}
           <button
-            onClick={openMapViewOSM}
+            onClick={() => onOpenMap('OSM')}
             className="flex items-center gap-1 px-2 py-1.5 bg-green-600 rounded-lg font-bold text-xs active:scale-95 transition-transform shadow"
-            title="Mapa (styl OSM)"
+            title="Mapa OpenStreetMap"
           >
             <Layers className="w-4 h-4" />
           </button>

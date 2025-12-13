@@ -20,7 +20,7 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
   onComplete,
   isAdmin = false,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false); // Domyślnie zwinięte
+  const [isExpanded, setIsExpanded] = useState(true); // Domyślnie rozwinięte
   const [completionImages, setCompletionImages] = useState<string[]>([]);
   const [completionNotes, setCompletionNotes] = useState('');
   const [clientEmail, setClientEmail] = useState(job.data.email || '');

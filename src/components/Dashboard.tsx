@@ -12,6 +12,7 @@ import MapBoardGoogle from './MapBoardGoogle';
 import MapBoardOSM from './MapBoardOSM';
 import PaymentStatusBadge, { PaymentStatusBar, PaymentStatusIcon, PaymentStatusMiniMenu } from './PaymentStatusBadge';
 import JobContextMenu from './JobContextMenu';
+import JobPlaceholder from './JobPlaceholder';
 
 import {
   DndContext,
@@ -86,6 +87,8 @@ const ROWS_CONFIG: {
   { id: 'WED', title: 'ŚRODA', shortTitle: 'ŚR', headerBg: 'bg-gradient-to-r from-violet-500 to-violet-600', headerText: 'text-white', dotColor: 'text-violet-500', bodyBg: 'bg-violet-50/50', borderColor: 'border-violet-500', badgeBg: 'bg-violet-100', badgeText: 'text-violet-700' },
   { id: 'THU', title: 'CZWARTEK', shortTitle: 'CZW', headerBg: 'bg-gradient-to-r from-amber-400 to-amber-500', headerText: 'text-amber-900', dotColor: 'text-amber-500', bodyBg: 'bg-amber-50/50', borderColor: 'border-amber-400', badgeBg: 'bg-amber-100', badgeText: 'text-amber-800' },
   { id: 'FRI', title: 'PIĄTEK', shortTitle: 'PT', headerBg: 'bg-gradient-to-r from-blue-500 to-blue-600', headerText: 'text-white', dotColor: 'text-blue-500', bodyBg: 'bg-blue-50/50', borderColor: 'border-blue-500', badgeBg: 'bg-blue-100', badgeText: 'text-blue-700' },
+  { id: 'SAT', title: 'SOBOTA', shortTitle: 'SB', headerBg: 'bg-gradient-to-r from-indigo-500 to-indigo-600', headerText: 'text-white', dotColor: 'text-indigo-500', bodyBg: 'bg-indigo-50/50', borderColor: 'border-indigo-500', badgeBg: 'bg-indigo-100', badgeText: 'text-indigo-700' },
+  { id: 'SUN', title: 'NIEDZIELA', shortTitle: 'ND', headerBg: 'bg-gradient-to-r from-purple-500 to-purple-600', headerText: 'text-white', dotColor: 'text-purple-500', bodyBg: 'bg-purple-50/50', borderColor: 'border-purple-500', badgeBg: 'bg-purple-100', badgeText: 'text-purple-700' },
   { id: 'COMPLETED', title: 'WYKONANE', shortTitle: 'OK', headerBg: 'bg-gradient-to-r from-green-600 to-green-700', headerText: 'text-white', dotColor: 'text-green-600', bodyBg: 'bg-green-50/50', borderColor: 'border-green-600', badgeBg: 'bg-green-100', badgeText: 'text-green-700' },
 ];
 
@@ -266,6 +269,14 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
     year: '2-digit'
   }) : '';
 
+  // Format scheduled date
+  const scheduledDateFormatted = job.data.scheduledDate ? new Date(job.data.scheduledDate).toLocaleDateString('pl-PL', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }) : null;
+
   const [showClickHint, setShowClickHint] = useState(false);
   const [showArrows, setShowArrows] = useState(false);
   // Stan mini-menu statusu płatności
@@ -405,21 +416,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           {job.projectImages?.[0] ? (
             <img src={job.projectImages[0]} className="w-full h-full object-cover pointer-events-none" alt="preview" loading="lazy" />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center p-3" style={{ 
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white'
-            }}>
-              {job.data.scopeWorkText ? (
-                <>
-                  <div className="text-[10px] font-bold mb-1 opacity-90">OPIS ZLECENIA</div>
-                  <div className="text-[9px] leading-tight text-center line-clamp-4 opacity-95">
-                    {job.data.scopeWorkText}
-                  </div>
-                </>
-              ) : (
-                <Box className="w-10 h-10 opacity-50" />
-              )}
-            </div>
+            <JobPlaceholder job={job} size="medium" />
           )}
 
           {/* Job ID - more subtle */}
@@ -484,6 +481,13 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
             )}
           </div>
           
+          {/* Scheduled Date (Termin) */}
+          {scheduledDateFormatted && (
+            <div className="mt-2 text-sm font-black text-black leading-tight capitalize">
+              {scheduledDateFormatted}
+            </div>
+          )}
+          
           <div className="flex justify-between items-center pt-2 mt-auto" style={{ borderTop: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2">
               {/* Creation date instead of checklist */}
@@ -517,6 +521,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
                   <Archive className="w-3.5 h-3.5" />
                 </button>
                 <button 
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); onDelete(job.id, e); }} 
                   className="p-1 hover:text-red-500 hover:bg-slate-100 rounded"
                   style={{ color: 'var(--text-muted)' }}
@@ -875,6 +880,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
                   <Archive className="w-3 h-3" />
                 </button>
                 <button 
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); onDelete(job.id, e); }} 
                   className="p-0.5 rounded hover:bg-slate-100 hover:text-red-500"
                   style={{ color: 'var(--text-muted)' }}
@@ -957,6 +963,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   const [searchQuery, setSearchQuery] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const [showWeekend, setShowWeekend] = useState(false); // New state for weekend visibility
   const [showTypeModal, setShowTypeModal] = useState(false);
   const healingDoneRef = useRef(false); // Zapobiega wielokrotnemu uruchamianiu healJobs
   
@@ -1260,20 +1267,95 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   };
 
   // Kolejność kolumn dla strzałek lewo/prawo
-  const COLUMN_ORDER: JobColumnId[] = ['PREPARE', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'COMPLETED'];
-
+  // Dynamic column order based on weekend visibility
+  const getColumnOrder = () => {
+    const base = ['MON', 'TUE', 'WED', 'THU', 'FRI'];
+    if (showWeekend) base.push('SAT', 'SUN');
+    base.push('COMPLETED');
+    return base as JobColumnId[];
+  };
+  
   // Helper to check if job can move left/right
   const getJobMoveLeftRightInfo = (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return { canMoveLeft: false, canMoveRight: false };
-    
+
     const columnId = job.columnId || 'PREPARE';
-    const currentIndex = COLUMN_ORDER.indexOf(columnId);
+    
+    // Special handling for PREPARE - arrows allow reordering
+    if (columnId === 'PREPARE') {
+        const colJobs = jobs
+            .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
+            .sort((a, b) => (a.order || 0) - (b.order || 0));
+        const index = colJobs.findIndex(j => j.id === jobId);
+        // Can move left (up) if not first, can move right (down) if not last
+        return {
+            canMoveLeft: index > 0,
+            canMoveRight: index < colJobs.length - 1
+        };
+    }
+
+    const order = getColumnOrder();
+    const currentIndex = order.indexOf(columnId);
+    
+    if (currentIndex === -1) return { canMoveLeft: false, canMoveRight: false };
     
     return {
       canMoveLeft: currentIndex > 0,
-      canMoveRight: currentIndex < COLUMN_ORDER.length - 1
+      canMoveRight: currentIndex < order.length - 1
     };
+  };
+
+  // Helper for reordering in PREPARE
+  const handleReorder = async (jobId: string, direction: 'up' | 'down') => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    
+    const colId = job.columnId || 'PREPARE';
+    const colJobs = jobs
+        .filter(j => (j.columnId || 'PREPARE') === colId)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+        
+    const index = colJobs.findIndex(j => j.id === jobId);
+    if (index === -1) return;
+    
+    let swapIndex = -1;
+    if (direction === 'up') swapIndex = index - 1;
+    if (direction === 'down') swapIndex = index + 1;
+    
+    if (swapIndex < 0 || swapIndex >= colJobs.length) return;
+    
+    const otherJob = colJobs[swapIndex];
+    
+    // Optimistic update - swap orders
+    const order1 = job.order || 0;
+    const order2 = otherJob.order || 0;
+    
+    // Ensure orders are distinct enough to swap, otherwise use index
+    let newOrder1 = order2;
+    let newOrder2 = order1;
+    if (order1 === order2) {
+       newOrder1 = index; 
+       newOrder2 = swapIndex;
+    }
+
+    setJobs(prev => prev.map(j => {
+        if (j.id === jobId) return { ...j, order: newOrder2 };
+        if (j.id === otherJob.id) return { ...j, order: newOrder1 };
+        return j;
+    }));
+    
+    try {
+        const jobType = job.type || 'ai';
+        const otherJobType = otherJob.type || 'ai';
+        await Promise.all([
+            jobsService.updateJob(jobId, { order: newOrder2 }, jobType),
+            jobsService.updateJob(otherJob.id, { order: newOrder1 }, otherJobType)
+        ]);
+    } catch (err) {
+        console.error('Reorder failed', err);
+        loadJobs();
+    }
   };
 
   // Move job to the left column
@@ -1282,10 +1364,17 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     if (!job) return;
     
     const columnId = job.columnId || 'PREPARE';
-    const currentIndex = COLUMN_ORDER.indexOf(columnId);
+    
+    if (columnId === 'PREPARE') {
+        await handleReorder(jobId, 'up');
+        return;
+    }
+
+    const order = getColumnOrder();
+    const currentIndex = order.indexOf(columnId);
     if (currentIndex <= 0) return; // Already at leftmost
     
-    const newColumnId = COLUMN_ORDER[currentIndex - 1];
+    const newColumnId = order[currentIndex - 1];
     
     // Optimistic update
     setJobs(prevJobs => prevJobs.map(j => 
@@ -1308,10 +1397,17 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     if (!job) return;
     
     const columnId = job.columnId || 'PREPARE';
-    const currentIndex = COLUMN_ORDER.indexOf(columnId);
-    if (currentIndex >= COLUMN_ORDER.length - 1) return; // Already at rightmost
     
-    const newColumnId = COLUMN_ORDER[currentIndex + 1];
+    if (columnId === 'PREPARE') {
+        await handleReorder(jobId, 'down');
+        return;
+    }
+
+    const order = getColumnOrder();
+    const currentIndex = order.indexOf(columnId);
+    if (currentIndex >= order.length - 1 || currentIndex === -1) return; // Already at rightmost
+    
+    const newColumnId = order[currentIndex + 1];
     
     // Optimistic update
     setJobs(prevJobs => prevJobs.map(j => 
@@ -1938,12 +2034,38 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             })}
 
             {/* 2. MIDDLE: MON-FRI COLUMNS (Vertical Grid) */}
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-               {ROWS_CONFIG.filter(r => ['MON', 'TUE', 'WED', 'THU', 'FRI'].includes(r.id)).map(row => {
+            <div className="flex justify-end px-2">
+               <button 
+                 onClick={() => setShowWeekend(!showWeekend)}
+                 className="text-[10px] font-bold text-slate-500 hover:text-slate-700 flex items-center gap-1 bg-white/50 px-2 py-1 rounded transition-colors"
+               >
+                 {showWeekend ? 'Ukryj weekend (Sob-Nd)' : 'Pokaż weekend (Sob-Nd)'}
+               </button>
+            </div>
+            
+            <div className={`grid grid-cols-1 gap-3 transition-all duration-300 ${showWeekend ? 'sm:grid-cols-7' : 'sm:grid-cols-5'}`}>
+               {ROWS_CONFIG.filter(r => {
+                 if (showWeekend) {
+                   return ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].includes(r.id);
+                 }
+                 return ['MON', 'TUE', 'WED', 'THU', 'FRI'].includes(r.id);
+               }).map(row => {
                   const rowJobs = getJobsForColumn(row.id);
+                  const today = new Date().getDay();
+                  const mapDayToId: Record<number, string> = { 1:'MON', 2:'TUE', 3:'WED', 4:'THU', 5:'FRI', 6:'SAT', 0:'SUN' };
+                  const isToday = mapDayToId[today] === row.id;
+
                   return (
-                    <div key={row.id} className="theme-surface flex flex-col min-h-[500px]" style={{ borderRadius: 'var(--radius-lg)' }}>
-                      <div className={`${row.headerBg} ${row.headerText} px-3 py-3 flex justify-between items-center sticky top-0 z-10`}>
+                    <div key={row.id} className={`theme-surface flex flex-col min-h-[500px] transition-all ${isToday ? 'ring-2 ring-blue-500 shadow-xl z-20' : ''}`} style={{ borderRadius: 'var(--radius-lg)' }}>
+                      <div className={`${row.headerBg} ${row.headerText} px-3 py-3 flex justify-between items-center sticky top-0 z-10 relative`} style={{ borderTopLeftRadius: 'var(--radius-lg)', borderTopRightRadius: 'var(--radius-lg)' }}>
+                         {isToday && (
+                           <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center animate-bounce z-50 pointer-events-none">
+                             <div className="bg-red-600 text-white px-3 py-1 rounded-full text-[10px] font-black shadow-lg uppercase tracking-wider flex items-center gap-1 border-2 border-white">
+                               DZISIAJ
+                             </div>
+                             <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-red-600"></div>
+                           </div>
+                         )}
                          <h3 className="font-bold tracking-wide text-xs sm:text-[10px] flex items-center gap-2">
                            <span className="sm:hidden">{row.title}</span>
                            <span className="hidden sm:inline">{row.shortTitle}</span>

@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 
 // Lazy load map component (uses Leaflet which is heavy)
 const MobileMapView = lazy(() => import('./components/mobile/MobileMapView'));
+const MobileGoogleMapView = lazy(() => import('./components/mobile/MobileGoogleMapView'));
 
 type MobileView = 'DASHBOARD' | 'JOB_DETAIL' | 'MAP';
 
@@ -22,6 +23,7 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<MobileView>('DASHBOARD');
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [mapProvider, setMapProvider] = useState<'GOOGLE' | 'OSM'>('OSM');
 
   const isAdmin = role === UserRole.ADMIN;
 
@@ -66,7 +68,8 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
     window.history.pushState({ view: 'JOB_DETAIL', jobId: job.id }, '');
   };
 
-  const handleOpenMap = () => {
+  const handleOpenMap = (provider: 'GOOGLE' | 'OSM' = 'OSM') => {
+    setMapProvider(provider);
     setView('MAP');
     window.history.pushState({ view: 'MAP' }, '');
   };
@@ -363,11 +366,19 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
             <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
           </div>
         }>
-          <MobileMapView
-            jobs={jobs}
-            onBack={handleBack}
-            onOpenJob={handleOpenJob}
-          />
+          {mapProvider === 'GOOGLE' ? (
+            <MobileGoogleMapView
+              jobs={jobs}
+              onBack={handleBack}
+              onOpenJob={handleOpenJob}
+            />
+          ) : (
+            <MobileMapView
+              jobs={jobs}
+              onBack={handleBack}
+              onOpenJob={handleOpenJob}
+            />
+          )}
         </Suspense>
       )}
     </div>

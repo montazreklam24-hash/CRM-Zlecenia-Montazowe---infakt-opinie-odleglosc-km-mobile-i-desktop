@@ -241,8 +241,16 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
 
       googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
 
-      // Custom wheel listener removed - let Google Maps 'cooperative' handling work
-      // This allows scrolling the page when not pressing Ctrl
+      // Fix Ctrl+Scroll behavior: Prevent browser page zoom so map can zoom
+      const mapDiv = mapRef.current;
+      const handleWheel = (e: WheelEvent) => {
+        if (e.ctrlKey) {
+          e.preventDefault(); // Stop browser zoom
+        }
+      };
+      
+      // Use passive: false to allow preventDefault
+      mapDiv.addEventListener('wheel', handleWheel, { passive: false });
 
       // Inicjalizacja OverlayView do konwersji LatLng -> Pixel
       const Overlay = new window.google.maps.OverlayView();

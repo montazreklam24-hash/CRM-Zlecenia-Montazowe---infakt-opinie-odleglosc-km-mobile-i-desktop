@@ -106,6 +106,14 @@ const MobileJobCard: React.FC<MobileJobCardProps> = ({
   const { street, city } = formatMobileAddress(job.data.address);
   const phoneFormatted = formatPhoneNumber(job.data.phoneNumber);
 
+  // Format scheduled date
+  const scheduledDateFormatted = job.data.scheduledDate ? new Date(job.data.scheduledDate).toLocaleDateString('pl-PL', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }) : null;
+
   const handleCardTap = () => {
     if (showMoveMenu) {
       setShowMoveMenu(false);
@@ -153,6 +161,13 @@ const MobileJobCard: React.FC<MobileJobCardProps> = ({
           <h3 className="font-bold text-sm text-slate-900 line-clamp-2 leading-tight mb-1">
             {job.data.jobTitle || 'Bez nazwy'}
           </h3>
+
+          {/* Scheduled Date */}
+          {scheduledDateFormatted && (
+            <div className="text-xs font-black text-black mb-1 capitalize leading-tight">
+              {scheduledDateFormatted}
+            </div>
+          )}
           
           {/* Address - prominent */}
           <div className="text-xs text-slate-600 mb-1">

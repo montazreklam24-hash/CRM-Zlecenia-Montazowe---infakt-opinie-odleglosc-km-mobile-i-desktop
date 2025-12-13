@@ -53,17 +53,32 @@ const JobPlaceholder: React.FC<JobPlaceholderProps> = ({
       'from-pink-600 to-rose-400',
       'from-cyan-600 to-sky-400',
       'from-indigo-600 to-indigo-400',
-      'from-teal-600 to-teal-400'
+      'from-teal-600 to-teal-400',
+      // Added more to reach 20 as requested
+      'from-red-600 to-red-400',
+      'from-lime-600 to-lime-400',
+      'from-fuchsia-600 to-fuchsia-400',
+      'from-yellow-500 to-yellow-300',
+      'from-slate-600 to-slate-400',
+      'from-stone-600 to-stone-400',
+      'from-sky-700 to-blue-500',
+      'from-rose-500 to-orange-400',
+      'from-purple-600 to-pink-500',
+      'from-emerald-500 to-teal-400',
+      'from-amber-600 to-orange-500',
+      'from-indigo-500 to-blue-400',
     ];
     // Użyj reszty z dzielenia
     const index = numericId ? numericId % gradients.length : Math.floor(Math.random() * gradients.length);
     return gradients[index];
   }, [numericId]);
 
-  // Rozmiary tekstu zależne od size
-  const streetSize = size === 'small' ? 'text-[10px]' : 'text-sm';
-  const descSize = size === 'small' ? 'text-[9px]' : 'text-xs';
-  const maxLines = size === 'small' ? 'line-clamp-3' : 'line-clamp-4';
+  // Rozmiary tekstu - ZWIĘKSZONE wg życzenia (2x)
+  // small (64px) - lekko większe
+  // medium/large (160px+) - dużo większe
+  const streetSize = size === 'small' ? 'text-[11px]' : 'text-lg'; 
+  const descSize = size === 'small' ? 'text-[10px]' : 'text-sm font-semibold';
+  const maxLines = size === 'small' ? 'line-clamp-3' : 'line-clamp-6';
 
   return (
     <div className={`w-full h-full bg-gradient-to-br ${gradientClass} p-2 flex flex-col text-white ${className}`}>

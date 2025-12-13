@@ -162,11 +162,17 @@ const MobileMapView: React.FC<MobileMapViewProps> = ({ jobs, onBack, onOpenJob }
       
       const marker = L.marker([lat, lng], { icon })
         .addTo(map)
-        .on('click', () => {
+        .on('click', (e) => {
+          L.DomEvent.stopPropagation(e);
           setSelectedJob(job);
         });
       
       markers.push(marker);
+    });
+
+    // Close card on map background click
+    map.on('click', () => {
+      setSelectedJob(null);
     });
 
     // Fit bounds if there are markers
