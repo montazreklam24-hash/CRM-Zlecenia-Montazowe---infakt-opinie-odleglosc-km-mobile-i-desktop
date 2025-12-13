@@ -58,20 +58,49 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
     }
   }, [refreshTrigger, loadJobs]);
 
-  // Navigation
+  // Navigation with History API support
   const handleOpenJob = (job: Job) => {
     setSelectedJob(job);
     setView('JOB_DETAIL');
-  };
-
-  const handleBack = () => {
-    setView('DASHBOARD');
-    setSelectedJob(null);
+    // Add entry to history stack
+    window.history.pushState({ view: 'JOB_DETAIL', jobId: job.id }, '');
   };
 
   const handleOpenMap = () => {
     setView('MAP');
+    window.history.pushState({ view: 'MAP' }, '');
   };
+
+  const handleBack = () => {
+    // If we have history state, go back
+    if (window.history.state) {
+      window.history.back();
+    } else {
+      // Fallback if accessed directly (though unlikely in this SPA flow)
+      setView('DASHBOARD');
+      setSelectedJob(null);
+    }
+  };
+
+  // Handle browser back button
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state?.view === 'JOB_DETAIL') {
+        // If navigating forward to job detail (rare but possible)
+        // We need to find the job from state if possible, or just stay
+        setView('JOB_DETAIL');
+      } else if (event.state?.view === 'MAP') {
+        setView('MAP');
+      } else {
+        // Back to root/dashboard
+        setView('DASHBOARD');
+        setSelectedJob(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Job Actions - PRZEPISANE OD NOWA z poprawną logiką
   const handleMoveUp = useCallback(async (jobId: string) => {

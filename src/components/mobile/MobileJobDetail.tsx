@@ -6,6 +6,7 @@ import {
   Building2, Mail, Calendar, DollarSign, CheckCircle2, AlertCircle,
   Camera, Send, Upload, ImagePlus, ZoomIn, ZoomOut
 } from 'lucide-react';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { jobsService } from '../../services/apiService';
 
 // Payment status helpers
@@ -91,10 +92,6 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
   const [completionError, setCompletionError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);       // Kamera
   const galleryInputRef = useRef<HTMLInputElement>(null);    // Galeria
-  
-  // Zoom state for lightbox
-  const [imageScale, setImageScale] = useState(1);
-  const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
   
   // Edit state
   const [editData, setEditData] = useState({
@@ -214,26 +211,9 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
   // Reset zoom when changing image
   const handleImageChange = (idx: number) => {
     setCurrentImageIndex(idx);
-    setImageScale(1);
-    setImagePosition({ x: 0, y: 0 });
   };
   
-  // Zoom handlers for lightbox
-  const handleZoomIn = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setImageScale(prev => Math.min(prev + 0.5, 4));
-  };
-  
-  const handleZoomOut = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setImageScale(prev => Math.max(prev - 0.5, 1));
-    if (imageScale <= 1.5) setImagePosition({ x: 0, y: 0 });
-  };
-  
-  const handleResetZoom = () => {
-    setImageScale(1);
-    setImagePosition({ x: 0, y: 0 });
-  };
+  // Zoom handlers removed (replaced by react-zoom-pan-pinch)
 
   // Handle completion without email
   const handleCompleteWithoutEmail = async () => {
@@ -565,62 +545,50 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
             {currentImageIndex >= 0 && (
               <div 
                 className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
-                onClick={() => { setCurrentImageIndex(-1); handleResetZoom(); }}
+                onClick={() => setCurrentImageIndex(-1)}
               >
                 {/* Close button */}
                 <button 
                   className="absolute top-4 right-4 p-2 bg-white/20 rounded-full text-white z-10"
-                  onClick={() => { setCurrentImageIndex(-1); handleResetZoom(); }}
+                  onClick={() => setCurrentImageIndex(-1)}
                 >
                   <X className="w-6 h-6" />
                 </button>
                 
-                {/* Zoom controls */}
-                <div className="absolute top-4 left-4 flex gap-2 z-10">
-                  <button 
-                    onClick={handleZoomOut}
-                    disabled={imageScale <= 1}
-                    className="p-2 bg-white/20 rounded-full text-white disabled:opacity-30"
-                  >
-                    <ZoomOut className="w-6 h-6" />
-                  </button>
-                  <button 
-                    onClick={handleZoomIn}
-                    disabled={imageScale >= 4}
-                    className="p-2 bg-white/20 rounded-full text-white disabled:opacity-30"
-                  >
-                    <ZoomIn className="w-6 h-6" />
-                  </button>
-                  {imageScale > 1 && (
-                    <span className="px-3 py-2 bg-white/20 rounded-full text-white text-sm font-medium">
-                      {Math.round(imageScale * 100)}%
-                    </span>
-                  )}
-                </div>
-                
                 {/* Image container with pinch-zoom support */}
                 <div 
                   className="w-full h-full flex items-center justify-center overflow-hidden"
-                  style={{ touchAction: 'manipulation' }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <img 
-                    src={images[currentImageIndex]} 
-                    alt="Powiększone zdjęcie"
-                    className="max-w-full max-h-full object-contain transition-transform duration-200"
-                    style={{ 
-                      transform: `scale(${imageScale}) translate(${imagePosition.x}px, ${imagePosition.y}px)`,
-                      touchAction: 'pinch-zoom'
-                    }}
-                    onDoubleClick={(e) => {
-                      e.stopPropagation();
-                      if (imageScale > 1) {
-                        handleResetZoom();
-                      } else {
-                        setImageScale(2);
-                      }
-                    }}
-                  />
+                  <TransformWrapper
+                    initialScale={1}
+                    minScale={1}
+                    maxScale={4}
+                    centerOnInit={true}
+                  >
+                    {({ zoomIn, zoomOut, resetTransform }) => (
+                      <React.Fragment>
+                        <div className="absolute top-4 left-4 flex gap-2 z-10">
+                          <button onClick={() => zoomOut()} className="p-2 bg-white/20 rounded-full text-white">
+                            <ZoomOut className="w-6 h-6" />
+                          </button>
+                          <button onClick={() => zoomIn()} className="p-2 bg-white/20 rounded-full text-white">
+                            <ZoomIn className="w-6 h-6" />
+                          </button>
+                        </div>
+                        <TransformComponent
+                          wrapperStyle={{ width: "100%", height: "100%" }}
+                          contentStyle={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        >
+                          <img 
+                            src={images[currentImageIndex]} 
+                            alt="Powiększone zdjęcie"
+                            className="max-w-full max-h-full object-contain"
+                          />
+                        </TransformComponent>
+                      </React.Fragment>
+                    )}
+                  </TransformWrapper>
                 </div>
                 
                 {/* Navigation dots */}
@@ -629,7 +597,7 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
                     {images.map((_, idx) => (
                       <button
                         key={idx}
-                        onClick={(e) => { e.stopPropagation(); handleImageChange(idx); }}
+                        onClick={(e) => { e.stopPropagation(); setCurrentImageIndex(idx); }}
                         className={`w-3 h-3 rounded-full transition-all ${
                           idx === currentImageIndex ? 'bg-white scale-125' : 'bg-white/50'
                         }`}
@@ -639,8 +607,8 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
                 )}
                 
                 {/* Hint */}
-                <div className="absolute bottom-16 left-0 right-0 text-center text-white/50 text-xs">
-                  Dotknij 2x aby powiększyć • Użyj przycisków +/- do zoomu
+                <div className="absolute bottom-16 left-0 right-0 text-center text-white/50 text-xs pointer-events-none">
+                  Możesz przybliżać palcami (pinch-to-zoom)
                 </div>
               </div>
             )}
