@@ -64,6 +64,7 @@ interface DashboardProps {
   onCreateNew: () => void;
   onCreateNewSimple?: () => void;
   initialTab?: 'ACTIVE' | 'ARCHIVED';
+  refreshTrigger?: number; // Trigger do odświeżania listy zleceń
 }
 
 // 7 kolumn: PRZYGOTOWANIE, PN-PT, WYKONANE (bez weekendu)
@@ -931,7 +932,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
   );
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, onCreateNewSimple, initialTab }) => {
+const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, onCreateNewSimple, initialTab, refreshTrigger }) => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'ACTIVE' | 'ARCHIVED'>('ACTIVE');
@@ -1046,6 +1047,13 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   useEffect(() => {
     loadJobs();
   }, []);
+
+  // Odśwież listę zleceń gdy refreshTrigger się zmienia
+  useEffect(() => {
+    if (refreshTrigger !== undefined) {
+      loadJobs();
+    }
+  }, [refreshTrigger]);
 
   const loadJobs = async (silent = false) => {
     if (!silent) setLoading(true);

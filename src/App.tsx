@@ -48,6 +48,7 @@ const App: React.FC = () => {
 
   const [appLogo, setAppLogo] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false); // Start as false - no loading screen
+  const [dashboardRefreshTrigger, setDashboardRefreshTrigger] = useState(0); // Trigger do odświeżania Dashboard
 
   // Mobile detection
   const { isMobile, isTablet, isTouchDevice } = useDeviceType();
@@ -69,6 +70,8 @@ const App: React.FC = () => {
       selectedImages: []
       // returnToArchive zostaje zachowane z poprzedniego stanu
     }));
+    // Odśwież Dashboard gdy wracamy do niego (np. po utworzeniu zlecenia)
+    setDashboardRefreshTrigger(prev => prev + 1);
   };
 
   const handleLogin = (user: User) => {
@@ -105,6 +108,8 @@ const App: React.FC = () => {
           body: JSON.stringify(jobData)
         });
       }
+      // Odśwież Dashboard po utworzeniu/aktualizacji zlecenia
+      setDashboardRefreshTrigger(prev => prev + 1);
       goToDashboard();
     } catch (error) {
       console.error('Error saving simple job:', error);
@@ -379,6 +384,7 @@ const App: React.FC = () => {
             onCreateNew={handleStartCreate}
             onCreateNewSimple={handleStartCreateSimple}
             initialTab={state.returnToArchive ? 'ARCHIVED' : 'ACTIVE'}
+            refreshTrigger={dashboardRefreshTrigger}
           />
         )}
 
