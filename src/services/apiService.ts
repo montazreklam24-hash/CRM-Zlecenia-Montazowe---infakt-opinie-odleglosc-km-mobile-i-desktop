@@ -303,8 +303,19 @@ export const jobsService = {
       return job;
     }
     
-    const response = await apiRequest<{ success: boolean; job: Job }>(`/jobs/${id}`);
-    return response.job;
+    // Spróbuj najpierw z jobs_ai, potem z jobs_simple
+    try {
+      const response = await apiRequest<{ success: boolean; job: Job }>(`/jobs/${id}`);
+      return response.job;
+    } catch (e) {
+      // Jeśli nie znaleziono w jobs_ai, spróbuj jobs_simple
+      try {
+        const response = await apiRequest<{ success: boolean; job: Job }>(`/jobs-simple/${id}`);
+        return response.job;
+      } catch (e2) {
+        throw new Error('Zlecenie nie istnieje');
+      }
+    }
   },
   
   async createJob(
@@ -368,7 +379,7 @@ export const jobsService = {
     return response.job;
   },
   
-  async updateJobColumn(id: string, columnId: JobColumnId, orderIndex?: number): Promise<void> {
+  async updateJobColumn(id: string, columnId: JobColumnId, orderIndex?: number, jobType?: 'ai' | 'simple'): Promise<void> {
     if (DEMO_MODE) {
       const job = DEMO_JOBS.find(j => j.id === id);
       if (job) {
@@ -383,18 +394,31 @@ export const jobsService = {
       return;
     }
     
+    // Jeśli typ nie jest podany, spróbuj pobrać zlecenie aby sprawdzić typ
+    let type = jobType;
+    if (!type) {
+      try {
+        const job = await this.getJob(id);
+        type = job.type || 'ai';
+      } catch (e) {
+        // Fallback: użyj 'ai' jeśli nie można pobrać zlecenia
+        type = 'ai';
+      }
+    }
+    
     const body: any = { columnId };
     if (orderIndex !== undefined) {
       body.columnOrder = orderIndex; // Backend oczekuje columnOrder, nie order
     }
     
-    await apiRequest(`/jobs/${id}`, {
+    const endpoint = type === 'simple' ? `/jobs-simple/${id}` : `/jobs/${id}`;
+    await apiRequest(endpoint, {
       method: 'PUT',
       body: JSON.stringify(body),
     });
   },
 
-  async updateJobPosition(id: string, columnId: JobColumnId, order: number): Promise<void> {
+  async updateJobPosition(id: string, columnId: JobColumnId, order: number, jobType?: 'ai' | 'simple'): Promise<void> {
     if (DEMO_MODE) {
       const job = DEMO_JOBS.find(j => j.id === id);
       if (job) {
@@ -407,7 +431,20 @@ export const jobsService = {
       return;
     }
     
-    await apiRequest(`/jobs/${id}`, {
+    // Jeśli typ nie jest podany, spróbuj pobrać zlecenie aby sprawdzić typ
+    let type = jobType;
+    if (!type) {
+      try {
+        const job = await this.getJob(id);
+        type = job.type || 'ai';
+      } catch (e) {
+        // Fallback: użyj 'ai' jeśli nie można pobrać zlecenia
+        type = 'ai';
+      }
+    }
+    
+    const endpoint = type === 'simple' ? `/jobs-simple/${id}` : `/jobs/${id}`;
+    await apiRequest(endpoint, {
       method: 'PUT',
       body: JSON.stringify({ columnId, columnOrder: order }), // Backend oczekuje columnOrder
     });

@@ -114,3 +114,5 @@ if ($action === 'fix' && ($result['summary']['ai_duplicates'] > 0 || $result['su
 header('Content-Type: application/json');
 echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
+
+

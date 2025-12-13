@@ -997,13 +997,14 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             const bestMatch = data.results[0];
             
             // Aktualizuj w bazie
+            const jobType = job.type || 'ai';
             await jobsService.updateJob(job.id, {
               data: {
                 ...job.data,
                 address: bestMatch.formattedAddress,
                 coordinates: bestMatch.coordinates
               }
-            });
+            }, jobType);
             
             fixedCount++;
             console.log(`✅ Auto-Heal: Naprawiono ${job.friendlyId} (${bestMatch.formattedAddress})`);
@@ -1109,7 +1110,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const jobName = job?.data.jobTitle || job?.friendlyId || 'to zlecenie';
     if (window.confirm(`📦 Czy na pewno chcesz zarchiwizować zlecenie?\n\n"${jobName}"`)) {
       try {
-        await jobsService.updateJob(id, { status: JobStatus.ARCHIVED });
+        const jobType = job?.type || 'ai';
+        await jobsService.updateJob(id, { status: JobStatus.ARCHIVED }, jobType);
         loadJobs();
         console.log('✅ Zlecenie zarchiwizowane:', id);
       } catch (err) {
@@ -1136,9 +1138,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     
     const currentlySent = !!job.reviewRequestSentAt;
     const newStatus = currentlySent ? undefined : Date.now();
+    const jobType = job.type || 'ai';
     
     try {
-      await jobsService.updateJob(jobId, { reviewRequestSentAt: newStatus });
+      await jobsService.updateJob(jobId, { reviewRequestSentAt: newStatus }, jobType);
       loadJobs();
     } catch (err) {
       console.error('Błąd zmiany statusu opinii:', err);
@@ -1173,8 +1176,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     
     // Save to backend
     try {
-      await jobsService.updateJobColumn(jobId, columnId, aboveOrder);
-      await jobsService.updateJobColumn(jobAbove.id, columnId, currentOrder);
+      const jobType = job.type || 'ai';
+      const jobAboveType = jobAbove.type || 'ai';
+      await jobsService.updateJobColumn(jobId, columnId, aboveOrder, jobType);
+      await jobsService.updateJobColumn(jobAbove.id, columnId, currentOrder, jobAboveType);
     } catch (err) {
       console.error('Failed to save order:', err);
       loadJobs(); // Reload on error
@@ -1208,8 +1213,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     
     // Save to backend
     try {
-      await jobsService.updateJobColumn(jobId, columnId, belowOrder);
-      await jobsService.updateJobColumn(jobBelow.id, columnId, currentOrder);
+      const jobType = job.type || 'ai';
+      const jobBelowType = jobBelow.type || 'ai';
+      await jobsService.updateJobColumn(jobId, columnId, belowOrder, jobType);
+      await jobsService.updateJobColumn(jobBelow.id, columnId, currentOrder, jobBelowType);
     } catch (err) {
       console.error('Failed to save order:', err);
       loadJobs(); // Reload on error
@@ -1269,7 +1276,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     
     // Save to backend
     try {
-      await jobsService.updateJobColumn(jobId, newColumnId);
+      const jobType = job.type || 'ai';
+      await jobsService.updateJobColumn(jobId, newColumnId, undefined, jobType);
     } catch (err) {
       console.error('Failed to move left:', err);
       loadJobs();
@@ -1294,7 +1302,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     
     // Save to backend
     try {
-      await jobsService.updateJobColumn(jobId, newColumnId);
+      const jobType = job.type || 'ai';
+      await jobsService.updateJobColumn(jobId, newColumnId, undefined, jobType);
     } catch (err) {
       console.error('Failed to move right:', err);
       loadJobs();
@@ -1352,7 +1361,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     
     // Zapisz do backendu z prawidłowym order
     try {
-      await jobsService.updateJobColumn(jobId, targetColumnId, maxOrder);
+      const jobType = job.type || 'ai';
+      await jobsService.updateJobColumn(jobId, targetColumnId, maxOrder, jobType);
       console.log('✅ handleMoveToColumn: zapisano pomyślnie');
     } catch (err) {
       console.error('❌ Failed to move job to column:', err);
@@ -1553,7 +1563,9 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
         return updated;
       });
       
-      await jobsService.updateJobPosition(draggedId, targetColumn, orderMap.get(draggedId) || 0);
+      const draggedJob = jobs.find(j => j.id === draggedId);
+      const jobType = draggedJob?.type || 'ai';
+      await jobsService.updateJobPosition(draggedId, targetColumn, orderMap.get(draggedId) || 0, jobType);
       console.log('✅ Reorder complete');
     } else {
       // Moving to different column
@@ -1574,7 +1586,9 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       });
       
       setJobs(updatedJobs);
-      await jobsService.updateJobPosition(draggedId, targetColumn, newOrder);
+      const draggedJob = jobs.find(j => j.id === draggedId);
+      const jobType = draggedJob?.type || 'ai';
+      await jobsService.updateJobPosition(draggedId, targetColumn, newOrder, jobType);
     }
   };
 
@@ -1994,8 +2008,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                     onSelectJob={onSelectJob} 
                     onJobsUpdated={loadJobs}
                     onChangeColumn={async (jobId, newColumnId) => {
+                      const job = jobs.find(j => j.id === jobId);
+                      const jobType = job?.type || 'ai';
                       setJobs(prev => prev.map(j => j.id === jobId ? { ...j, columnId: newColumnId } : j));
-                      await jobsService.updateJobColumn(jobId, newColumnId);
+                      await jobsService.updateJobColumn(jobId, newColumnId, undefined, jobType);
                     }}
                   />
                 ) : (

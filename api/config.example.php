@@ -47,3 +47,5 @@ define('BASE_ADDRESS', 'ul. Poprawna 39R, Warszawa');
 
 // ... (skopiuj resztę z oryginalnego config.php)
 
+
+
