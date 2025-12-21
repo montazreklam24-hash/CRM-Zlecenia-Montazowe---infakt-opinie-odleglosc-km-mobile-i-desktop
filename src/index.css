@@ -9,11 +9,11 @@
    THEME SYSTEM - 4 MOTYWY
    ============================================ */
 
-/* MOTYW 1: Glass Minimal (domy┼Ťlny) - styl Notion/Linear */
+/* MOTYW 1: Glass Minimal (domyślny) - styl Notion/Linear */
 :root, [data-theme="glass"] {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   
-  /* T┼éa - ZDJ─śCIE MIASTA Z BILLBOARDAMI */
+  /* Tła - ZDJĘCIE MIASTA Z BILLBOARDAMI */
   --bg-page: url('https://images.unsplash.com/photo-1534430480872-3498386e7856?w=1920&q=80') center/cover fixed;
   --bg-card: rgba(255, 255, 255, 0.55);
   --bg-card-hover: rgba(255, 255, 255, 0.7);
@@ -46,13 +46,13 @@
   --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.12);
   --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.06);
   
-  /* Zaokr─ůglenia - minimalne */
+  /* Zaokrąglenia - minimalne */
   --radius-sm: 2px;
   --radius-md: 3px;
   --radius-lg: 3px;
   --radius-xl: 4px;
   
-  /* Blur - mocny efekt szk┼éa */
+  /* Blur - mocny efekt szkła */
   --blur: blur(20px);
   
   /* Glass border */
@@ -234,6 +234,112 @@
   --column-done: #16a34a;
 }
 
+/* MOTYW 5: Bitrix Pro - profesjonalny, biznesowy */
+[data-theme="bitrix"] {
+  --bg-page: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 50%, #90CAF9 100%);
+  --bg-card: rgba(255, 255, 255, 0.85);
+  --bg-card-hover: rgba(255, 255, 255, 0.95);
+  --bg-surface: rgba(255, 255, 255, 0.6);
+  --bg-input: #ffffff;
+  --bg-header: rgba(255, 255, 255, 0.8);
+  
+  --text-primary: #263238;
+  --text-secondary: #546E7A;
+  --text-muted: #90A4AE;
+  --text-inverse: #ffffff;
+  
+  --accent-primary: #00AEEF;
+  --accent-primary-hover: #009BD6;
+  --accent-success: #7BD500;
+  --accent-warning: #FFD400;
+  --accent-danger: #FF5752;
+  --accent-orange: #FF9E0F;
+  
+  --border-light: rgba(38, 50, 56, 0.08);
+  --border-medium: rgba(38, 50, 56, 0.15);
+  --border-strong: rgba(38, 50, 56, 0.25);
+  
+  --shadow-sm: 0 1px 2px rgba(38, 50, 56, 0.05);
+  --shadow-md: 0 4px 8px rgba(38, 50, 56, 0.08);
+  --shadow-lg: 0 8px 24px rgba(38, 50, 56, 0.12);
+  --shadow-card: 0 2px 4px rgba(38, 50, 56, 0.06);
+  
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  
+  --blur: blur(12px);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.4);
+  
+  --scrollbar-bg: #ECEFF1;
+  --scrollbar-thumb: #CFD8DC;
+  --scrollbar-thumb-hover: #B0BEC5;
+  
+  --column-prepare: #78909C;
+  --column-mon: #FF5752;
+  --column-tue: #7BD500;
+  --column-wed: #AB47BC;
+  --column-thu: #FFD400;
+  --column-fri: #29B6F6;
+  --column-sat: #FF9E0F;
+  --column-sun: #8D6E63;
+  --column-done: #7BD500;
+}
+
+/* MOTYW 6: Trello Modern - nowoczesny, clean */
+[data-theme="trello-modern"] {
+  --bg-page: #F4F5F7;
+  --bg-card: #ffffff;
+  --bg-card-hover: #F4F5F7;
+  --bg-surface: #EBECF0;
+  --bg-input: #FAFBFC;
+  --bg-header: #ffffff;
+  
+  --text-primary: #172B4D;
+  --text-secondary: #5E6C84;
+  --text-muted: #6B778C;
+  --text-inverse: #ffffff;
+  
+  --accent-primary: #0079BF;
+  --accent-primary-hover: #026AA7;
+  --accent-success: #61BD4F;
+  --accent-warning: #F2D600;
+  --accent-danger: #EB5A46;
+  --accent-orange: #FF9F1A;
+  
+  --border-light: #DFE1E6;
+  --border-medium: #C1C7D0;
+  --border-strong: #A5ADBA;
+  
+  --shadow-sm: 0 1px 2px rgba(9, 30, 66, 0.08);
+  --shadow-md: 0 3px 5px rgba(9, 30, 66, 0.12);
+  --shadow-lg: 0 8px 16px -4px rgba(9, 30, 66, 0.18);
+  --shadow-card: 0 1px 1px rgba(9, 30, 66, 0.25), 0 0 1px rgba(9, 30, 66, 0.31);
+  
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  
+  --blur: none;
+  --glass-border: none;
+  
+  --scrollbar-bg: #DFE1E6;
+  --scrollbar-thumb: #C1C7D0;
+  --scrollbar-thumb-hover: #A5ADBA;
+  
+  --column-prepare: #5E6C84;
+  --column-mon: #EB5A46;
+  --column-tue: #61BD4F;
+  --column-wed: #C377E0;
+  --column-thu: #F2D600;
+  --column-fri: #0079BF;
+  --column-sat: #FF9F1A;
+  --column-sun: #FFAB4A;
+  --column-done: #61BD4F;
+}
+
 /* ============================================
    GLOBAL STYLES
    ============================================ */
@@ -248,7 +354,7 @@ body {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
-/* Glass theme - Warszawa Pa┼éac Kultury i Nauki */
+/* Glass theme - Warszawa Pałac Kultury i Nauki */
 :root body,
 [data-theme="glass"] body,
 body[data-theme="glass"] {
@@ -256,7 +362,7 @@ body[data-theme="glass"] {
   position: relative;
 }
 
-/* Przyciemnienie dla czytelno┼Ťci - delikatne 10-15% */
+/* Przyciemnienie dla czytelności - delikatne 10-15% */
 :root body::before,
 [data-theme="glass"] body::before,
 body[data-theme="glass"]::before {
@@ -307,6 +413,30 @@ body[data-theme="orange"] {
 
 [data-theme="orange"] body::before,
 body[data-theme="orange"]::before {
+  display: none;
+}
+
+/* Bitrix theme needs fixed background */
+[data-theme="bitrix"] body,
+body[data-theme="bitrix"] {
+  background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 50%, #90CAF9 100%);
+  background-attachment: fixed;
+}
+
+[data-theme="bitrix"] body::before,
+body[data-theme="bitrix"]::before {
+  display: none;
+}
+
+/* Trello Modern theme needs fixed background */
+[data-theme="trello-modern"] body,
+body[data-theme="trello-modern"] {
+  background: linear-gradient(180deg, #F5F7FA 0%, #E8ECF1 100%);
+  background-attachment: fixed;
+}
+
+[data-theme="trello-modern"] body::before,
+body[data-theme="trello-modern"]::before {
   display: none;
 }
 

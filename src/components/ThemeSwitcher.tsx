@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Palette, Check, Sun, Moon, Layout, Flame } from 'lucide-react';
 
-type ThemeId = 'glass' | 'dark' | 'trello' | 'orange';
+type ThemeId = 'glass' | 'dark' | 'trello' | 'orange' | 'bitrix' | 'trello-modern';
 
 interface Theme {
   id: ThemeId;
@@ -58,6 +58,28 @@ const themes: Theme[] = [
       bg: 'bg-gradient-to-br from-orange-500 to-orange-700',
       card: 'bg-white',
       accent: 'bg-orange-500'
+    }
+  },
+  {
+    id: 'bitrix',
+    name: 'Bitrix Pro',
+    description: 'Profesjonalny, biznesowy',
+    icon: <Layout className="w-4 h-4" />,
+    preview: {
+      bg: 'bg-gradient-to-br from-blue-100 to-blue-200',
+      card: 'bg-white/80',
+      accent: 'bg-blue-500'
+    }
+  },
+  {
+    id: 'trello-modern',
+    name: 'Trello Modern',
+    description: 'Kolorowy, energiczny',
+    icon: <Layout className="w-4 h-4" />,
+    preview: {
+      bg: 'bg-gradient-to-b from-slate-50 to-slate-100',
+      card: 'bg-white',
+      accent: 'bg-green-500'
     }
   }
 ];
