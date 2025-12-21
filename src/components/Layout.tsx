@@ -4,11 +4,18 @@ import Sidebar from './Sidebar';
 import ThemeSwitcher from './ThemeSwitcher';
 import { Menu, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useDeviceType } from '../hooks/useDeviceType';
+import { User, UserRole } from '../types';
 
 interface LayoutProps {
   onLogout?: () => void;
-  user?: { name?: string; email?: string };
+  user?: User;
 }
+
+const ROLE_NAMES: Record<UserRole, string> = {
+  [UserRole.ADMIN]: 'Administrator',
+  [UserRole.WORKER]: 'Montażysta',
+  [UserRole.PRINTER]: 'Drukarz'
+};
 
 const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -16,6 +23,9 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
   const { isMobile } = useDeviceType();
   const urlParams = new URLSearchParams(window.location.search);
   const [showUserMenu, setShowUserMenu] = useState(false);
+
+  const userRoleName = user?.role ? ROLE_NAMES[user.role] : 'Użytkownik';
+
 
   const handleViewToggle = (view: 'desktop' | 'mobile') => {
     if (view === 'mobile') {
@@ -109,9 +119,9 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
               }}
             >
               <span className="hidden md:inline">
-                ZALOGOWANO JAKO {user?.name || 'Administrator'} {user?.name || 'Admin'}
+                {userRoleName}
               </span>
-              <span className="md:hidden">Użytkownik</span>
+              <span className="md:hidden">{userRoleName}</span>
               {showUserMenu ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
 
@@ -125,15 +135,16 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
                 }}
               >
                 <div className="px-4 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{user?.name || 'Administrator'}</p>
-                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{user?.email || 'admin@montazreklam24.pl'}</p>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{user?.name || 'Użytkownik'}</p>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{user?.email || ''}</p>
                 </div>
                 <button
                   onClick={() => {
                     setShowUserMenu(false);
                     if (onLogout) onLogout();
                   }}
-                  className="w-full text-left px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 transition-colors"
+                  className="w-full text-left px-4 py-2 text-sm transition-colors"
+                  style={{ color: 'var(--accent-danger)' }}
                 >
                   Wyloguj
                 </button>
