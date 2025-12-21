@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Job } from '../types';
+import { getJobThumbnailUrl } from '../utils/imageUtils';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -104,7 +105,7 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob }) => {
       const marker = L.marker([lat, lng], { icon: svgIcon });
 
       // Card Style Popup
-      const imgUrl = job.projectImages?.[0];
+      const imgUrl = getJobThumbnailUrl(job.projectImages?.[0]);
       const imgHtml = imgUrl 
         ? `<div style="width:100%;aspect-ratio:1/1;background-image:url('${imgUrl}');background-size:cover;background-position:center;border-radius:8px;margin-bottom:8px;border:1px solid #e2e8f0;"></div>`
         : `<div style="width:100%;aspect-ratio:1/1;background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#94a3b8;border-radius:8px;margin-bottom:8px;border:1px solid #e2e8f0;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></div>`;

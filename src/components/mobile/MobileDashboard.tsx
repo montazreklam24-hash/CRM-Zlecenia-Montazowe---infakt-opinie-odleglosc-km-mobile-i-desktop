@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Job, JobColumnId, JobStatus, PaymentStatus } from '../../types';
+import { getJobThumbnailUrl } from '../../utils/imageUtils';
 import { 
   Plus, ChevronUp, ChevronDown, Navigation, Phone,
   MoreVertical, Trash2, Copy, Archive, Package, Map, Layers, Search, Monitor
@@ -678,7 +679,7 @@ const MobileJobCardCompact: React.FC<MobileJobCardCompactProps> = ({
         {/* Left: Thumbnail */}
         <div className="w-16 h-16 flex-shrink-0 bg-slate-100 relative cursor-pointer overflow-hidden">
           {job.projectImages?.[0] ? (
-            <img src={job.projectImages[0]} loading="lazy" className="w-full h-full object-cover" alt="" />
+            <img src={getJobThumbnailUrl(job.projectImages[0])} loading="lazy" className="w-full h-full object-cover" alt="" />
           ) : (
             <JobPlaceholder job={job} size="small" />
           )}

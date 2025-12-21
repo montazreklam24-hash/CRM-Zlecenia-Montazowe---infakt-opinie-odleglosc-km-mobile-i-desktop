@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Job, JobColumnId, PaymentStatus } from '../../types';
+import { getJobThumbnailUrl } from '../../utils/imageUtils';
 import { 
   MapPin, Phone, ChevronUp, ChevronDown, 
   MoreVertical, Trash2, Copy, Archive, Navigation
@@ -141,8 +142,8 @@ const MobileJobCard: React.FC<MobileJobCardProps> = ({
         >
           {job.projectImages?.[0] ? (
             <img 
-              src={job.projectImages[0]} 
-              loading="lazy"
+              src={getJobThumbnailUrl(job.projectImages[0])} 
+              loading="lazy" 
               className="w-full h-full object-cover" 
               alt="" 
             />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Job, JobAttachment, JobStatus } from '../types';
-import { processImageFile } from '../utils/imageUtils';
+import { processImageFile, isImageFile, getJobThumbnailUrl, getFileExtension } from '../utils/imageUtils';
 
 declare global {
   interface Window {
@@ -203,13 +203,6 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
     }
   };
   
-  const isPdf = (url: string) => {
-    if (!url) return false;
-    return url.startsWith('data:application/pdf') || 
-           url.toLowerCase().endsWith('.pdf') || 
-           url.toLowerCase().includes('.pdf?');
-  };
-
   const handleSave = async () => {
     if (isSaving) return;
     setIsSaving(true);
@@ -513,29 +506,35 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
               Zdjęcia (Ctrl+V lub kliknij)
             </label>
             <div className="flex flex-wrap gap-3">
-              {projectImages.map((img, idx) => (
-                <div key={idx} className="relative group">
-                  {isPdf(img) ? (
-                    <div className="w-24 h-24 flex flex-col items-center justify-center bg-slate-100 rounded-lg border-2 border-slate-200 text-slate-400">
-                      <span className="text-2xl">📄</span>
-                      <span className="text-[10px] font-bold">PDF</span>
-                    </div>
-                  ) : (
-                    <img
-                      src={img}
-                      alt={`Zdjęcie ${idx + 1}`}
-                      className="w-24 h-24 object-cover rounded-lg border-2 border-slate-200"
-                      loading="lazy"
-                    />
-                  )}
-                  <button
-                    onClick={() => setProjectImages(prev => prev.filter((_, i) => i !== idx))}
-                    className="absolute -top-2 -right-2 w-6 h-6 bg-orange-500 text-white rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
+              {projectImages.map((img, idx) => {
+                const isImg = isImageFile(img);
+                const thumbUrl = getJobThumbnailUrl(img);
+                const ext = getFileExtension(img);
+
+                return (
+                  <div key={idx} className="relative group">
+                    {!isImg && thumbUrl === img ? (
+                      <div className="w-24 h-24 flex flex-col items-center justify-center bg-slate-100 rounded-lg border-2 border-slate-200 text-slate-400">
+                        <span className="text-2xl">📄</span>
+                        <span className="text-[10px] font-bold uppercase">{ext || 'PLIK'}</span>
+                      </div>
+                    ) : (
+                      <img
+                        src={thumbUrl}
+                        alt={`Zdjęcie ${idx + 1}`}
+                        className="w-24 h-24 object-cover rounded-lg border-2 border-slate-200"
+                        loading="lazy"
+                      />
+                    )}
+                    <button
+                      onClick={() => setProjectImages(prev => prev.filter((_, i) => i !== idx))}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-orange-500 text-white rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })}
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center hover:border-green-400 hover:bg-green-50 transition-colors"

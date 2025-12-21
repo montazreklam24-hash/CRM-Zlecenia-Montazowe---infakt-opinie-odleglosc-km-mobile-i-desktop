@@ -214,3 +214,38 @@ export function rotateImage90(base64: string): Promise<string> {
   });
 }
 
+/**
+ * Zwraca rozszerzenie pliku z URL lub ścieżki
+ */
+export function getFileExtension(url: string | undefined): string {
+  if (!url) return '';
+  const parts = url.split('.');
+  if (parts.length <= 1) return '';
+  const ext = parts.pop()?.toLowerCase() || '';
+  // Usuń query params jeśli są
+  return ext.split('?')[0];
+}
+
+/**
+ * Sprawdza czy plik pod adresem URL jest obrazem obsługiwanym bezpośrednio przez przeglądarkę
+ */
+export function isImageFile(url: string | undefined): boolean {
+  const ext = getFileExtension(url);
+  return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
+}
+
+/**
+ * Zwraca URL podglądu dla pliku (oryginał dla obrazów, .jpg dla PDF/EPS)
+ */
+export function getJobThumbnailUrl(url: string | undefined): string {
+  if (!url) return '';
+  if (isImageFile(url)) return url;
+  
+  const ext = getFileExtension(url);
+  if (['pdf', 'eps', 'ai', 'psd'].includes(ext)) {
+    return `${url}.jpg`;
+  }
+  
+  return url;
+}
+

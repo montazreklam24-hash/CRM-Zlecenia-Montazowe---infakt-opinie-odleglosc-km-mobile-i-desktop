@@ -13,6 +13,7 @@ import MapBoardOSM from './MapBoardOSM';
 import PaymentStatusBadge, { PaymentStatusBar, PaymentStatusIcon, PaymentStatusMiniMenu } from './PaymentStatusBadge';
 import JobContextMenu from './JobContextMenu';
 import JobPlaceholder from './JobPlaceholder';
+import { getJobThumbnailUrl } from '../utils/imageUtils';
 
 import {
   DndContext,
@@ -414,7 +415,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
         {/* Image */}
         <div className="aspect-square relative overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
           {job.projectImages?.[0] ? (
-            <img src={job.projectImages[0]} className="w-full h-full object-cover pointer-events-none" alt="preview" loading="lazy" />
+            <img src={getJobThumbnailUrl(job.projectImages[0])} className="w-full h-full object-cover pointer-events-none" alt="preview" loading="lazy" />
           ) : (
             <JobPlaceholder job={job} size="medium" />
           )}
@@ -807,7 +808,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
         {/* Thumbnail */}
         <div className="aspect-square relative overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
           {job.projectImages?.[0] ? (
-            <img src={job.projectImages[0]} className="w-full h-full object-cover pointer-events-none" alt="" loading="lazy" />
+            <img src={getJobThumbnailUrl(job.projectImages[0])} className="w-full h-full object-cover pointer-events-none" alt="" loading="lazy" />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center p-2" style={{ 
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -2170,7 +2171,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                 <div className="theme-card shadow-2xl rotate-2 opacity-95 p-2" style={{ width: '120px' }}>
                   <div className="aspect-square rounded overflow-hidden mb-2" style={{ background: 'var(--bg-surface)' }}>
                     {activeJob.projectImages?.[0] ? (
-                      <img src={activeJob.projectImages[0]} className="w-full h-full object-cover" alt="" loading="lazy" />
+                      <img src={getJobThumbnailUrl(activeJob.projectImages[0])} className="w-full h-full object-cover" alt="" loading="lazy" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Box className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
@@ -2257,7 +2258,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                 <div className="theme-card w-40 shadow-2xl rotate-2 opacity-95">
                   <div className="aspect-square relative overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
                     {activeJob.projectImages?.[0] ? (
-                      <img src={activeJob.projectImages[0]} className="w-full h-full object-cover" alt="" loading="lazy" />
+                      <img src={getJobThumbnailUrl(activeJob.projectImages[0])} className="w-full h-full object-cover" alt="" loading="lazy" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Box className="w-10 h-10" style={{ color: 'var(--text-muted)' }} />
@@ -2404,7 +2405,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                 <div className="theme-card shadow-2xl rotate-2 opacity-95 p-2" style={{ width: '120px' }}>
                   <div className="aspect-square rounded overflow-hidden mb-2" style={{ background: 'var(--bg-surface)' }}>
                     {activeJob.projectImages?.[0] ? (
-                      <img src={activeJob.projectImages[0]} className="w-full h-full object-cover" alt="" loading="lazy" />
+                      <img src={getJobThumbnailUrl(activeJob.projectImages[0])} className="w-full h-full object-cover" alt="" loading="lazy" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Box className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />

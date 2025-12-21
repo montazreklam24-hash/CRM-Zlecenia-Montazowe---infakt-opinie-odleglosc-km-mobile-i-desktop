@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { Job, JobColumnId } from '../types';
+import { getJobThumbnailUrl } from '../utils/imageUtils';
 import { Locate, Loader2 } from 'lucide-react';
 
 interface MapBoardProps {
@@ -142,7 +143,7 @@ const SmartPopup = ({ job, position, onClose, onSelect, mapContainer }: { job: J
 
   const color = COLUMN_COLORS[job.columnId || 'PREPARE'] || '#475569';
   const colName = COLUMN_NAMES[job.columnId || 'PREPARE'];
-  const imgUrl = job.projectImages?.[0];
+  const imgUrl = getJobThumbnailUrl(job.projectImages?.[0]);
 
   return (
     <div 
