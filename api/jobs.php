@@ -1,7 +1,7 @@
 <?php
 /**
  * CRM Zlecenia Montażowe - CRUD Zleceń
- * Z obsługą obrazów (tabela job_images)
+ * Jednolita tabela: jobs_ai (jako 'jobs')
  */
 
 // DEBUG - pokaż błędy
@@ -45,12 +45,13 @@ function handleJobs($method, $id = null) {
 }
 
 /**
- * GET /api/jobs - Lista zleceń
+ * GET /api/jobs (dawniej jobs-all) - Lista wszystkich zleceń
  */
 function getJobs() {
     $user = requireAuth();
     $pdo = getDB();
     
+    // Pobieramy wszystko z jobs_ai (teraz jedyne źródło)
     $sql = "SELECT * FROM jobs_ai ORDER BY column_order ASC, created_at DESC";
     $stmt = $pdo->query($sql);
     $jobs = $stmt->fetchAll();
@@ -113,11 +114,10 @@ function createJob() {
             $title = 'Nowe zlecenie';
         }
         
-        // Generuj friendly ID (używamy funkcji z config.php)
+        // Generuj friendly ID (zawsze z jobs_ai)
         $friendlyId = generateFriendlyId('ai');
 
-        // SPRAWDZANIE DUPLIKATÓW (v2.1)
-        // 1. Sprawdź po Gmail Message ID (jeśli podano)
+        // SPRAWDZANIE DUPLIKATÓW
         $gmailMessageId = isset($data['gmailMessageId']) ? $data['gmailMessageId'] : null;
         $gmailThreadId = isset($data['gmailThreadId']) ? $data['gmailThreadId'] : null;
 
@@ -127,7 +127,7 @@ function createJob() {
             $existingJob = $stmt->fetch();
             
             if ($existingJob) {
-                // Zwracamy istniejące zlecenie zamiast tworzyć nowe
+                // Zwracamy istniejące zlecenie
                 $stmt = $pdo->prepare('SELECT * FROM jobs_ai WHERE id = ?');
                 $stmt->execute([$existingJob['id']]);
                 $job = $stmt->fetch();
@@ -170,34 +170,29 @@ function createJob() {
             }
         }
 
-        try {
-            $stmt->execute(array(
-                $friendlyId,
-                $title,
-                isset($data['clientName']) ? $data['clientName'] : null,
-                $phone,
-                isset($data['email']) ? $data['email'] : null,
-                isset($data['nip']) ? $data['nip'] : null,
-                isset($data['address']) ? $data['address'] : null,
-                $coordLat,
-                $coordLng,
-                $description,
-                isset($input['adminNotes']) ? $input['adminNotes'] : null,
-                'NEW',
-                isset($input['columnId']) ? $input['columnId'] : 'PREPARE',
-                0,
-                $user['id'],
-                $gmailMessageId,
-                $gmailThreadId
-            ));
-        } catch (PDOException $e) {
-            logError("SQL Error in createJob: " . $e->getMessage());
-            throw $e;
-        }
+        $stmt->execute(array(
+            $friendlyId,
+            $title,
+            isset($data['clientName']) ? $data['clientName'] : null,
+            $phone,
+            isset($data['email']) ? $data['email'] : null,
+            isset($data['nip']) ? $data['nip'] : null,
+            isset($data['address']) ? $data['address'] : null,
+            $coordLat,
+            $coordLng,
+            $description,
+            isset($input['adminNotes']) ? $input['adminNotes'] : null,
+            'NEW',
+            isset($input['columnId']) ? $input['columnId'] : 'PREPARE',
+            0,
+            $user['id'],
+            $gmailMessageId,
+            $gmailThreadId
+        ));
         
         $jobId = $pdo->lastInsertId();
         
-        // Zapisz obrazy
+        // Zapisz obrazy (zawsze typ 'ai')
         if (isset($input['projectImages']) && is_array($input['projectImages'])) {
             saveJobImages($jobId, $input['projectImages'], 'project', 'ai');
         }
@@ -212,7 +207,7 @@ function createJob() {
         
         jsonResponse(array('success' => true, 'job' => mapJobToFrontend($job)), 201);
     } catch (Exception $e) {
-        error_log('Error creating AI job: ' . $e->getMessage());
+        error_log('Error creating job: ' . $e->getMessage());
         jsonResponse(array('error' => 'Database error: ' . $e->getMessage()), 500);
     }
 }
@@ -253,7 +248,6 @@ function updateJob($id) {
             'description' => 'description'
         );
         
-        // Pola z data
         foreach ($fieldMap as $frontendField => $dbField) {
             if (isset($data[$frontendField])) {
                 $updates[] = "$dbField = ?";
@@ -326,7 +320,7 @@ function updateJob($id) {
             $params[] = $input['completionNotes'];
         }
         
-        // Prośba o opinię - obsługuje też NULL (gdy chcemy wyczyścić)
+        // Prośba o opinię
         if (array_key_exists('reviewRequestSentAt', $input)) {
             $updates[] = "review_request_sent_at = ?";
             if ($input['reviewRequestSentAt'] === null || $input['reviewRequestSentAt'] === '') {
@@ -347,7 +341,7 @@ function updateJob($id) {
             $stmt->execute($params);
         }
         
-        // Aktualizuj obrazy (jeśli przesłane)
+        // Aktualizuj obrazy (zawsze typ 'ai')
         if (isset($input['projectImages']) && is_array($input['projectImages'])) {
             saveJobImages($id, $input['projectImages'], 'project', 'ai');
         }
@@ -362,7 +356,7 @@ function updateJob($id) {
         
         jsonResponse(array('success' => true, 'job' => mapJobToFrontend($job)));
     } catch (Exception $e) {
-        error_log('Error updating AI job: ' . $e->getMessage());
+        error_log('Error updating job: ' . $e->getMessage());
         jsonResponse(array('error' => 'Database error: ' . $e->getMessage()), 500);
     }
 }
@@ -380,13 +374,12 @@ function deleteJob($id) {
         jsonResponse(array('error' => 'Zlecenie nie istnieje'), 404);
     }
     
-    // Usuń pliki obrazów z dysku
+    // Usuń pliki obrazów z dysku (typ 'ai' domyślnie)
     $stmt = $pdo->prepare('SELECT file_path FROM job_images WHERE job_id = ? AND job_type = ?');
     $stmt->execute(array($id, 'ai'));
     $images = $stmt->fetchAll();
     foreach ($images as $img) {
         if (!empty($img['file_path'])) {
-            // UPLOADS_DIR z images.php
             $file = UPLOADS_DIR . '/' . basename($img['file_path']);
             if (file_exists($file)) {
                 @unlink($file);
@@ -419,10 +412,10 @@ function mapJobToFrontend($job) {
     $jobId = $job['id'];
     
     return array(
-        'id' => 'ai-' . strval($jobId),
-        'original_id' => strval($jobId), // Dla pewności zachowujemy oryginał
+        'id' => strval($jobId), // Czyste ID (bez prefiksu ai-)
+        'original_id' => strval($jobId),
         'friendlyId' => $job['friendly_id'],
-        'type' => 'ai',
+        'type' => 'ai', // Domyślny typ dla kompatybilności
         'createdAt' => strtotime($job['created_at']) * 1000,
         'status' => $job['status'] ? $job['status'] : 'NEW',
         'paymentStatus' => isset($job['payment_status']) ? $job['payment_status'] : 'none',
@@ -443,6 +436,7 @@ function mapJobToFrontend($job) {
                 'grossAmount' => $job['value_gross'] ? floatval($job['value_gross']) : null
             )
         ),
+        // Pobieramy obrazy typu 'ai'
         'projectImages' => getJobImages($jobId, 'project', 'ai'),
         'completionImages' => getJobImages($jobId, 'completion', 'ai'),
         'adminNotes' => $job['notes'],
@@ -454,44 +448,7 @@ function mapJobToFrontend($job) {
     );
 }
 
-/**
- * GET /api/jobs-all - Połączona lista zleceń AI + Simple
- */
+// Zastąpienie starego handleJobsAll (teraz alias dla getJobs)
 function handleJobsAll() {
-    $user = requireAuth();
-    $pdo = getDB();
-    
-    $result = array();
-    
-    // Pobierz zlecenia AI
-    try {
-        $stmt = $pdo->query("SELECT * FROM jobs_ai ORDER BY column_order ASC, created_at DESC");
-        $jobsAI = $stmt->fetchAll();
-        foreach ($jobsAI as $job) {
-            $mapped = mapJobToFrontend($job);
-            $mapped['type'] = 'ai';
-            $result[] = $mapped;
-        }
-    } catch (Exception $e) {
-        // Tabela nie istnieje
-    }
-    
-    // Pobierz zlecenia proste
-    try {
-        require_once __DIR__ . '/jobs_simple.php';
-        $stmt = $pdo->query("SELECT * FROM jobs_simple ORDER BY column_order ASC, created_at DESC");
-        $jobsSimple = $stmt->fetchAll();
-        foreach ($jobsSimple as $job) {
-            $mapped = mapJobSimpleToFrontend($job);
-            $result[] = $mapped;
-        }
-    } catch (Exception $e) {
-        // Tabela nie istnieje
-    }
-    
-    jsonResponse(array(
-        'success' => true,
-        'jobs' => $result,
-        'total' => count($result)
-    ));
+    getJobs();
 }

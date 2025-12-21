@@ -52,7 +52,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 pt-24 p-4 md:p-8 min-h-screen transition-all duration-300 w-full">
+      <main className="flex-1 pt-32 p-4 md:p-8 min-h-screen transition-all duration-300 w-full">
         <div className="max-w-7xl mx-auto">
            <Outlet />
         </div>
@@ -62,4 +62,5 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
 };
 
 export default Layout;
+
 

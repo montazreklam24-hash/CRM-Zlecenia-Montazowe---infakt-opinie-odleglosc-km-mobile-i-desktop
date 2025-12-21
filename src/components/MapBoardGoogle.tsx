@@ -160,6 +160,7 @@ const SmartPopup = ({ job, position, onClose, onSelect, mapSize }: { job: Job, p
           borderRight: placement === 'top' ? '1px solid #e2e8f0' : 'none',
           borderTop: placement === 'bottom' ? '1px solid #e2e8f0' : 'none',
           borderLeft: placement === 'bottom' ? '1px solid #e2e8f0' : 'none',
+          [placement === 'top' ? 'boxShadow' : 'boxShadow']: '2px 2px 2px rgba(0, 0, 0, 0.05)'
         }}
       />
     </div>
@@ -176,8 +177,30 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
   const [hoveredJob, setHoveredJob] = useState<Job | null>(null);
   const [popupPos, setPopupPos] = useState<{x: number, y: number} | null>(null);
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+  const [isApiLoaded, setIsApiLoaded] = useState(false);
 
   const [isLocating, setIsLocating] = useState(false);
+
+  // Sprawdzaj dostępność API
+  useEffect(() => {
+    const checkGoogle = () => {
+      if (window.google && window.google.maps && window.google.maps.Map) {
+        setIsApiLoaded(true);
+        return true;
+      }
+      return false;
+    };
+
+    if (checkGoogle()) return;
+
+    const interval = setInterval(() => {
+      if (checkGoogle()) {
+        clearInterval(interval);
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLocateMe = () => {
     if (!googleMapRef.current) return;
@@ -224,65 +247,69 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
 
   // Inicjalizacja mapy
   useEffect(() => {
-    if (!mapRef.current || !window.google) return;
+    if (!isApiLoaded || !mapRef.current) return;
 
     if (!googleMapRef.current) {
-      const mapOptions = {
-        center: { lat: 52.2297, lng: 21.0122 }, // Warszawa
-        zoom: 11,
-        mapId: 'DEMO_MAP_ID',
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: true,
-        clickableIcons: false,
-        scrollwheel: false, // Disabled by default, enabled only with Ctrl
-        gestureHandling: 'cooperative', // Shows message "Use Ctrl + scroll to zoom"
-      };
+      try {
+        const mapOptions = {
+          center: { lat: 52.2297, lng: 21.0122 }, // Warszawa
+          zoom: 11,
+          mapId: 'DEMO_MAP_ID',
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: true,
+          clickableIcons: false,
+          scrollwheel: false, // Disabled by default, enabled only with Ctrl
+          gestureHandling: 'cooperative', // Shows message "Use Ctrl + scroll to zoom"
+        };
 
-      googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
+        googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
 
-      // Fix Ctrl+Scroll behavior: Prevent browser page zoom so map can zoom
-      const mapDiv = mapRef.current;
-      const handleWheel = (e: WheelEvent) => {
-        if (e.ctrlKey) {
-          e.preventDefault(); // Stop browser zoom
-        }
-      };
-      
-      // Use passive: false to allow preventDefault
-      mapDiv.addEventListener('wheel', handleWheel, { passive: false });
+        // Fix Ctrl+Scroll behavior: Prevent browser page zoom so map can zoom
+        const mapDiv = mapRef.current;
+        const handleWheel = (e: WheelEvent) => {
+          if (e.ctrlKey) {
+            e.preventDefault(); // Stop browser zoom
+          }
+        };
+        
+        // Use passive: false to allow preventDefault
+        mapDiv.addEventListener('wheel', handleWheel, { passive: false });
 
-      // Inicjalizacja OverlayView do konwersji LatLng -> Pixel
-      const Overlay = new window.google.maps.OverlayView();
-      Overlay.onAdd = function() {};
-      Overlay.onRemove = function() {};
-      Overlay.draw = function() {};
-      Overlay.setMap(googleMapRef.current);
-      overlayRef.current = Overlay;
+        // Inicjalizacja OverlayView do konwersji LatLng -> Pixel
+        const Overlay = new window.google.maps.OverlayView();
+        Overlay.onAdd = function() {};
+        Overlay.onRemove = function() {};
+        Overlay.draw = function() {};
+        Overlay.setMap(googleMapRef.current);
+        overlayRef.current = Overlay;
 
-      // Obsługa zmiany rozmiaru mapy
-      const updateSize = () => {
-        if (mapRef.current) {
-          setMapSize({ 
-            width: mapRef.current.offsetWidth, 
-            height: mapRef.current.offsetHeight 
-          });
-        }
-      };
-      
-      updateSize();
-      window.addEventListener('resize', updateSize);
-      
-      // Nasłuchiwanie zmian bounds/zoomu żeby zamknąć popup lub go przesunąć (dla uproszczenia zamykamy)
-      googleMapRef.current.addListener('bounds_changed', () => {
-        setHoveredJob(null);
-      });
+        // Obsługa zmiany rozmiaru mapy
+        const updateSize = () => {
+          if (mapRef.current) {
+            setMapSize({ 
+              width: mapRef.current.offsetWidth, 
+              height: mapRef.current.offsetHeight 
+            });
+          }
+        };
+        
+        updateSize();
+        window.addEventListener('resize', updateSize);
+        
+        // Nasłuchiwanie zmian bounds/zoomu żeby zamknąć popup lub go przesunąć (dla uproszczenia zamykamy)
+        googleMapRef.current.addListener('bounds_changed', () => {
+          setHoveredJob(null);
+        });
+      } catch (error) {
+        console.error("Google Maps init error:", error);
+      }
     }
-  }, []);
+  }, [isApiLoaded]);
 
   // Aktualizacja pinezek
   useEffect(() => {
-    if (!googleMapRef.current || !jobs) return;
+    if (!googleMapRef.current || !jobs || !isApiLoaded) return;
 
     // Wyczyść stare pinezki
     markersRef.current.forEach(marker => marker.setMap(null));
@@ -355,7 +382,7 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
        googleMapRef.current.fitBounds(bounds);
     }
 
-  }, [jobs]);
+  }, [jobs, isApiLoaded]);
 
   return (
     <div className="w-full h-[500px] bg-slate-100 rounded-xl overflow-hidden shadow-inner relative border border-slate-200 isolate">
@@ -372,9 +399,12 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
         />
       )}
 
-      {!window.google && (
+      {!isApiLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-100/80 z-10">
-          <p className="text-slate-500">Ładowanie mapy Google...</p>
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+            <p className="text-slate-500 font-medium">Ładowanie mapy Google...</p>
+          </div>
         </div>
       )}
       
@@ -386,7 +416,7 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
       {/* Locate Me Button */}
       <button
         onClick={handleLocateMe}
-        disabled={isLocating}
+        disabled={isLocating || !isApiLoaded}
         className="absolute bottom-6 right-14 z-10 p-3 bg-white text-slate-700 rounded-lg shadow-md hover:bg-slate-50 active:bg-slate-100 disabled:opacity-70 transition-colors"
         title="Moja lokalizacja"
       >
