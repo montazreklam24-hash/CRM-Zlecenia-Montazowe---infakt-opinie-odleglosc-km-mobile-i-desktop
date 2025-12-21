@@ -133,7 +133,7 @@ function renderSidebar(state) {
                     ✨ Analizuj Maila (AI)
                 </button>
                 
-                <hr class="crm-divider" style="margin: 4px 0;">
+                <hr class="crm-divider" style="margin: 2px 0;">
                 
                 <div class="crm-field">
                     <label>Tytuł</label>
@@ -157,7 +157,7 @@ function renderSidebar(state) {
                 
                 <div class="crm-field">
                     <label>Zakres prac</label>
-                    <textarea id="crm-input-scope" rows="4"></textarea>
+                    <textarea id="crm-input-scope" rows="3"></textarea>
                 </div>
 
                 <!-- DRAG & DROP ZONE -->
@@ -170,7 +170,7 @@ function renderSidebar(state) {
                     <div id="crm-file-list" class="crm-file-list"></div>
                 </div>
                 
-                <button id="crm-send" class="crm-btn-success crm-full-width" style="margin-top:6px;">
+                <button id="crm-send" class="crm-btn-success crm-full-width" style="margin-top:4px;">
                     🚀 Wyślij do CRM
                 </button>
             </div>
