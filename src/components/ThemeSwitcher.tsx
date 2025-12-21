@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Palette, Check, Sun, Moon, Layout } from 'lucide-react';
+import { Palette, Check, Sun, Moon, Layout, Flame } from 'lucide-react';
 
-type ThemeId = 'glass' | 'dark' | 'trello';
+type ThemeId = 'glass' | 'dark' | 'trello' | 'orange';
 
 interface Theme {
   id: ThemeId;
@@ -47,6 +47,17 @@ const themes: Theme[] = [
       bg: 'bg-gradient-to-b from-[#0079bf] to-[#026aa7]',
       card: 'bg-white',
       accent: 'bg-[#61bd4f]'
+    }
+  },
+  {
+    id: 'orange',
+    name: 'Orange Modern',
+    description: 'Pomarańczowy, nowoczesny',
+    icon: <Flame className="w-4 h-4" />,
+    preview: {
+      bg: 'bg-gradient-to-br from-orange-500 to-orange-700',
+      card: 'bg-white',
+      accent: 'bg-orange-500'
     }
   }
 ];

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import ThemeSwitcher from './ThemeSwitcher';
 import { Menu, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useDeviceType } from '../hooks/useDeviceType';
 
@@ -82,13 +83,10 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
             </button>
           </div>
 
-          {/* Trello Classic Button */}
-          <button
-            onClick={() => window.open('https://trello.com', '_blank')}
-            className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition-colors"
-          >
-            Trello Classic
-          </button>
+          {/* Theme Switcher */}
+          <div className="hidden md:flex">
+            <ThemeSwitcher />
+          </div>
 
           {/* User Menu */}
           <div className="relative">

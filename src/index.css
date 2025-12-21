@@ -181,6 +181,59 @@
   --column-done: #61bd4f;
 }
 
+/* MOTYW 4: Orange Modern - pomarańczowy, nowoczesny */
+[data-theme="orange"] {
+  --bg-page: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
+  --bg-card: #ffffff;
+  --bg-card-hover: #fff7ed;
+  --bg-surface: rgba(255, 247, 237, 0.95);
+  --bg-input: #ffffff;
+  --bg-header: rgba(0, 0, 0, 0.2);
+  --glass-border: none;
+  
+  --text-primary: #1c1917;
+  --text-secondary: #78716c;
+  --text-muted: #a8a29e;
+  --text-inverse: #ffffff;
+  
+  --accent-primary: #f97316;
+  --accent-primary-hover: #ea580c;
+  --accent-success: #22c55e;
+  --accent-warning: #f59e0b;
+  --accent-danger: #ef4444;
+  --accent-orange: #f97316;
+  
+  --border-light: rgba(28, 25, 23, 0.08);
+  --border-medium: rgba(28, 25, 23, 0.13);
+  --border-strong: rgba(28, 25, 23, 0.2);
+  
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 16px -4px rgba(0, 0, 0, 0.15);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
+  
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+  
+  --blur: none;
+  
+  --scrollbar-bg: rgba(28, 25, 23, 0.08);
+  --scrollbar-thumb: rgba(28, 25, 23, 0.2);
+  --scrollbar-thumb-hover: rgba(28, 25, 23, 0.35);
+  
+  --column-prepare: #475569;
+  --column-mon: #f97316;
+  --column-tue: #ea580c;
+  --column-wed: #d97706;
+  --column-thu: #c2410c;
+  --column-fri: #f97316;
+  --column-sat: #ea580c;
+  --column-sun: #d97706;
+  --column-done: #16a34a;
+}
+
 /* ============================================
    GLOBAL STYLES
    ============================================ */
@@ -242,6 +295,18 @@ body[data-theme="trello"] {
 
 [data-theme="trello"] body::before,
 body[data-theme="trello"]::before {
+  display: none;
+}
+
+/* Orange theme needs fixed background */
+[data-theme="orange"] body,
+body[data-theme="orange"] {
+  background: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
+  background-attachment: fixed;
+}
+
+[data-theme="orange"] body::before,
+body[data-theme="orange"]::before {
   display: none;
 }
 
