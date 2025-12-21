@@ -24,7 +24,7 @@ define('DB_CHARSET', 'utf8mb4');
 // Gemini API Key (Google AI Studio)
 // https://aistudio.google.com/apikey
 define('GEMINI_API_KEY', 'YOUR_GEMINI_API_KEY_HERE');
-define('GEMINI_MODEL', 'gemini-2.0-flash');
+define('GEMINI_MODEL', 'gemini-1.5-flash');
 
 // Google Maps API Key
 // https://console.cloud.google.com/apis/credentials
@@ -46,6 +46,10 @@ define('MAX_UPLOAD_SIZE', 10 * 1024 * 1024);
 define('BASE_ADDRESS', 'ul. Poprawna 39R, Warszawa');
 
 // ... (skopiuj resztę z oryginalnego config.php)
+
+
+
+
 
 
 
