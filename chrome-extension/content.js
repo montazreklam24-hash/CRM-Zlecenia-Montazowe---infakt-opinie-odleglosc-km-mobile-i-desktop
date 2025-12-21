@@ -9,6 +9,8 @@ console.log('[CRM] Skrypt v5.3 załadowany!');
 let sidebar = null;
 let lastMessageId = null;
 let uploadedFiles = []; // Przechowuje ręcznie dodane pliki {name, data: base64}
+let gmailAttachments = []; // Lista załączników pobrana z Gmail API
+let selectedAttachmentIds = []; // ID wybranych załączników z Gmaila
 
 // --- FLOATING BUTTON ---
 
@@ -72,6 +74,8 @@ function openSidebar() {
     
     // Resetuj pliki przy otwarciu
     uploadedFiles = [];
+    gmailAttachments = [];
+    selectedAttachmentIds = [];
 }
 
 function createSidebar() {
@@ -156,6 +160,14 @@ function renderSidebar(state) {
                 </div>
 
                 <div class="crm-field">
+                    <label>NIP</label>
+                    <div style="display: flex; gap: 5px;">
+                        <input id="crm-input-nip" style="flex: 1;">
+                        <button id="crm-gus-btn" class="crm-btn-mini">GUS</button>
+                    </div>
+                </div>
+
+                <div class="crm-field">
                     <label>Adres</label>
                     <textarea id="crm-input-address" rows="2"></textarea>
                 </div>
@@ -174,12 +186,20 @@ function renderSidebar(state) {
                     </div>
                     <div id="crm-file-list" class="crm-file-list"></div>
                 </div>
+
+                <!-- GMAIL ATTACHMENTS SELECTION -->
+                <div id="crm-gmail-attachments-section" class="crm-field" style="display: none; margin-top: 10px;">
+                    <button id="crm-open-att-modal" class="crm-btn-secondary crm-full-width" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; font-size: 12px; padding: 8px;">
+                        📎 Wybierz załączniki (<span id="crm-att-count">0</span>)
+                    </button>
+                </div>
             </div>
         `;
         
         setupFormHandlers(content);
         setupDragDrop(content);
         renderFileList(); // Jeśli coś było wcześniej dodane
+        updateAttachmentsButton(); // Aktualizuj licznik na przycisku
     }
 }
 
@@ -307,6 +327,134 @@ function renderFileList() {
         item.appendChild(removeBtn);
         list.appendChild(item);
     });
+}
+
+function updateAttachmentsButton() {
+    const section = document.getElementById('crm-gmail-attachments-section');
+    const countSpan = document.getElementById('crm-att-count');
+    if (!section || !countSpan) return;
+
+    if (gmailAttachments.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    countSpan.innerText = selectedAttachmentIds.length;
+}
+
+function openAttachmentsModal() {
+    // Usuń stary modal jeśli istnieje
+    const existing = document.querySelector('.crm-modal-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'crm-modal-overlay';
+    
+    const modal = document.createElement('div');
+    modal.className = 'crm-modal';
+    
+    modal.innerHTML = `
+        <div class="crm-modal-header">
+            <h2>Wybierz załączniki z maila</h2>
+            <button class="crm-modal-close">&times;</button>
+        </div>
+        <div class="crm-modal-body">
+            <p style="font-size: 13px; color: #64748b; margin-bottom: 16px;">
+                Zaznacz pliki, które chcesz dodać do zlecenia. Odznacz logotypy ze stopek i inne zbędne grafiki.
+            </p>
+            
+            <div class="crm-modal-actions">
+                <button id="crm-att-select-all" class="crm-btn-text">Zaznacz wszystkie</button>
+                <span style="color: #cbd5e1;">|</span>
+                <button id="crm-att-select-none" class="crm-btn-text">Odznacz wszystkie</button>
+            </div>
+            
+            <div class="crm-att-grid">
+                <!-- Załączniki zostaną wyrenderowane tutaj -->
+            </div>
+        </div>
+        <div class="crm-modal-footer">
+            <button class="crm-btn-secondary crm-modal-cancel" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">Anuluj</button>
+            <button class="crm-btn-primary crm-modal-save">Zastosuj wybór</button>
+        </div>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    const grid = modal.querySelector('.crm-att-grid');
+    
+    function renderGrid() {
+        grid.innerHTML = '';
+        gmailAttachments.forEach(att => {
+            const isSelected = selectedAttachmentIds.includes(att.id);
+            const card = document.createElement('div');
+            card.className = `crm-att-card ${isSelected ? 'selected' : ''}`;
+            
+            const ext = att.name.split('.').pop().toLowerCase();
+            let icon = '📄';
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) icon = '🖼️';
+            if (ext === 'pdf') icon = '📕';
+            if (['doc', 'docx'].includes(ext)) icon = '📝';
+            if (['xls', 'xlsx'].includes(ext)) icon = '📊';
+
+            card.innerHTML = `
+                <div class="crm-att-icon">${icon}</div>
+                <div class="crm-att-info">
+                    <div class="crm-att-filename">${att.name}</div>
+                    <div class="crm-att-meta">${Math.round(att.size / 1024)} KB • ${att.mimeType} ${att.isInline ? '(inline)' : ''}</div>
+                </div>
+                <input type="checkbox" ${isSelected ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: #f97316;">
+            `;
+
+            card.onclick = () => {
+                const checkbox = card.querySelector('input');
+                checkbox.checked = !checkbox.checked;
+                toggleAttachment(att.id, checkbox.checked);
+                card.classList.toggle('selected', checkbox.checked);
+            };
+
+            // Zapobiegaj podwójnemu toggle przy kliknięciu bezpośrednio w checkbox
+            card.querySelector('input').onclick = (e) => {
+                e.stopPropagation();
+                toggleAttachment(att.id, e.target.checked);
+                card.classList.toggle('selected', e.target.checked);
+            };
+
+            grid.appendChild(card);
+        });
+    }
+
+    function toggleAttachment(id, selected) {
+        if (selected) {
+            if (!selectedAttachmentIds.includes(id)) selectedAttachmentIds.push(id);
+        } else {
+            selectedAttachmentIds = selectedAttachmentIds.filter(item => item !== id);
+        }
+    }
+
+    modal.querySelector('#crm-att-select-all').onclick = () => {
+        selectedAttachmentIds = gmailAttachments.map(a => a.id);
+        renderGrid();
+    };
+
+    modal.querySelector('#crm-att-select-none').onclick = () => {
+        selectedAttachmentIds = [];
+        renderGrid();
+    };
+
+    modal.querySelector('.crm-modal-close').onclick = 
+    modal.querySelector('.crm-modal-cancel').onclick = () => {
+        overlay.remove();
+    };
+
+    modal.querySelector('.crm-modal-save').onclick = () => {
+        updateAttachmentsButton();
+        overlay.remove();
+    };
+
+    renderGrid();
 }
 
 /**
@@ -437,12 +585,23 @@ async function getEmailImages() {
 }
 
 function setupFormHandlers(content) {
+    // PRZYCISK ZAŁĄCZNIKÓW
+    const attBtn = content.querySelector('#crm-open-att-modal');
+    if (attBtn) {
+        attBtn.onclick = () => openAttachmentsModal();
+    }
+
     // 1. ZACZYTAJ
     content.querySelector('#crm-read').onclick = async () => {
         const btn = content.querySelector('#crm-read');
         const originalText = btn.innerText;
         btn.innerText = '⏳ Analizuję...';
         btn.disabled = true;
+
+        // Resetuj załączniki przed nową analizą
+        gmailAttachments = [];
+        selectedAttachmentIds = [];
+        updateAttachmentsButton();
 
         try {
             const bodyText = document.body.innerText.substring(0, 15000); 
@@ -499,6 +658,30 @@ function setupFormHandlers(content) {
                 }
             });
             
+            // POBIERZ LISTĘ ZAŁĄCZNIKÓW DO WYBORU
+            if (messageId) {
+                console.log('[CRM Content] Fetching attachments list for:', messageId);
+                const attRes = await chrome.runtime.sendMessage({
+                    action: 'getGmailAttachments',
+                    messageId: messageId
+                });
+                
+                if (attRes.success && attRes.attachments) {
+                    gmailAttachments = attRes.attachments;
+                    // Domyślnie zaznacz te które nie są inline i mają min. 5KB (pomiń mikro-śmieci)
+                    selectedAttachmentIds = gmailAttachments
+                        .filter(a => !a.isInline && a.size > 5000) 
+                        .map(a => a.id);
+                        
+                    updateAttachmentsButton();
+                    
+                    // Automatycznie otwórz okno wyboru jeśli są załączniki
+                    if (gmailAttachments.length > 0) {
+                        openAttachmentsModal();
+                    }
+                }
+            }
+            
             console.log('[CRM Content] Analysis response:', {
                 success: response.success,
                 phone: response.data?.phone,
@@ -511,6 +694,7 @@ function setupFormHandlers(content) {
                 document.getElementById('crm-input-title').value = d.suggestedTitle || '';
                 document.getElementById('crm-input-phone').value = d.phone || ''; 
                 document.getElementById('crm-input-email').value = d.email || '';
+                document.getElementById('crm-input-nip').value = d.nip || '';
                 document.getElementById('crm-input-address').value = d.address || '';
                 document.getElementById('crm-input-scope').value = d.scopeWorkText || d.scopeOfWork || '';
             } else {
@@ -524,6 +708,53 @@ function setupFormHandlers(content) {
         }
     };
 
+    // GUS BUTTON
+    const gusBtn = content.querySelector('#crm-gus-btn');
+    if (gusBtn) {
+        gusBtn.onclick = async () => {
+            const nipInput = document.getElementById('crm-input-nip');
+            const nip = nipInput.value.replace(/[^\d]/g, '');
+            if (nip.length !== 10) {
+                alert('Podaj poprawny NIP (10 cyfr)');
+                return;
+            }
+
+            const originalText = gusBtn.innerText;
+            gusBtn.innerText = '⏳...';
+            gusBtn.disabled = true;
+
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    action: 'lookupGus',
+                    nip: nip
+                });
+
+                if (response.success && response.company) {
+                    const c = response.company;
+                    // Uzupełnij dane
+                    if (c.name) document.getElementById('crm-input-title').value = c.name.substring(0, 50);
+                    
+                    let fullAddr = '';
+                    if (c.street) {
+                        fullAddr = c.street;
+                        if (c.postCode || c.city) fullAddr += ', ' + [c.postCode, c.city].filter(Boolean).join(' ');
+                    }
+                    if (fullAddr) document.getElementById('crm-input-address').value = fullAddr;
+                    
+                    // Poinformuj użytkownika
+                    alert('Znaleziono firmę: ' + c.name);
+                } else {
+                    alert('Błąd GUS: ' + (response.error || 'Nie znaleziono firmy'));
+                }
+            } catch (e) {
+                alert('Błąd połączenia: ' + e.message);
+            } finally {
+                gusBtn.innerText = originalText;
+                gusBtn.disabled = false;
+            }
+        };
+    }
+
     // 2. WYŚLIJ
     content.querySelector('#crm-send').onclick = async () => {
         const btn = content.querySelector('#crm-send');
@@ -534,6 +765,7 @@ function setupFormHandlers(content) {
         const title = document.getElementById('crm-input-title').value;
         const phone = document.getElementById('crm-input-phone').value;
         const email = document.getElementById('crm-input-email').value;
+        const nip = document.getElementById('crm-input-nip').value;
         const address = document.getElementById('crm-input-address').value;
         const scope = document.getElementById('crm-input-scope').value;
         
@@ -549,6 +781,7 @@ function setupFormHandlers(content) {
             messageId: messageId,
             messageIdLength: messageId?.length,
             manualAttachments: uploadedFiles.length,
+            selectedGmailAttachments: selectedAttachmentIds.length,
             title: title.substring(0, 50),
             phone: phone,
             email: email
@@ -561,10 +794,12 @@ function setupFormHandlers(content) {
                     title, 
                     phone, 
                     email, 
+                    nip,
                     fullAddress: address, 
                     description: scope,
                     gmailMessageId: messageId,
-                    manualAttachments: uploadedFiles // <-- Przekazujemy skompresowane pliki
+                    manualAttachments: uploadedFiles,
+                    selectedAttachmentIds: selectedAttachmentIds // <-- PRZEKAZUJEMY WYBRANE ID
                 }
             });
             
