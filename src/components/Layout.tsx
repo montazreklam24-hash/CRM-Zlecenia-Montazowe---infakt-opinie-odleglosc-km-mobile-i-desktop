@@ -62,32 +62,26 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
                <img 
                  src="/logo.png" 
                  alt="Montaż24"
-                 className="h-[75px] w-auto object-contain absolute top-0 left-0 transition-transform hover:scale-105"
+                 className="h-[85px] w-auto object-contain absolute top-0 left-0 transition-transform hover:scale-105"
                  style={{ 
                    top: '-5px', 
-                   filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'
+                   filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+                   zIndex: 60
                  }}
                  onError={(e) => {
-                   e.currentTarget.style.display = 'none';
-                   // Pokaż fallback text jeśli brak logo
-                   const fallback = document.getElementById('logo-fallback');
-                   if (fallback) fallback.style.display = 'flex';
+                   // Jeśli brak logo, pokaż placeholder tekstowy
+                   e.currentTarget.style.opacity = '0.3'; // Tylko przyciemnij zamiast ukrywać, żeby było widać że brakuje pliku
                  }}
                />
                
-               {/* Fallback (ukryty domyślnie) */}
-               <div id="logo-fallback" className="hidden items-center gap-2">
-                  <div className="font-bold text-lg">
-                    <span style={{ color: '#f97316' }}>montaż</span>
-                    <span className="text-white"> reklam </span>
-                    <span style={{ color: '#f97316' }} className="text-xl">24</span>
-                  </div>
-               </div>
-
-               {/* Tekst obok logo - margines zależy od szerokości logo, zakładam ok 180px na logo */}
-               <div className="flex flex-col justify-center ml-[180px] hidden sm:flex">
-                  <span className="text-orange-500 font-bold text-sm lowercase leading-tight tracking-wide">crm.montazreklam24.pl</span>
-                  <span className="text-gray-400 text-[10px] lowercase leading-tight">wersja beta</span>
+               {/* Tekst obok logo - margines zależy od szerokości logo */}
+               <div className="flex flex-col justify-center ml-[140px] hidden sm:flex z-50">
+                  <span className="text-orange-500 font-bold text-lg leading-tight tracking-wide">
+                    CRM.MontazReklam24.pl
+                  </span>
+                  <span className="text-gray-400 text-[10px] lowercase leading-tight ml-1">
+                    wersja beta
+                  </span>
                </div>
             </div>
           </div>
