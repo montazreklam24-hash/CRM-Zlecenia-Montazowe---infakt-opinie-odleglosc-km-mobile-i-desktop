@@ -13,6 +13,52 @@ const DEFAULT_SETTINGS = {
 };
 
 // =========================================================================
+// DEBUG LOGGING
+// =========================================================================
+
+const MAX_LOG_ENTRIES = 50;
+
+async function logDebug(level, category, message, data = null) {
+  const timestamp = new Date().toISOString();
+  const logEntry = {
+    timestamp,
+    level, // 'info', 'warn', 'error'
+    category, // 'oauth', 'import', 'api', etc.
+    message,
+    data: data ? JSON.stringify(data) : null
+  };
+  
+  // Log do console
+  const consoleMethod = level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log';
+  console[consoleMethod](`[CRM BG ${category}]`, message, data || '');
+  
+  // Zapisz do storage
+  try {
+    const result = await chrome.storage.local.get(['debugLogs']);
+    const logs = result.debugLogs || [];
+    logs.push(logEntry);
+    
+    // Zachowaj tylko ostatnie MAX_LOG_ENTRIES wpisów
+    if (logs.length > MAX_LOG_ENTRIES) {
+      logs.splice(0, logs.length - MAX_LOG_ENTRIES);
+    }
+    
+    await chrome.storage.local.set({ debugLogs: logs });
+  } catch (e) {
+    console.error('[CRM BG] Failed to save debug log:', e);
+  }
+}
+
+async function getDebugLogs() {
+  const result = await chrome.storage.local.get(['debugLogs']);
+  return result.debugLogs || [];
+}
+
+async function clearDebugLogs() {
+  await chrome.storage.local.set({ debugLogs: [] });
+}
+
+// =========================================================================
 // KOMUNIKACJA Z CONTENT SCRIPT
 // =========================================================================
 
@@ -39,12 +85,59 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     case 'testConnection':
       testConnection(request.settings).then(sendResponse);
       return true;
+      
+    case 'testGmailConnection':
+      testGmailConnection().then(sendResponse);
+      return true;
+      
+    case 'getDebugLogs':
+      getDebugLogs().then(sendResponse);
+      return true;
+      
+    case 'clearDebugLogs':
+      clearDebugLogs().then(() => sendResponse({ success: true }));
+      return true;
   }
 });
 
 // =========================================================================
 // ANALIZA EMAILA PRZEZ GEMINI
 // =========================================================================
+
+// Funkcja pomocnicza do wyciągania telefonu z tekstu (fallback)
+function extractPhoneFromText(text) {
+  if (!text) return null;
+  
+  // Wzorce dla polskich numerów telefonów
+  const patterns = [
+    // +48 500 123 456, +48500123456, 0048 500 123 456
+    /(?:\+48|0048)?\s*(\d{3}[\s\-]?\d{3}[\s\-]?\d{3})/g,
+    // (500) 123-456, 500-123-456, 500 123 456
+    /\(?(\d{3})\)?[\s\-]?(\d{3})[\s\-]?(\d{3})/g,
+    // tel. 500123456, telefon: 500123456, tel: 500123456
+    /tel[\.:]?\s*(\d{9}|\d{3}[\s\-]?\d{3}[\s\-]?\d{3})/gi,
+    // 9 cyfr pod rząd (polski numer)
+    /\b(\d{9})\b/g
+  ];
+  
+  for (const pattern of patterns) {
+    const matches = text.match(pattern);
+    if (matches && matches.length > 0) {
+      // Weź pierwszy znaleziony numer
+      let phone = matches[0].replace(/[^\d]/g, '');
+      // Jeśli zaczyna się od 48 lub 0048, usuń prefix
+      if (phone.startsWith('48') && phone.length === 11) {
+        phone = phone.substring(2);
+      }
+      // Jeśli ma 9 cyfr, zwróć
+      if (phone.length === 9) {
+        return phone.match(/.{1,3}/g).join(' ');
+      }
+    }
+  }
+  
+  return null;
+}
 
 async function analyzeEmail(emailData) {
   const settings = await getSettings();
@@ -57,7 +150,7 @@ async function analyzeEmail(emailData) {
 Jesteś asystentem CRM do wyciągania danych z emaili o zleceniach montażowych reklam.
 
 Przeanalizuj poniższego maila i wyciągnij następujące dane:
-- Telefon kontaktowy (telefon, tel, mobile, komórka)
+- Telefon kontaktowy (telefon, tel, mobile, komórka) - BARDZO WAŻNE!
 - Email kontaktowy
 - Nazwa firmy (jeśli jest)
 - NIP (jeśli jest)
@@ -66,18 +159,24 @@ Przeanalizuj poniższego maila i wyciągnij następujące dane:
 - Zakres prac (krótki opis co trzeba zrobić - STRESZCZENIE)
 - Sugerowany tytuł zlecenia (krótki, max 50 znaków)
 
-WAŻNE:
+WAŻNE - TELEFON:
+- Szukaj numerów telefonów w CAŁEJ treści maila - w tekście, podpisie, stopce
+- Telefon może być w różnych formatach: 500123456, 500-123-456, 500 123 456, +48 500 123 456, (500) 123-456, tel. 500123456, telefon: 500123456
+- Polskie numery: 9 cyfr (bez prefiksu kraju) lub z +48/0048
+- Formatuj jako: 500 123 456 (tylko cyfry ze spacjami co 3)
+- Jeśli jest wiele numerów, wybierz główny kontaktowy (nie faks, nie centrala jeśli jest bezpośredni)
+- Szukaj słów kluczowych: telefon, tel., mobile, komórka, kontakt, tel:
+
+WAŻNE - INNE DANE:
 - Szukaj adresów w całej treści maila, nie tylko w podpisie
 - Jeśli jest wiele adresów, wybierz adres montażu/dostawy
 - Dla Warszawy spróbuj określić dzielnicę na podstawie ulicy
 - Jeśli w mailu jest nazwa obiektu (np. Promenada), znajdź jego adres
-- Numer telefonu formatuj jako: 500 100 200
 - NIP formatuj jako: 123-456-78-90
 
 Mail:
 ---
-Od: ${emailData.from}
-Temat: ${emailData.subject}
+Temat: ${emailData.subject || ''}
 Data: ${emailData.date || ''}
 
 ${emailData.body}
@@ -104,7 +203,7 @@ Odpowiedz TYLKO w formacie JSON (bez markdown):
   "confidence": 0.8
 }
 
-Jeśli nie znalazłeś danego pola, ustaw null.
+Jeśli nie znalazłeś danego pola, ustaw null. Dla telefonu - jeśli nie ma numeru, ustaw null (NIE pisz "brak" ani "nie znaleziono").
 `;
 
   try {
@@ -140,7 +239,32 @@ Jeśli nie znalazłeś danego pola, ustaw null.
     // Usuń markdown jeśli jest
     text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     
-    const parsed = JSON.parse(text);
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      console.error('[CRM BG] JSON parse error:', e, 'Text:', text);
+      return { success: false, error: 'Błąd parsowania odpowiedzi AI' };
+    }
+    
+    // Fallback: jeśli Gemini nie znalazło telefonu, spróbuj wyciągnąć z tekstu
+    if (!parsed.phone || parsed.phone === 'null' || parsed.phone === null) {
+      const phoneMatch = extractPhoneFromText(emailData.body);
+      if (phoneMatch) {
+        parsed.phone = phoneMatch;
+        console.log('[CRM BG] Phone extracted via fallback:', phoneMatch);
+      }
+    }
+    
+    // Formatuj telefon (usuń niepotrzebne znaki, zostaw tylko cyfry i spacje)
+    if (parsed.phone && parsed.phone !== 'null') {
+      parsed.phone = parsed.phone.replace(/[^\d\s]/g, '').replace(/\s+/g, ' ').trim();
+      // Jeśli ma 9 cyfr, sformatuj jako XXX XXX XXX
+      const digits = parsed.phone.replace(/\s/g, '');
+      if (digits.length === 9) {
+        parsed.phone = digits.match(/.{1,3}/g).join(' ');
+      }
+    }
     
     // Formatuj adres do stringa
     let fullAddress = '';
@@ -149,6 +273,8 @@ Jeśli nie znalazłeś danego pola, ustaw null.
         fullAddress = [a.street ? a.street + (a.buildingNo ? ' ' + a.buildingNo : '') : '', a.postCode, a.city].filter(Boolean).join(', ');
     }
     parsed.address = fullAddress;
+    
+    console.log('[CRM BG] Parsed data:', parsed);
     
     return { 
       success: true, 
@@ -244,12 +370,16 @@ async function uploadFileToCRM(fileObj) {
 // =========================================================================
 
 async function getAuthToken() {
+  await logDebug('info', 'oauth', 'Requesting OAuth token...');
+  
   return new Promise((resolve, reject) => {
     chrome.identity.getAuthToken({ interactive: true }, (token) => {
       if (chrome.runtime.lastError || !token) {
-        console.error('Auth error:', chrome.runtime.lastError);
-        reject(chrome.runtime.lastError?.message || 'Brak tokena');
+        const error = chrome.runtime.lastError?.message || 'Brak tokena';
+        logDebug('error', 'oauth', 'Failed to get OAuth token', { error: chrome.runtime.lastError });
+        reject(error);
       } else {
+        logDebug('info', 'oauth', 'OAuth token obtained', { tokenLength: token.length, tokenPrefix: token.substring(0, 20) + '...' });
         resolve(token);
       }
     });
@@ -257,34 +387,51 @@ async function getAuthToken() {
 }
 
 async function importAttachments(messageId) {
+  await logDebug('info', 'import', 'Starting attachment import', { messageId, messageIdLength: messageId?.length });
+  
   try {
-    console.log('[CRM BG] Importing attachments for:', messageId);
     const googleToken = await getAuthToken();
+    await logDebug('info', 'import', 'Sending import request to API', { messageId, hasToken: !!googleToken });
+    
     const result = await apiRequest('import_gmail.php', 'POST', {
       messageId: messageId,
       token: googleToken
     });
     
-    console.log('[CRM BG] Import result:', result);
+    await logDebug('info', 'import', 'Import API response received', { 
+      success: result.success, 
+      attachmentsCount: result.attachments?.length || 0,
+      error: result.error || null
+    });
     
     if (result.success && result.attachments) {
-      // Zwróć ścieżki do plików
-      return result.attachments.map(att => att.path); 
+      const paths = result.attachments.map(att => att.path);
+      await logDebug('info', 'import', 'Import successful', { attachmentsCount: paths.length, paths });
+      return paths;
     }
     
     // Jeśli import się nie udał (np. błąd API Google), rzuć błąd
     if (result.error) {
+        await logDebug('warn', 'import', 'Import failed with error', { error: result.error });
+        
         // Jeśli to błąd autoryzacji/konta, wyczyść token, żeby wymusić ponowne logowanie
         if (result.error.includes('400') || result.error.includes('401') || result.error.includes('403')) {
-            console.warn('[CRM BG] Auth error detected. Clearing cached token to force re-login next time.');
-            chrome.identity.removeCachedAuthToken({ token: googleToken }, () => {});
+            await logDebug('warn', 'oauth', 'Auth error detected, clearing cached token', { error: result.error });
+            chrome.identity.removeCachedAuthToken({ token: googleToken }, () => {
+              logDebug('info', 'oauth', 'Cached token cleared');
+            });
         }
         throw new Error("Import załączników: " + result.error);
     }
 
+    await logDebug('warn', 'import', 'Import completed but no attachments found');
     return [];
   } catch (error) {
-    console.error('[CRM BG] Attachment import error:', error);
+    await logDebug('error', 'import', 'Attachment import error', { 
+      message: error.message, 
+      stack: error.stack,
+      messageId 
+    });
     // Przekaż błąd wyżej, żeby zatrzymać tworzenie zlecenia
     throw error;
   }
@@ -294,30 +441,60 @@ async function importAttachments(messageId) {
 // POBIERANIE Message ID z Thread ID (naprawa błędu 400)
 // =========================================================================
 async function getRealMessageId(threadIdOrMessageId) {
+  await logDebug('info', 'messageId', 'Resolving message ID', { 
+    inputId: threadIdOrMessageId, 
+    inputLength: threadIdOrMessageId?.length,
+    looksLikeThreadId: threadIdOrMessageId?.length >= 20 || threadIdOrMessageId?.startsWith('FM')
+  });
+  
   // Jeśli ID wygląda na poprawne messageId (krótkie hex), zwróć je
   if (!threadIdOrMessageId || (threadIdOrMessageId.length < 20 && !threadIdOrMessageId.startsWith('FM'))) {
+      await logDebug('info', 'messageId', 'ID looks like valid Message ID, using as-is');
       return threadIdOrMessageId;
   }
 
   // Jeśli to długie ID (Thread ID lub Legacy), pytamy API o listę wiadomości w wątku
   try {
     const token = await getAuthToken();
-    const response = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadIdOrMessageId}?format=minimal`,
-      { headers: { 'Authorization': `Bearer ${token}` } }
-    );
+    const url = `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadIdOrMessageId}?format=minimal`;
+    await logDebug('info', 'messageId', 'Fetching thread data from Gmail API', { url });
     
-    if (!response.ok) return threadIdOrMessageId; // Fallback
+    const response = await fetch(url, { 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    });
+    
+    await logDebug('info', 'messageId', 'Gmail API response', { 
+      status: response.status, 
+      ok: response.ok 
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      await logDebug('warn', 'messageId', 'Failed to resolve thread ID, using original', { 
+        status: response.status, 
+        error: errorText 
+      });
+      return threadIdOrMessageId; // Fallback
+    }
     
     const data = await response.json();
     if (data.messages && data.messages.length > 0) {
         // Zwróć ID ostatniej wiadomości w wątku
         const lastMsg = data.messages[data.messages.length - 1];
-        console.log('[CRM BG] Resolved Thread ID', threadIdOrMessageId, 'to Message ID', lastMsg.id);
+        await logDebug('info', 'messageId', 'Thread ID resolved to Message ID', { 
+          threadId: threadIdOrMessageId,
+          messageId: lastMsg.id,
+          messagesInThread: data.messages.length
+        });
         return lastMsg.id;
     }
+    
+    await logDebug('warn', 'messageId', 'Thread has no messages, using original ID');
   } catch (e) {
-    console.error('[CRM BG] Error resolving thread ID:', e);
+    await logDebug('error', 'messageId', 'Error resolving thread ID', { 
+      error: e.message, 
+      stack: e.stack 
+    });
   }
   
   return threadIdOrMessageId;
@@ -332,6 +509,11 @@ async function createJobInCRM(jobData) {
 
     // 1. POBIERZ ZAŁĄCZNIKI Z GMAILA (JEŚLI WŁĄCZONE)
     if (settings.importAttachments) {
+        await logDebug('info', 'createJob', 'Import attachments enabled, processing', { 
+          hasMessageId: !!finalMessageId,
+          messageId: finalMessageId 
+        });
+        
         if (finalMessageId) {
             finalMessageId = await getRealMessageId(finalMessageId);
         }
@@ -340,11 +522,13 @@ async function createJobInCRM(jobData) {
           try {
             projectImages = await importAttachments(finalMessageId);
           } catch (importError) {
-            console.warn('[CRM BG] Import załączników nie powiódł się, kontynuuję bez nich:', importError.message);
+            await logDebug('warn', 'createJob', 'Import załączników nie powiódł się, kontynuuję bez nich', { 
+              error: importError.message 
+            });
             attachmentWarning = "Załączniki Gmail nie zostały pobrane: " + importError.message;
           }
         } else {
-            console.warn('[CRM BG] Brak messageId, pomijam załączniki Gmail');
+            await logDebug('warn', 'createJob', 'Brak messageId, pomijam załączniki Gmail');
         }
     }
 
@@ -421,6 +605,70 @@ async function testConnection(settings) {
     }
   } catch (error) {
     return { success: false, error: 'Nie można połączyć z serwerem' };
+  }
+}
+
+async function testGmailConnection() {
+  await logDebug('info', 'test', 'Starting Gmail OAuth connection test');
+  
+  try {
+    // 1. Pobierz token OAuth
+    const token = await getAuthToken();
+    await logDebug('info', 'test', 'OAuth token obtained for test');
+    
+    // 2. Testuj połączenie z Gmail API - pobierz profil użytkownika
+    const profileUrl = 'https://gmail.googleapis.com/gmail/v1/users/me/profile';
+    await logDebug('info', 'test', 'Testing Gmail API connection', { url: profileUrl });
+    
+    const response = await fetch(profileUrl, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    await logDebug('info', 'test', 'Gmail API response received', { 
+      status: response.status, 
+      ok: response.ok 
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      await logDebug('error', 'test', 'Gmail API test failed', { 
+        status: response.status, 
+        error: errorText 
+      });
+      
+      // Jeśli błąd autoryzacji, wyczyść token
+      if (response.status === 401 || response.status === 403) {
+        await logDebug('warn', 'test', 'Clearing invalid token');
+        chrome.identity.removeCachedAuthToken({ token }, () => {});
+      }
+      
+      return { 
+        success: false, 
+        error: `Gmail API error (${response.status}): ${errorText.substring(0, 100)}` 
+      };
+    }
+    
+    const profile = await response.json();
+    await logDebug('info', 'test', 'Gmail API test successful', { 
+      emailAddress: profile.emailAddress 
+    });
+    
+    return { 
+      success: true, 
+      emailAddress: profile.emailAddress 
+    };
+    
+  } catch (error) {
+    await logDebug('error', 'test', 'Gmail connection test error', { 
+      message: error.message, 
+      stack: error.stack 
+    });
+    return { 
+      success: false, 
+      error: error.message 
+    };
   }
 }
 
