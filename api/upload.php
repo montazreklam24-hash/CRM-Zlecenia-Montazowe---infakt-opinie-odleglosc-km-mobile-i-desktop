@@ -6,6 +6,7 @@
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/images.php'; // For generateThumbnail
 
 // Obsługa CORS
 handleCORS();
@@ -34,7 +35,7 @@ if ($file['size'] > MAX_UPLOAD_SIZE) {
 }
 
 // Sprawdź typ MIME
-$allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+$allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'application/postscript'];
 $finfo = finfo_open(FILEINFO_MIME_TYPE);
 $mimeType = finfo_file($finfo, $file['tmp_name']);
 finfo_close($finfo);
@@ -57,7 +58,8 @@ if (empty($extension)) {
         'image/png' => 'png',
         'image/gif' => 'gif',
         'image/webp' => 'webp',
-        'application/pdf' => 'pdf'
+        'application/pdf' => 'pdf',
+        'application/postscript' => 'eps'
     ];
     $extension = isset($extensions[$mimeType]) ? $extensions[$mimeType] : 'bin';
 }
@@ -75,6 +77,11 @@ $publicUrl = UPLOADS_URL . $filename;
 
 // Przenieś plik
 if (move_uploaded_file($file['tmp_name'], $targetPath)) {
+    // Generuj miniaturkę dla PDF/EPS
+    if (in_array(strtolower($extension), ['pdf', 'eps', 'ai', 'psd'])) {
+        generateThumbnail($targetPath);
+    }
+
     jsonResponse(array(
         'success' => true,
         'url' => $publicUrl,

@@ -707,6 +707,49 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
     }
   };
 
+  const AttachmentThumbnail = ({ url, onClick, isImage }: { url: string; onClick: () => void; isImage: boolean }) => {
+    const [error, setError] = useState(false);
+    const ext = getFileExtension(url);
+    
+    // If it's a standard image, just show it
+    if (isImage) {
+      return (
+        <div onClick={onClick} className="w-full h-full cursor-zoom-in">
+          <img src={url} className="w-full h-full object-cover" alt="attachment" loading="lazy" />
+        </div>
+      );
+    }
+  
+    // If it's not an image, try to show the thumbnail (url + .jpg)
+    // If error, show icon
+    if (error) {
+      return (
+        <div onClick={onClick} className="w-full h-full cursor-pointer flex flex-col items-center justify-center text-slate-400 p-4 bg-slate-100">
+          <FileText className="w-12 h-12 mb-2 text-slate-400" />
+          <span className="text-[10px] font-bold bg-white px-2 py-1 rounded-lg shadow-sm uppercase text-slate-600 border border-slate-200">
+            {ext || 'PLIK'}
+          </span>
+        </div>
+      );
+    }
+  
+    return (
+      <div onClick={onClick} className="w-full h-full cursor-pointer relative group">
+         <img 
+           src={url + '.jpg'} 
+           className="w-full h-full object-cover" 
+           alt="thumbnail" 
+           loading="lazy" 
+           onError={() => setError(true)}
+         />
+         {/* Overlay indicating it's a file */}
+         <div className="absolute bottom-2 right-2 bg-white/90 px-1.5 py-0.5 rounded text-[10px] font-bold shadow-sm border border-slate-200 uppercase">
+           {ext}
+         </div>
+      </div>
+    );
+  };
+
   return (
     <div className="w-full max-w-3xl mx-auto pb-40">
       
