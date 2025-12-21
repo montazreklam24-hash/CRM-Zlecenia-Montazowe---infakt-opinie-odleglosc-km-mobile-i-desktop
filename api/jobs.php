@@ -114,8 +114,8 @@ function createJob() {
             $title = 'Nowe zlecenie';
         }
         
-        // Generuj friendly ID (zawsze z jobs_ai)
-        $friendlyId = generateFriendlyId('ai');
+        // Generuj friendly ID
+        $friendlyId = generateFriendlyId();
 
         // SPRAWDZANIE DUPLIKATÓW
         $gmailMessageId = isset($data['gmailMessageId']) ? $data['gmailMessageId'] : null;
@@ -192,12 +192,12 @@ function createJob() {
         
         $jobId = $pdo->lastInsertId();
         
-        // Zapisz obrazy (zawsze typ 'ai')
+        // Zapisz obrazy
         if (isset($input['projectImages']) && is_array($input['projectImages'])) {
-            saveJobImages($jobId, $input['projectImages'], 'project', 'ai');
+            saveJobImages($jobId, $input['projectImages'], 'project');
         }
         if (isset($input['completionImages']) && is_array($input['completionImages'])) {
-            saveJobImages($jobId, $input['completionImages'], 'completion', 'ai');
+            saveJobImages($jobId, $input['completionImages'], 'completion');
         }
         
         // Zwróć utworzone zlecenie
@@ -341,12 +341,12 @@ function updateJob($id) {
             $stmt->execute($params);
         }
         
-        // Aktualizuj obrazy (zawsze typ 'ai')
+        // Aktualizuj obrazy
         if (isset($input['projectImages']) && is_array($input['projectImages'])) {
-            saveJobImages($id, $input['projectImages'], 'project', 'ai');
+            saveJobImages($id, $input['projectImages'], 'project');
         }
         if (isset($input['completionImages']) && is_array($input['completionImages'])) {
-            saveJobImages($id, $input['completionImages'], 'completion', 'ai');
+            saveJobImages($id, $input['completionImages'], 'completion');
         }
         
         // Zwróć zaktualizowane zlecenie
@@ -374,9 +374,9 @@ function deleteJob($id) {
         jsonResponse(array('error' => 'Zlecenie nie istnieje'), 404);
     }
     
-    // Usuń pliki obrazów z dysku (typ 'ai' domyślnie)
-    $stmt = $pdo->prepare('SELECT file_path FROM job_images WHERE job_id = ? AND job_type = ?');
-    $stmt->execute(array($id, 'ai'));
+    // Usuń pliki obrazów z dysku
+    $stmt = $pdo->prepare('SELECT file_path FROM job_images WHERE job_id = ?');
+    $stmt->execute(array($id));
     $images = $stmt->fetchAll();
     foreach ($images as $img) {
         if (!empty($img['file_path'])) {
@@ -388,7 +388,7 @@ function deleteJob($id) {
     }
     
     // Usuń obrazy z bazy
-    $pdo->prepare('DELETE FROM job_images WHERE job_id = ? AND job_type = ?')->execute(array($id, 'ai'));
+    $pdo->prepare('DELETE FROM job_images WHERE job_id = ?')->execute(array($id));
     
     // Usuń zlecenie
     $stmt = $pdo->prepare('DELETE FROM jobs_ai WHERE id = ?');
@@ -412,10 +412,10 @@ function mapJobToFrontend($job) {
     $jobId = $job['id'];
     
     return array(
-        'id' => strval($jobId), // Czyste ID (bez prefiksu ai-)
+        'id' => strval($jobId), // Czyste ID
         'original_id' => strval($jobId),
         'friendlyId' => $job['friendly_id'],
-        'type' => 'ai', // Domyślny typ dla kompatybilności
+        'type' => 'ai', // Domyślny typ dla kompatybilności (deprecated)
         'createdAt' => strtotime($job['created_at']) * 1000,
         'status' => $job['status'] ? $job['status'] : 'NEW',
         'paymentStatus' => isset($job['payment_status']) ? $job['payment_status'] : 'none',
@@ -436,9 +436,9 @@ function mapJobToFrontend($job) {
                 'grossAmount' => $job['value_gross'] ? floatval($job['value_gross']) : null
             )
         ),
-        // Pobieramy obrazy typu 'ai'
-        'projectImages' => getJobImages($jobId, 'project', 'ai'),
-        'completionImages' => getJobImages($jobId, 'completion', 'ai'),
+        // Pobieramy obrazy
+        'projectImages' => getJobImages($jobId, 'project'),
+        'completionImages' => getJobImages($jobId, 'completion'),
         'adminNotes' => $job['notes'],
         'checklist' => array(),
         'completedAt' => !empty($job['completed_at']) ? strtotime($job['completed_at']) * 1000 : null,

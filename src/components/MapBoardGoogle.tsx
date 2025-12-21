@@ -26,41 +26,119 @@ declare global {
 }
 
 // Komponent dymka z inteligentnym pozycjonowaniem
-const SmartPopup = ({ job, position, onClose, onSelect, mapSize }: { job: Job, position: { x: number, y: number }, onClose: () => void, onSelect: () => void, mapSize: { width: number, height: number } }) => {
+const SmartPopup = ({ job, position, onClose, onSelect, mapContainer }: { job: Job, position: { x: number, y: number }, onClose: () => void, onSelect: () => void, mapContainer: HTMLDivElement | null }) => {
   const popupRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
   const [placement, setPlacement] = useState<'top' | 'bottom'>('top');
 
   useLayoutEffect(() => {
-    if (!popupRef.current) return;
+    if (!popupRef.current || !mapContainer) return;
     
-    const { width, height } = popupRef.current.getBoundingClientRect();
+    const popupRect = popupRef.current.getBoundingClientRect();
+    const mapRect = mapContainer.getBoundingClientRect();
     const MARKER_HEIGHT = 40;
-    const PADDING = 10;
+    const PADDING = 15; // Większy padding wewnętrzny kontenera
+    const VIEWPORT_PADDING = 20; // Większy padding od krawędzi viewport
 
-    let top = position.y - height - PADDING; // Domyślnie nad markerem
-    let left = position.x - (width / 2); // Wyśrodkowany
+    // Jeśli popup nie ma jeszcze wymiarów, użyj domyślnych
+    const popupWidth = popupRect.width || 180;
+    const popupHeight = popupRect.height || 200;
+
+    // Przelicz pozycję markera na współrzędne względem kontenera mapy
+    const markerX = position.x;
+    const markerY = position.y;
+
+    // Viewport dimensions
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Pozycja względem kontenera mapy (absolute positioning) - wyśrodkowany nad markerem
+    let top = markerY - popupHeight - PADDING; // Domyślnie nad markerem
+    let left = markerX - (popupWidth / 2); // Wyśrodkowany względem markera
     let newPlacement: 'top' | 'bottom' = 'top';
 
-    // Sprawdź czy mieści się u góry
-    if (top < 0) {
-      top = position.y + MARKER_HEIGHT + PADDING; // Pokaż pod markerem
+    // Oblicz pozycje absolutne względem viewport
+    let absoluteLeft = mapRect.left + left;
+    let absoluteTop = mapRect.top + top;
+    let absoluteRight = absoluteLeft + popupWidth;
+    let absoluteBottom = absoluteTop + popupHeight;
+
+    // Sprawdź czy mieści się u góry kontenera i viewport
+    if (top < PADDING || absoluteTop < VIEWPORT_PADDING) {
+      top = markerY + MARKER_HEIGHT + PADDING; // Pokaż pod markerem
       newPlacement = 'bottom';
+      absoluteTop = mapRect.top + top;
+      absoluteBottom = absoluteTop + popupHeight;
     }
 
-    // Sprawdź czy mieści się z lewej
-    if (left < PADDING) {
-      left = PADDING;
+    // Sprawdź czy mieści się z lewej strony (zarówno kontener jak i viewport)
+    const minLeft = Math.max(PADDING, VIEWPORT_PADDING - mapRect.left);
+    if (left < minLeft || absoluteLeft < VIEWPORT_PADDING) {
+      left = minLeft;
+      absoluteLeft = mapRect.left + left;
+      absoluteRight = absoluteLeft + popupWidth;
     }
 
-    // Sprawdź czy mieści się z prawej
-    if (left + width > mapSize.width - PADDING) {
-      left = mapSize.width - width - PADDING;
+    // Sprawdź czy mieści się z prawej strony (zarówno kontener jak i viewport)
+    const maxLeft = Math.min(
+      mapRect.width - popupWidth - PADDING,
+      viewportWidth - mapRect.left - popupWidth - VIEWPORT_PADDING
+    );
+    if (left + popupWidth > mapRect.width - PADDING || absoluteRight > viewportWidth - VIEWPORT_PADDING) {
+      left = maxLeft;
+      absoluteLeft = mapRect.left + left;
+      absoluteRight = absoluteLeft + popupWidth;
+    }
+
+    // Jeśli nadal wychodzi poza viewport z prawej, przesuń bardziej w lewo
+    if (absoluteRight > viewportWidth - VIEWPORT_PADDING) {
+      left = Math.max(minLeft, viewportWidth - mapRect.left - popupWidth - VIEWPORT_PADDING);
+      absoluteLeft = mapRect.left + left;
+      absoluteRight = absoluteLeft + popupWidth;
+    }
+
+    // Jeśli nadal wychodzi poza viewport z lewej, przesuń bardziej w prawo
+    if (absoluteLeft < VIEWPORT_PADDING) {
+      left = Math.min(maxLeft, VIEWPORT_PADDING - mapRect.left);
+      absoluteLeft = mapRect.left + left;
+      absoluteRight = absoluteLeft + popupWidth;
+    }
+
+    // Jeśli wychodzi poza viewport z dołu, przesuń wyżej
+    if (absoluteBottom > viewportHeight - VIEWPORT_PADDING && newPlacement === 'bottom') {
+      top = markerY - popupHeight - PADDING;
+      newPlacement = 'top';
+      absoluteTop = mapRect.top + top;
+      absoluteBottom = absoluteTop + popupHeight;
+    }
+
+    // Jeśli wychodzi poza viewport z góry, przesuń niżej
+    if (absoluteTop < VIEWPORT_PADDING && newPlacement === 'top') {
+      top = markerY + MARKER_HEIGHT + PADDING;
+      newPlacement = 'bottom';
+      absoluteTop = mapRect.top + top;
+      absoluteBottom = absoluteTop + popupHeight;
+    }
+
+    // Ostateczne sprawdzenie - jeśli marker jest zbyt blisko krawędzi, przesuń popup bardziej na środek
+    const markerAbsoluteX = mapRect.left + markerX;
+    const markerAbsoluteY = mapRect.top + markerY;
+    
+    // Jeśli marker jest blisko lewej krawędzi, przesuń popup bardziej w prawo
+    if (markerAbsoluteX < viewportWidth * 0.3 && absoluteLeft < VIEWPORT_PADDING + 50) {
+      left = Math.max(minLeft, markerX - popupWidth * 0.3);
+      absoluteLeft = mapRect.left + left;
+    }
+    
+    // Jeśli marker jest blisko prawej krawędzi, przesuń popup bardziej w lewo
+    if (markerAbsoluteX > viewportWidth * 0.7 && absoluteRight > viewportWidth - VIEWPORT_PADDING - 50) {
+      left = Math.min(maxLeft, markerX - popupWidth * 0.7);
+      absoluteLeft = mapRect.left + left;
     }
 
     setCoords({ top, left });
     setPlacement(newPlacement);
-  }, [position, mapSize]);
+  }, [position, mapContainer]);
 
   const color = COLUMN_COLORS[job.columnId || 'PREPARE'] || '#475569';
   const colName = COLUMN_NAMES[job.columnId || 'PREPARE'];
@@ -176,7 +254,6 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
   // Stan dla dymka
   const [hoveredJob, setHoveredJob] = useState<Job | null>(null);
   const [popupPos, setPopupPos] = useState<{x: number, y: number} | null>(null);
-  const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
   const [isApiLoaded, setIsApiLoaded] = useState(false);
 
   const [isLocating, setIsLocating] = useState(false);
@@ -260,21 +337,40 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
           fullscreenControl: true,
           clickableIcons: false,
           scrollwheel: false, // Disabled by default, enabled only with Ctrl
-          gestureHandling: 'cooperative', // Shows message "Use Ctrl + scroll to zoom"
+          gestureHandling: 'auto', // Auto gesture handling, we control scrollwheel manually
         };
 
         googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
 
-        // Fix Ctrl+Scroll behavior: Prevent browser page zoom so map can zoom
+        // Fix Ctrl+Scroll behavior: Enable scrollwheel only when Ctrl is pressed
         const mapDiv = mapRef.current;
         const handleWheel = (e: WheelEvent) => {
           if (e.ctrlKey) {
             e.preventDefault(); // Stop browser zoom
+            // Enable scrollwheel for map zoom
+            googleMapRef.current.setOptions({ scrollwheel: true });
+          } else {
+            // Disable scrollwheel when Ctrl is not pressed
+            googleMapRef.current.setOptions({ scrollwheel: false });
+          }
+        };
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+          if (e.ctrlKey || e.metaKey) {
+            googleMapRef.current.setOptions({ scrollwheel: true });
+          }
+        };
+        
+        const handleKeyUp = (e: KeyboardEvent) => {
+          if (!e.ctrlKey && !e.metaKey) {
+            googleMapRef.current.setOptions({ scrollwheel: false });
           }
         };
         
         // Use passive: false to allow preventDefault
         mapDiv.addEventListener('wheel', handleWheel, { passive: false });
+        document.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keyup', handleKeyUp);
 
         // Inicjalizacja OverlayView do konwersji LatLng -> Pixel
         const Overlay = new window.google.maps.OverlayView();
@@ -284,23 +380,17 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
         Overlay.setMap(googleMapRef.current);
         overlayRef.current = Overlay;
 
-        // Obsługa zmiany rozmiaru mapy
-        const updateSize = () => {
-          if (mapRef.current) {
-            setMapSize({ 
-              width: mapRef.current.offsetWidth, 
-              height: mapRef.current.offsetHeight 
-            });
-          }
-        };
-        
-        updateSize();
-        window.addEventListener('resize', updateSize);
-        
         // Nasłuchiwanie zmian bounds/zoomu żeby zamknąć popup lub go przesunąć (dla uproszczenia zamykamy)
         googleMapRef.current.addListener('bounds_changed', () => {
           setHoveredJob(null);
         });
+        
+        // Cleanup listeners
+        return () => {
+          mapDiv.removeEventListener('wheel', handleWheel);
+          document.removeEventListener('keydown', handleKeyDown);
+          document.removeEventListener('keyup', handleKeyUp);
+        };
       } catch (error) {
         console.error("Google Maps init error:", error);
       }
@@ -393,7 +483,7 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
         <SmartPopup 
           job={hoveredJob}
           position={popupPos}
-          mapSize={mapSize}
+          mapContainer={mapRef.current}
           onClose={() => setHoveredJob(null)}
           onSelect={() => onSelectJob(hoveredJob)}
         />

@@ -311,18 +311,88 @@
       <label for="autoAnalyze">Automatycznie analizuj po kliknięciu CRM</label>
     </div>
 
-    <div class="checkbox-group">
+    <div class="checkbox-group" style="background: #fef3c7; padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 2px solid #fbbf24;">
       <input type="checkbox" id="importAttachments">
-      <label for="importAttachments">Pobieraj załączniki (wymaga logowania)</label>
+      <label for="importAttachments" style="font-weight: 600; color: #92400e;">
+        📎 Automatycznie pobieraj zdjęcia z Gmail
+      </label>
+      <p style="font-size: 11px; color: #78350f; margin-top: 6px; margin-left: 28px;">
+        Po włączeniu, zdjęcia z wątku mailowego będą automatycznie dodawane do zlecenia przy wysyłce do CRM
+      </p>
     </div>
     
     <button class="btn btn-primary" id="saveBtn">
       💾 Zapisz ustawienia
     </button>
     
-    <button class="btn btn-secondary" id="testBtn">
-      🔌 Testuj połączenie
-    </button>
+    <div style="margin-top: 16px; padding: 12px; background: #eff6ff; border-radius: 8px; border-left: 4px solid #3b82f6;">
+      <h4 style="font-size: 13px; font-weight: 600; color: #1e40af; margin-bottom: 8px;">🧪 Testy połączeń</h4>
+      <button class="btn btn-secondary" id="testBtn" style="margin-top: 0;">
+        🔌 Testuj połączenie CRM
+      </button>
+      
+      <button class="btn btn-secondary" id="testGmailBtn" style="margin-top: 8px; background: #fef3c7; border-color: #fbbf24; color: #92400e;">
+        📧 Testuj Gmail OAuth
+      </button>
+      <p style="font-size: 11px; color: #1e3a8a; margin-top: 8px;">
+        Kliknij "Testuj Gmail OAuth" aby sprawdzić czy możesz pobierać załączniki z Gmail
+      </p>
+    </div>
+    
+    <!-- Diagnostics Panel -->
+    <div style="margin-top: 20px; border-top: 2px solid #e2e8f0; padding-top: 16px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; cursor: pointer; padding: 8px; background: #f1f5f9; border-radius: 6px;" id="diagnosticsToggle">
+        <h3 style="font-size: 14px; font-weight: 600; color: #475569; margin: 0;">🔍 Diagnostyka i logi</h3>
+        <span id="diagnosticsArrow" style="font-size: 12px; color: #94a3b8;">▼</span>
+      </div>
+      
+      <div id="diagnosticsPanel" style="display: none;">
+        <div style="margin-bottom: 12px;">
+          <button class="btn btn-secondary" id="refreshLogsBtn" style="width: 100%; margin-top: 0; font-size: 12px; padding: 8px;">
+            🔄 Odśwież logi
+          </button>
+          <button class="btn btn-secondary" id="clearLogsBtn" style="width: 100%; margin-top: 8px; font-size: 12px; padding: 8px;">
+            🗑️ Wyczyść logi
+          </button>
+        </div>
+        
+        <div id="gmailStatus" style="padding: 10px; background: #f1f5f9; border-radius: 6px; margin-bottom: 12px; font-size: 12px;">
+          <strong>Status Gmail:</strong> <span id="gmailStatusText">Sprawdzam...</span>
+        </div>
+        
+        <div style="margin-bottom: 12px;">
+          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <input type="text" id="testMessageIdInput" placeholder="Message ID lub URL" style="flex: 1; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; font-family: monospace;">
+            <button class="btn btn-secondary" id="getMessageIdBtn" style="width: auto; padding: 8px 12px; font-size: 11px; white-space: nowrap;">
+              📋 Pobierz z Gmail
+            </button>
+          </div>
+          <p style="font-size: 10px; color: #94a3b8; margin-bottom: 8px;">
+            💡 Przycisk "Pobierz z Gmail" automatycznie znajdzie Message ID z otwartego maila
+          </p>
+          <button class="btn btn-secondary" id="testMessageBtn" style="width: 100%; margin-top: 0; font-size: 12px; padding: 8px;">
+            🔍 Analizuj konkretny mail
+          </button>
+          <div id="testMessageResult" style="margin-top: 12px; padding: 10px; background: #1e293b; color: #e2e8f0; border-radius: 6px; font-family: monospace; font-size: 11px; max-height: 300px; overflow-y: auto; display: none; white-space: pre-wrap;"></div>
+        </div>
+        
+        <div style="max-height: 200px; overflow-y: auto; background: #1e293b; color: #e2e8f0; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 11px; line-height: 1.4;">
+          <div id="debugLogs" style="white-space: pre-wrap; word-break: break-all;">Ładowanie logów...</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Instructions -->
+    <div style="margin-top: 20px; padding: 12px; background: #f0fdf4; border-radius: 8px; border-left: 4px solid #10b981;">
+      <h4 style="font-size: 13px; font-weight: 600; color: #065f46; margin-bottom: 8px;">📖 Jak używać automatycznego pobierania zdjęć:</h4>
+      <ol style="font-size: 11px; color: #047857; margin-left: 16px; line-height: 1.6;">
+        <li>Włącz checkbox "Automatycznie pobieraj zdjęcia z Gmail" powyżej</li>
+        <li>Kliknij "Zapisz ustawienia"</li>
+        <li>Kliknij "Testuj Gmail OAuth" - zaloguj się do Google jeśli trzeba</li>
+        <li>Otwórz email w Gmail i kliknij przycisk CRM</li>
+        <li>Zdjęcia z wątku mailowego będą automatycznie dodane przy wysyłce</li>
+      </ol>
+    </div>
     
     <div class="quick-actions">
       <a href="#" class="quick-action" id="openCrm">

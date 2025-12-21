@@ -11,6 +11,13 @@ export default {
         display: ['Space Grotesk', 'Inter', 'sans-serif'],
       },
       colors: {
+        // Kolory dynamiczne oparte na zmiennych CSS
+        primary: {
+          DEFAULT: 'var(--accent-primary)',
+          hover: 'var(--accent-primary-hover)',
+          50: 'var(--accent-primary-50)',   // Muszę dodać te zmienne w index.css lub użyć opacity
+        },
+        // Zachowujemy brand jako pomarańczowy (dla logo itp.)
         brand: {
           50: '#fff7ed',
           100: '#ffedd5',
@@ -43,14 +50,3 @@ export default {
   },
   plugins: [],
 }
-
-
-
-
-
-
-
-
-
-
-

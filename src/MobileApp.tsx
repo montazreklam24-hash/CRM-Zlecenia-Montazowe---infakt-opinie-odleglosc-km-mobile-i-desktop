@@ -228,10 +228,8 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
     
     if (!window.confirm('Usunąć zlecenie?')) return;
     
-    const jobType = job.type === 'simple' ? 'simple' : 'ai';
-    
     try {
-      await jobsService.deleteJob(jobId, jobType);
+      await jobsService.deleteJob(jobId);
       setJobs(prev => prev.filter(j => j.id !== jobId));
       if (selectedJob?.id === jobId) handleBack();
     } catch (err) {
@@ -255,7 +253,6 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
     
     if (!window.confirm('Archiwizować?')) return;
     
-    const jobType = job.type === 'simple' ? 'simple' : 'ai';
     const now = Date.now();
     
     setJobs(prev => prev.map(j => 
@@ -267,7 +264,7 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
         status: JobStatus.ARCHIVED,
         completedAt: now,
         columnId: 'ARCHIVE' as JobColumnId
-      }, jobType);
+      });
       if (selectedJob?.id === jobId) handleBack();
     } catch (err) {
       loadJobs();
@@ -278,10 +275,8 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
     
-    const jobType = job.type === 'simple' ? 'simple' : 'ai';
-    
     try {
-      await jobsService.updateJob(jobId, updates, jobType);
+      await jobsService.updateJob(jobId, updates);
       setJobs(prev => prev.map(j => j.id === jobId ? { ...j, ...updates } : j));
       if (selectedJob?.id === jobId) {
         setSelectedJob({ ...selectedJob, ...updates });
@@ -296,13 +291,11 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
     
-    const jobType = job.type === 'simple' ? 'simple' : 'ai';
-    
     // Optimistic update
     setJobs(prev => prev.map(j => j.id === jobId ? { ...j, paymentStatus: status } : j));
     
     try {
-      await jobsService.updateJob(jobId, { paymentStatus: status }, jobType);
+      await jobsService.updateJob(jobId, { paymentStatus: status });
     } catch (err) {
       console.error('Failed to update payment status:', err);
       loadJobs(); // Rollback on error

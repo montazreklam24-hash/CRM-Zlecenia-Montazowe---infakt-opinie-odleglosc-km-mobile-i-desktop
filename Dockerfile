@@ -24,3 +24,7 @@ WORKDIR /var/www/html
 # W kontenerze Apache działa zazwyczaj jako www-data
 RUN chown -R www-data:www-data /var/www/html
 
+
+
+
+

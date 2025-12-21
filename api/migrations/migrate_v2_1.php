@@ -58,3 +58,7 @@ try {
     die("Błąd połączenia z bazą: " . $e->getMessage() . "\n");
 }
 
+
+
+
+

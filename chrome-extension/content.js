@@ -316,86 +316,98 @@ function renderFileList() {
 function getCurrentMessageId() {
     console.log('[CRM Content] Getting message ID...');
     
-    // Strategia 1: Sprawdź data-message-id w elementach wiadomości
-    // Gmail używa różnych formatów - szukamy prawdziwego Message ID (krótkie hex, 16-20 znaków)
-    const messageElements = document.querySelectorAll('div[data-message-id], tr[data-message-id]');
-    for (let i = messageElements.length - 1; i >= 0; i--) {
-        const id = messageElements[i].getAttribute('data-message-id');
-        if (id) {
-            // Prawdziwy Message ID to krótki hex (16-20 znaków), nie zaczyna się od FM ani msg-
-            if (id.length >= 16 && id.length <= 20 && !id.startsWith('FM') && !id.startsWith('msg-')) {
-                console.log('[CRM Content] Found Message ID from data-message-id:', id);
-                return id;
-            }
-        }
-    }
-    
-    // Strategia 2: Sprawdź URL hash - może zawierać Message ID
+    // Strategia 1: Sprawdź URL hash (Najpewniejsza metoda na ThreadID/MessageID)
     const hash = window.location.hash;
     if (hash) {
-        const hashParts = hash.split('/');
-        for (let part of hashParts) {
-            const cleanId = part.split('?')[0].split('#')[0];
-            // Walidacja: krótki hex, nie Thread ID ani Legacy ID
-            if (cleanId && cleanId.length >= 16 && cleanId.length <= 20 && 
-                !cleanId.startsWith('FM') && !cleanId.startsWith('msg-') &&
-                /^[a-zA-Z0-9_-]+$/.test(cleanId)) {
-                console.log('[CRM Content] Found Message ID from URL hash:', cleanId);
-                return cleanId;
-            }
+        // Parsuj hash: #inbox/18123abc...
+        // Często ostatnia część to ID
+        const parts = hash.split('/');
+        // Szukamy części która wygląda jak ID (długa liczba szesnastkowa lub legacy)
+        // Iterujemy od końca
+        for (let i = parts.length - 1; i >= 0; i--) {
+             const part = parts[i].split('?')[0].split('#')[0];
+             // Walidacja ID: minimum 5 znaków, alfanumeryczne
+             if (part.length > 5 && /^[a-zA-Z0-9_-]+$/.test(part)) {
+                 console.log('[CRM Content] Found ID from URL hash:', part);
+                 return part;
+             }
         }
     }
-    
-    // Strategia 3: Sprawdź atrybuty aria-label lub data-legacy-thread-id (może zawierać Message ID w innym formacie)
-    const threadElements = document.querySelectorAll('[data-legacy-thread-id], [aria-label*="message"]');
-    for (let elem of threadElements) {
-        const threadId = elem.getAttribute('data-legacy-thread-id');
-        if (threadId && threadId.length >= 16 && threadId.length <= 20 && 
-            !threadId.startsWith('FM') && !threadId.startsWith('msg-')) {
-            console.log('[CRM Content] Found Message ID from legacy-thread-id:', threadId);
-            return threadId;
-        }
+
+    // Strategia 2: Sprawdź parametry URL (np. view=msg&th=...)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('th')) {
+        const th = urlParams.get('th');
+        console.log('[CRM Content] Found ID from URL param th:', th);
+        return th;
     }
     
-    // Strategia 4: Sprawdź elementy z klasą zawierającą "message" - mogą mieć ID w atrybutach
-    const messageDivs = document.querySelectorAll('div[class*="message"], div[class*="Message"]');
-    for (let div of messageDivs) {
-        // Sprawdź wszystkie atrybuty data-*
-        for (let attr of div.attributes) {
-            if (attr.name.startsWith('data-') && attr.value) {
-                const value = attr.value.trim();
-                if (value.length >= 16 && value.length <= 20 && 
-                    !value.startsWith('FM') && !value.startsWith('msg-') &&
-                    /^[a-zA-Z0-9_-]+$/.test(value)) {
-                    console.log('[CRM Content] Found Message ID from data attribute:', value, 'attr:', attr.name);
-                    return value;
-                }
-            }
-        }
-    }
-    
-    // Strategia 5: Fallback - użyj ostatniego data-message-id nawet jeśli wygląda na Thread ID
-    // Background.js spróbuje go rozwiązać
+    // Strategia 3: Fallback do DOM (mniej pewne)
+    const messageElements = document.querySelectorAll('div[data-message-id]');
     if (messageElements.length > 0) {
+        // Weź ostatni element (często właściwa wiadomość w wątku)
         const lastMsg = messageElements[messageElements.length - 1];
-        const fallbackId = lastMsg.getAttribute('data-message-id');
-        if (fallbackId) {
-            console.log('[CRM Content] Using fallback ID (will be resolved by background):', fallbackId);
-            return fallbackId;
-        }
-    }
-    
-    // Strategia 6: Ostatnia deska ratunku - URL hash bez walidacji
-    if (hash) {
-        const urlId = hash.split('/').pop().split('?')[0].split('#')[0];
-        if (urlId && urlId.length > 5) {
-            console.log('[CRM Content] Using ID from URL as last resort:', urlId);
-            return urlId.replace(/[^a-zA-Z0-9_-]/g, '');
+        const id = lastMsg.getAttribute('data-message-id');
+        if (id) {
+             console.log('[CRM Content] Found ID from DOM (fallback):', id);
+             return id;
         }
     }
     
     console.warn('[CRM Content] Could not find Message ID');
     return null;
+}
+
+/**
+ * Pobiera obrazy z aktualnego maila (z załączników i inline)
+ * Zwraca tablicę obiektów {data: base64, mimeType: string}
+ */
+async function getEmailImages() {
+    const images = [];
+    
+    try {
+        // 1. Znajdź wszystkie obrazy w treści maila (inline)
+        const emailBody = document.querySelector('[role="main"]') || document.body;
+        const imgElements = emailBody.querySelectorAll('img[src]');
+        
+        for (const img of imgElements) {
+            try {
+                const src = img.src;
+                // Pomiń obrazy systemowe Gmaila (ikony, avatary)
+                if (src.includes('googleusercontent.com') && !src.includes('attachment')) {
+                    continue;
+                }
+                
+                // Spróbuj pobrać obraz jako base64
+                const response = await fetch(src);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    if (blob.type.startsWith('image/')) {
+                        const base64 = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result);
+                            reader.readAsDataURL(blob);
+                        });
+                        images.push({
+                            data: base64,
+                            mimeType: blob.type
+                        });
+                        console.log('[CRM Content] Found inline image:', blob.type, blob.size, 'bytes');
+                    }
+                }
+            } catch (e) {
+                console.warn('[CRM Content] Failed to extract image:', e);
+            }
+        }
+        
+        // 2. Jeśli mamy messageId, spróbuj pobrać załączniki przez API (jeśli użytkownik ma włączone importAttachments)
+        // To będzie zrobione w background.js jeśli importAttachments jest włączone
+        
+    } catch (e) {
+        console.error('[CRM Content] Error getting email images:', e);
+    }
+    
+    return images;
 }
 
 function setupFormHandlers(content) {
@@ -413,14 +425,59 @@ function setupFormHandlers(content) {
             const messageId = getCurrentMessageId();
             lastMessageId = messageId;
             
+            // Pobierz obrazy z maila (jeśli są)
+            const emailImages = await getEmailImages();
+            console.log('[CRM Content] Found', emailImages.length, 'images in email');
+            
+            // Pobierz adres email nadawcy z maila (jeśli dostępny)
+            let fromEmail = null;
+            try {
+                // Spróbuj znaleźć email nadawcy w DOM Gmaila
+                const fromElement = document.querySelector('[email]');
+                if (fromElement) {
+                    fromEmail = fromElement.getAttribute('email');
+                } else {
+                    // Alternatywnie, szukaj w tekście "Od:"
+                    const fromText = Array.from(document.querySelectorAll('span, div')).find(el => 
+                        el.textContent && el.textContent.includes('Od:') && el.textContent.includes('@')
+                    );
+                    if (fromText) {
+                        const emailMatch = fromText.textContent.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/);
+                        if (emailMatch) {
+                            fromEmail = emailMatch[0];
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('[CRM Content] Could not extract from email:', e);
+            }
+            
+            // Loguj informacje przed wysłaniem
+            console.log('[CRM Content] Sending to analyze:', {
+                messageId: messageId,
+                messageIdLength: messageId?.length,
+                fromEmail: fromEmail,
+                bodyLength: bodyText.length,
+                imagesCount: emailImages.length
+            });
+            
             const response = await chrome.runtime.sendMessage({
                 action: 'analyzeEmail',
                 data: { 
                     body: bodyText, 
                     subject: document.title,
                     messageId: messageId,
-                    date: new Date().toISOString()
+                    date: new Date().toISOString(),
+                    images: emailImages, // Przekaż obrazy do analizy
+                    fromEmail: fromEmail // Przekaż email nadawcy
                 }
+            });
+            
+            console.log('[CRM Content] Analysis response:', {
+                success: response.success,
+                phone: response.data?.phone,
+                email: response.data?.email,
+                hasError: !!response.error
             });
             
             if (response.success && response.data) {
@@ -460,6 +517,16 @@ function setupFormHandlers(content) {
         if (messageId) {
             messageId = messageId.replace(/[^a-zA-Z0-9_\-]/g, '');
         }
+        
+        // Loguj przed wysłaniem
+        console.log('[CRM Content] Creating job with:', {
+            messageId: messageId,
+            messageIdLength: messageId?.length,
+            manualAttachments: uploadedFiles.length,
+            title: title.substring(0, 50),
+            phone: phone,
+            email: email
+        });
 
         try {
             const res = await chrome.runtime.sendMessage({
@@ -473,6 +540,12 @@ function setupFormHandlers(content) {
                     gmailMessageId: messageId,
                     manualAttachments: uploadedFiles // <-- Przekazujemy skompresowane pliki
                 }
+            });
+            
+            console.log('[CRM Content] Create job response:', {
+                success: res.success,
+                warning: res.warning,
+                error: res.error
             });
             
             if (res.success) {

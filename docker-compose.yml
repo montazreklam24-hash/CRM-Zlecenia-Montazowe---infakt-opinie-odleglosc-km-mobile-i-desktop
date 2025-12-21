@@ -8,7 +8,9 @@ services:
     ports:
       - "8080:80"
     volumes:
-      - .:/var/www/html
+      - ./dist:/var/www/html
+      - ./api:/var/www/html/api
+      - ./uploads:/var/www/html/uploads
     depends_on:
       - db
     networks:
@@ -52,4 +54,9 @@ volumes:
 
 networks:
   crm_network:
+
+
+
+
+
 

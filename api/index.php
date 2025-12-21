@@ -58,15 +58,10 @@ switch ($endpoint) {
         handleJobs($method, $id);
         break;
         
-    case 'jobs-simple':
-        require_once __DIR__ . '/jobs_simple.php';
-        handleJobsSimple($method, $id);
-        break;
-        
     case 'jobs-all':
+        // Alias dla /jobs - zachowany dla kompatybilności
         require_once __DIR__ . '/jobs.php';
-        require_once __DIR__ . '/jobs_simple.php';
-        handleJobsAll();
+        getJobs();
         break;
         
     case 'geocode':

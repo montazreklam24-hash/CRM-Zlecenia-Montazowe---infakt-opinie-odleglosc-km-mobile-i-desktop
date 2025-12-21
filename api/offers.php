@@ -339,8 +339,8 @@ function convertOfferToJob($offerId) {
     $stmt->execute(array($offer['client_id']));
     $client = $stmt->fetch();
     
-    // Utwórz zlecenie AI
-    $friendlyId = generateFriendlyId('ai');
+    // Utwórz zlecenie
+    $friendlyId = generateFriendlyId();
     
     $stmt = $pdo->prepare('
         INSERT INTO jobs_ai (

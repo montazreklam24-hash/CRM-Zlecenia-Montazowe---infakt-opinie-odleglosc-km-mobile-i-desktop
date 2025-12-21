@@ -14,11 +14,15 @@ if (!defined('UPLOADS_URL')) {
 
 /**
  * Zapisuje base64 jako plik i zwraca ścieżkę
+ * Obsługuje obrazy (base64) oraz istniejące ścieżki do plików (obrazy, PDF-y, dokumenty)
  */
 function saveImageToFile($base64Data, $jobId, $type, $order) {
-    // Jeśli to nie jest base64 tylko już istniejący URL - zwróć bez zmian
+    // Jeśli to nie jest base64 tylko już istniejący URL/ścieżka - zwróć bez zmian
+    // To obsługuje obrazy, PDF-y i wszystkie inne pliki które już są zapisane
     if (strpos($base64Data, 'data:image') !== 0 && 
+        strpos($base64Data, 'data:application') !== 0 &&
         (strpos($base64Data, '/uploads') !== false || strpos($base64Data, '/api/uploads') !== false)) {
+        // To jest już istniejący plik (obraz, PDF, dokument) - zwróć ścieżkę bez zmian
         return $base64Data;
     }
     
@@ -49,24 +53,32 @@ function saveImageToFile($base64Data, $jobId, $type, $order) {
 }
 
 /**
- * Zapisuje obrazy do tabeli job_images
+ * Zapisuje obrazy i załączniki (obrazy, PDF-y, dokumenty) do tabeli job_images
  * jobType parametr jest deprecated - zachowany dla kompatybilności
+ * 
+ * Akceptuje:
+ * - Ścieżki do plików: /uploads/file.pdf, /uploads/image.jpg
+ * - Base64 obrazów: data:image/jpeg;base64,...
+ * - Base64 PDF-ów: data:application/pdf;base64,... (rzadko używane)
  */
 function saveJobImages($jobId, $images, $type = 'project', $jobType = 'ai') {
     if (empty($images) || !is_array($images)) return;
     
     $pdo = getDB();
     
-    // Pobierz stare obrazy (bez filtrowania po job_type - wszystko w jednej tabeli)
+    // Pobierz stare pliki (obrazy i załączniki) - bez filtrowania po job_type
     $stmt = $pdo->prepare('SELECT file_path FROM job_images WHERE job_id = ? AND type = ?');
     $stmt->execute(array($jobId, $type));
     $oldImages = $stmt->fetchAll();
     
     // Zbieramy nazwy plików, które są przesyłane w inpucie i mają pozostać
+    // Obsługujemy zarówno obrazy jak i PDF-y oraz inne pliki
     $filesToKeep = array();
     foreach ($images as $imgData) {
         // Sprawdzamy czy to URL (ścieżka), a nie base64
-        if (is_string($imgData) && strpos($imgData, 'data:image') !== 0 && 
+        if (is_string($imgData) && 
+            strpos($imgData, 'data:image') !== 0 && 
+            strpos($imgData, 'data:application') !== 0 &&
             (strpos($imgData, '/uploads') !== false || strpos($imgData, '/api/uploads') !== false)) {
             $filesToKeep[] = basename($imgData);
         }

@@ -133,13 +133,13 @@ const App: React.FC = () => {
   const handleSaveSimpleJob = async (jobData: Partial<Job>) => {
     try {
       if (jobData.id) {
-        await jobsService.updateJob(jobData.id, jobData, 'simple');
+        await jobsService.updateJob(jobData.id, jobData);
       } else {
-        await fetch('/api/jobs-simple', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(jobData)
-        });
+        await jobsService.createJob(
+          jobData.data!, 
+          jobData.projectImages || [], 
+          jobData.adminNotes
+        );
       }
       closeModal();
     } catch (error) {
@@ -258,15 +258,11 @@ const App: React.FC = () => {
                  onJobSaved={closeModal}
                  onArchive={async (id) => {
                     // Logic duplication - should be moved to service/hook
-                    const job = state.selectedJob;
-                    const jobType = job?.type === 'simple' ? 'simple' : 'ai';
-                    await jobsService.updateJob(id, { status: JobStatus.ARCHIVED, completedAt: Date.now(), columnId: 'ARCHIVE' as const }, jobType);
+                    await jobsService.updateJob(id, { status: JobStatus.ARCHIVED, completedAt: Date.now(), columnId: 'ARCHIVE' as const });
                     closeModal();
                  }}
                  onDelete={async (id) => {
-                    const job = state.selectedJob;
-                    const jobType = job?.type === 'simple' ? 'simple' : 'ai';
-                    await jobsService.deleteJob(id, jobType);
+                    await jobsService.deleteJob(id);
                     closeModal();
                  }}
                />
