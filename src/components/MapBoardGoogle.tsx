@@ -123,7 +123,7 @@ const SmartPopup = ({ job, position, onClose, onSelect, mapSize }: { job: Job, p
             <a 
               href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.data.address)}`}
               target="_blank"
-              className="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-bold py-1.5 rounded flex items-center justify-center gap-1 transition-colors"
+              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-bold py-1.5 rounded flex items-center justify-center gap-1 transition-colors"
             >
               <span>🧭</span> Nawiguj
             </a>
@@ -421,7 +421,7 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
         title="Moja lokalizacja"
       >
         {isLocating ? (
-          <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+          <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
         ) : (
           <Locate className="w-6 h-6" />
         )}

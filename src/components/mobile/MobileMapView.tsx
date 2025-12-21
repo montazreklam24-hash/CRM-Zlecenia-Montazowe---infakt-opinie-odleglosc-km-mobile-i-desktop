@@ -95,8 +95,8 @@ const MobileMapView: React.FC<MobileMapViewProps> = ({ jobs, onBack, onOpenJob }
             className: 'bg-transparent border-none',
             html: `
               <div class="relative flex items-center justify-center w-6 h-6">
-                <div class="absolute w-full h-full bg-blue-500/30 rounded-full animate-ping"></div>
-                <div class="relative w-3 h-3 bg-blue-500 border-2 border-white rounded-full shadow-sm"></div>
+                <div class="absolute w-full h-full bg-orange-500/30 rounded-full animate-ping"></div>
+                <div class="relative w-3 h-3 bg-orange-500 border-2 border-white rounded-full shadow-sm"></div>
               </div>
             `,
             iconSize: [24, 24],
@@ -248,7 +248,7 @@ const MobileMapView: React.FC<MobileMapViewProps> = ({ jobs, onBack, onOpenJob }
           className="absolute top-4 right-4 z-[400] p-3 bg-white text-slate-700 rounded-xl shadow-lg active:scale-95 disabled:opacity-70"
         >
           {isLocating ? (
-            <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+            <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
           ) : (
             <Locate className="w-6 h-6" />
           )}
@@ -320,7 +320,7 @@ const MobileMapView: React.FC<MobileMapViewProps> = ({ jobs, onBack, onOpenJob }
                 href={`https://www.google.com/maps/dir/?api=1&destination=${selectedJob.data.coordinates?.lat},${selectedJob.data.coordinates?.lng}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-500 text-white font-bold rounded-xl active:bg-blue-600"
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-orange-500 text-white font-bold rounded-xl active:bg-orange-600"
               >
                 <Navigation className="w-5 h-5" />
                 NAWIGUJ

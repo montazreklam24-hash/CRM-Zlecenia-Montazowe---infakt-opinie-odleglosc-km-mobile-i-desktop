@@ -86,7 +86,7 @@ const ROWS_CONFIG: {
   { id: 'TUE', title: 'WTOREK', shortTitle: 'WT', headerBg: 'bg-gradient-to-r from-emerald-500 to-emerald-600', headerText: 'text-white', dotColor: 'text-emerald-500', bodyBg: 'bg-emerald-50/50', borderColor: 'border-emerald-500', badgeBg: 'bg-emerald-100', badgeText: 'text-emerald-700' },
   { id: 'WED', title: 'ŚRODA', shortTitle: 'ŚR', headerBg: 'bg-gradient-to-r from-violet-500 to-violet-600', headerText: 'text-white', dotColor: 'text-violet-500', bodyBg: 'bg-violet-50/50', borderColor: 'border-violet-500', badgeBg: 'bg-violet-100', badgeText: 'text-violet-700' },
   { id: 'THU', title: 'CZWARTEK', shortTitle: 'CZW', headerBg: 'bg-gradient-to-r from-amber-400 to-amber-500', headerText: 'text-amber-900', dotColor: 'text-amber-500', bodyBg: 'bg-amber-50/50', borderColor: 'border-amber-400', badgeBg: 'bg-amber-100', badgeText: 'text-amber-800' },
-  { id: 'FRI', title: 'PIĄTEK', shortTitle: 'PT', headerBg: 'bg-gradient-to-r from-blue-500 to-blue-600', headerText: 'text-white', dotColor: 'text-blue-500', bodyBg: 'bg-blue-50/50', borderColor: 'border-blue-500', badgeBg: 'bg-blue-100', badgeText: 'text-blue-700' },
+  { id: 'FRI', title: 'PIĄTEK', shortTitle: 'PT', headerBg: 'bg-gradient-to-r from-orange-500 to-orange-600', headerText: 'text-white', dotColor: 'text-orange-500', bodyBg: 'bg-orange-50/50', borderColor: 'border-orange-500', badgeBg: 'bg-orange-100', badgeText: 'text-orange-700' },
   { id: 'SAT', title: 'SOBOTA', shortTitle: 'SB', headerBg: 'bg-gradient-to-r from-indigo-500 to-indigo-600', headerText: 'text-white', dotColor: 'text-indigo-500', bodyBg: 'bg-indigo-50/50', borderColor: 'border-indigo-500', badgeBg: 'bg-indigo-100', badgeText: 'text-indigo-700' },
   { id: 'SUN', title: 'NIEDZIELA', shortTitle: 'ND', headerBg: 'bg-gradient-to-r from-purple-500 to-purple-600', headerText: 'text-white', dotColor: 'text-purple-500', bodyBg: 'bg-purple-50/50', borderColor: 'border-purple-500', badgeBg: 'bg-purple-100', badgeText: 'text-purple-700' },
   { id: 'COMPLETED', title: 'WYKONANE', shortTitle: 'OK', headerBg: 'bg-gradient-to-r from-green-600 to-green-700', headerText: 'text-white', dotColor: 'text-green-600', bodyBg: 'bg-green-50/50', borderColor: 'border-green-600', badgeBg: 'bg-green-100', badgeText: 'text-green-700' },
@@ -313,7 +313,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           className="min-w-[160px] w-40 h-16 mr-3 rounded-lg border-dashed animate-pulse flex items-center justify-center"
           style={{ borderColor: '#3b82f6', background: 'rgba(59, 130, 246, 0.2)', borderWidth: '3px' }}
         >
-          <span className="text-xs text-blue-500 font-bold">↓ TUTAJ ↓</span>
+          <span className="text-xs text-orange-500 font-bold">↓ TUTAJ ↓</span>
         </div>
       )}
       <div 
@@ -325,7 +325,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
         {showArrows && canMoveLeft && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveLeft?.(job.id); }}
-            className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
+            className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:scale-110 transition-all"
             title="Przesuń w lewo"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -336,7 +336,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
         {showArrows && canMoveRight && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveRight?.(job.id); }}
-            className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
+            className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:scale-110 transition-all"
             title="Przesuń w prawo"
           >
             <ChevronRight className="w-5 h-5" />
@@ -454,13 +454,13 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="flex items-center justify-start gap-2 pl-2 pr-1 py-1 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-xs border border-blue-200 w-full"
+              className="flex items-center justify-start gap-2 pl-2 pr-1 py-1 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition-colors text-xs border border-orange-200 w-full"
               style={{ minHeight: '40px' }}
             >
-              <MapPin className="w-4 h-4 flex-shrink-0 text-blue-600" />
+              <MapPin className="w-4 h-4 flex-shrink-0 text-orange-600" />
               <div className="flex flex-col min-w-0 leading-tight text-left">
                 <span className="font-bold truncate text-[11px]">{addressParts.street}</span>
-                <span className="text-[9px] text-blue-600/80 truncate font-medium">
+                <span className="text-[9px] text-orange-600/80 truncate font-medium">
                   {addressParts.city}
                   {distance !== null && ` • ${distance.toFixed(1)} km`}
                 </span>
@@ -704,7 +704,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
           className="w-full h-12 mb-2 rounded-lg border-dashed animate-pulse flex items-center justify-center"
           style={{ borderColor: '#3b82f6', background: 'rgba(59, 130, 246, 0.2)', borderWidth: '3px' }}
         >
-          <span className="text-[10px] text-blue-500 font-bold">↓ TUTAJ ↓</span>
+          <span className="text-[10px] text-orange-500 font-bold">↓ TUTAJ ↓</span>
         </div>
       )}
       <div 
@@ -716,7 +716,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
         {showArrows && canMoveUp && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveUp?.(job.id); }}
-            className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
+            className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 p-0.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:scale-110 transition-all"
             title="Przesuń w górę"
           >
             <ChevronUp className="w-5 h-5" />
@@ -727,7 +727,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
         {showArrows && canMoveDown && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveDown?.(job.id); }}
-            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
+            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-20 p-0.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:scale-110 transition-all"
             title="Przesuń w dół"
           >
             <ChevronDown className="w-5 h-5" />
@@ -738,7 +738,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
         {showArrows && canMoveLeft && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveLeft?.(job.id); }}
-            className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
+            className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:scale-110 transition-all"
             title="Przesuń w lewo"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -749,7 +749,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
         {showArrows && canMoveRight && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveRight?.(job.id); }}
-            className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
+            className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:scale-110 transition-all"
             title="Przesuń w prawo"
           >
             <ChevronRight className="w-5 h-5" />
@@ -1909,7 +1909,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                         
                         {/* Dane zlecenia w środku */}
                         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onSelectJob(job, true)}>
-                          <h4 className="font-bold text-sm mb-1 group-hover:text-blue-600 transition-colors" style={{ color: 'var(--text-primary)' }}>
+                          <h4 className="font-bold text-sm mb-1 group-hover:text-orange-600 transition-colors" style={{ color: 'var(--text-primary)' }}>
                             {job.data.jobTitle || 'Bez nazwy'}
                           </h4>
                           <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
@@ -2526,12 +2526,12 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                   setShowTypeModal(false);
                   onCreateNew();
                 }}
-                className="w-full p-5 border-2 border-blue-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group text-left"
+                className="w-full p-5 border-2 border-orange-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group text-left"
               >
                 <div className="flex items-center gap-4">
                   <span className="text-4xl">🤖</span>
                   <div>
-                    <h3 className="text-xl font-bold text-blue-700 group-hover:text-blue-800">Zlecenie AI</h3>
+                    <h3 className="text-xl font-bold text-orange-700 group-hover:text-orange-800">Zlecenie AI</h3>
                     <p className="text-slate-600 text-sm mt-1">Wklej mail - Gemini wypełni dane automatycznie</p>
                   </div>
                 </div>

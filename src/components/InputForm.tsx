@@ -206,7 +206,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing, onSwitchT
           {/* Job Title */}
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <Type className="w-4 h-4 text-blue-500" />
+              <Type className="w-4 h-4 text-orange-500" />
               NAZWA ZLECENIA
               <span className="text-slate-400 font-normal">(opcjonalnie)</span>
             </label>
@@ -233,7 +233,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing, onSwitchT
                   className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all ${
                     isListening 
                       ? 'bg-red-100 text-red-600 animate-pulse' 
-                      : 'bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-600'
+                      : 'bg-slate-100 text-slate-500 hover:bg-orange-50 hover:text-orange-600'
                   }`}
                 >
                   {isListening ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
@@ -315,7 +315,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing, onSwitchT
                         <button 
                           type="button" 
                           onClick={() => rotateImageAtIndex(idx)} 
-                          className="p-1.5 bg-blue-500 rounded-lg text-white shadow-lg hover:bg-blue-600"
+                          className="p-1.5 bg-orange-500 rounded-lg text-white shadow-lg hover:bg-orange-600"
                           title="Obróć o 90°"
                         >
                           <RotateCw className="w-3 h-3" />

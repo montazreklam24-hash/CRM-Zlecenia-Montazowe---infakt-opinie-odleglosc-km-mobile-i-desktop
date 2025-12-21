@@ -713,7 +713,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
               >
                 <Trash2 className="w-3.5 h-3.5" /> Usuń
               </button>
-              <button onClick={() => setIsEditing(true)} className="flex items-center gap-1.5 text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-xl font-bold shadow-lg shadow-blue-500/25">
+              <button onClick={() => setIsEditing(true)} className="flex items-center gap-1.5 text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-xl font-bold shadow-lg shadow-orange-500/25">
                 <Edit2 className="w-3.5 h-3.5" /> Edytuj
               </button>
             </>
@@ -784,7 +784,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                         alert('Błąd zmiany kolumny');
                       }
                     }}
-                    className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm font-bold text-slate-700 focus:border-blue-500 outline-none"
+                    className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm font-bold text-slate-700 focus:border-orange-500 outline-none"
                   >
                     <option value="PREPARE">DO PRZYGOTOWANIA</option>
                     <option value="MON">PONIEDZIAŁEK</option>
@@ -933,7 +933,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                 />
                 <button 
                   onClick={handleCheckAddress}
-                  className="self-end text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 px-2 py-1 bg-blue-50 rounded-lg"
+                  className="self-end text-xs font-bold text-orange-600 hover:text-orange-800 flex items-center gap-1 px-2 py-1 bg-orange-50 rounded-lg"
                 >
                   <Navigation className="w-3 h-3" /> SPRAWDŹ NA MAPIE
                 </button>
@@ -946,7 +946,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                     href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(editedData.address)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-blue-600 shadow-lg shadow-blue-500/25"
+                    className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-orange-600 shadow-lg shadow-orange-500/25"
                   >
                     <Navigation className="w-4 h-4" /> Nawiguj
                   </a>
@@ -956,7 +956,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
           </div>
 
           {/* Scheduled Date & Time */}
-          <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-5 shadow-sm border border-indigo-200">
+          <div className="bg-gradient-to-r from-indigo-50 to-orange-50 rounded-xl p-5 shadow-sm border border-indigo-200">
             <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wide mb-3 flex items-center gap-2">
               <Calendar className="w-4 h-4" /> TERMIN MONTAŻU
             </p>
@@ -1092,9 +1092,9 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
 
           {/* Scope of Work */}
           {(editedData.scopeWorkText || isEditing) && (
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-5 shadow-sm">
+            <div className="bg-orange-50 border border-orange-100 rounded-xl p-5 shadow-sm">
               <div className="flex justify-between items-center mb-3">
-                <p className="text-xs font-bold text-blue-600 uppercase tracking-wide flex items-center gap-2">
+                <p className="text-xs font-bold text-orange-600 uppercase tracking-wide flex items-center gap-2">
                   <ScrollText className="w-4 h-4" /> ZAKRES PRAC
                 </p>
                 {isEditing && isSupported && (
@@ -1103,7 +1103,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                     className={`p-1.5 rounded-lg transition-all ${
                       isListening && activeVoiceField === 'scopeWorkText'
                         ? 'bg-red-100 text-red-600 animate-pulse'
-                        : 'bg-white text-slate-400 hover:text-blue-600'
+                        : 'bg-white text-slate-400 hover:text-orange-600'
                     }`}
                     title="Nagraj głosowo"
                   >
@@ -1115,7 +1115,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                 <textarea 
                   value={editedData.scopeWorkText || ''} 
                   onChange={(e) => handleDataChange('scopeWorkText', e.target.value)}
-                  className="w-full min-h-[100px] bg-white border border-blue-200 rounded-lg p-3 text-sm text-slate-800"
+                  className="w-full min-h-[100px] bg-white border border-orange-200 rounded-lg p-3 text-sm text-slate-800"
                   placeholder="Opis zakresu prac..."
                 />
               ) : (
@@ -1233,7 +1233,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                     className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm w-48" 
                     placeholder="Dodaj zadanie..." 
                   />
-                  <button onClick={addChecklistItem} className="bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600">
+                  <button onClick={addChecklistItem} className="bg-orange-500 text-white p-2 rounded-lg hover:bg-orange-600">
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
@@ -1274,7 +1274,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                 <Camera className="w-4 h-4" /> Pliki i Projekty
               </h3>
               {isEditing && (
-                <label className="cursor-pointer bg-blue-50 text-blue-600 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-blue-100 transition-colors shadow-sm border border-blue-200">
+                <label className="cursor-pointer bg-orange-50 text-orange-600 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-orange-100 transition-colors shadow-sm border border-orange-200">
                   <Plus className="w-4 h-4" /> DODAJ
                   <input type="file" multiple accept="image/*,application/pdf" className="hidden" onChange={(e) => handleImageUpload(e, 'project')} />
                 </label>
@@ -1308,7 +1308,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                     }
                   }
                 }}
-                className="mb-4 p-4 border-2 border-dashed border-slate-300 rounded-xl text-center text-sm text-slate-500 hover:border-blue-400 hover:bg-blue-50/50 transition-colors cursor-pointer"
+                className="mb-4 p-4 border-2 border-dashed border-slate-300 rounded-xl text-center text-sm text-slate-500 hover:border-orange-400 hover:bg-orange-50/50 transition-colors cursor-pointer"
               >
                 <p className="mb-1">Przeciągnij i upuść zdjęcia tutaj</p>
                 <p className="text-xs text-slate-400">lub użyj Ctrl+V aby wkleić</p>
@@ -1349,7 +1349,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                             {!isPdf(img) && (
                               <button 
                                 onClick={(e) => {e.stopPropagation(); rotateProjectImage(idx)}} 
-                                className="p-2 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600"
+                                className="p-2 bg-orange-500 text-white rounded-lg shadow-md hover:bg-orange-600"
                                 title="Obróć o 90°"
                               >
                                 <RotateCw className="w-5 h-5" />
@@ -1492,7 +1492,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
         
         {/* Worker Completion Form */}
         {!isAdmin && !isEditing && job?.status !== JobStatus.COMPLETED && (
-          <div className="bg-white p-6 rounded-2xl shadow-xl border-t-4 border-blue-500">
+          <div className="bg-white p-6 rounded-2xl shadow-xl border-t-4 border-orange-500">
             <h3 className="font-bold text-xl text-slate-800 mb-4">Raport Montażowy</h3>
             <textarea 
               className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl mb-4" 
@@ -1516,7 +1516,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
             <button 
               onClick={handleCompleteJob} 
               disabled={isProcessing} 
-              className="w-full py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold rounded-xl shadow-xl shadow-blue-500/25 flex items-center justify-center gap-3 hover:from-blue-600 hover:to-blue-700 disabled:opacity-50"
+              className="w-full py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold rounded-xl shadow-xl shadow-orange-500/25 flex items-center justify-center gap-3 hover:from-orange-600 hover:to-orange-700 disabled:opacity-50"
             >
               {isProcessing ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} 
               Zakończ Zlecenie
@@ -1531,7 +1531,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-slate-200 p-6 rounded-t-2xl">
               <div className="flex items-center gap-3">
-                <Navigation className="w-6 h-6 text-blue-600" />
+                <Navigation className="w-6 h-6 text-orange-600" />
                 <h3 className="text-xl font-bold text-slate-800">
                   {showManualAddress ? 'Wprowadź adres ręcznie' : 'Wybierz lokalizację'}
                 </h3>
@@ -1556,7 +1556,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                         className={`w-full text-left p-4 border-2 rounded-xl transition-colors ${
                           idx === 0 
                             ? 'border-green-500 bg-green-50 hover:bg-green-100' 
-                            : 'border-slate-200 hover:border-blue-400 hover:bg-blue-50'
+                            : 'border-slate-200 hover:border-orange-400 hover:bg-orange-50'
                         }`}
                       >
                         <div className="flex justify-between items-start">
@@ -1578,7 +1578,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                   <div className="border-t pt-4 space-y-2">
                     <button
                       onClick={() => setShowManualAddress(true)}
-                      className="w-full py-3 text-blue-600 font-medium hover:bg-blue-50 rounded-xl transition-colors"
+                      className="w-full py-3 text-orange-600 font-medium hover:bg-orange-50 rounded-xl transition-colors"
                     >
                       🖊️ Żaden się nie zgadza - wprowadzę ręcznie
                     </button>
@@ -1609,7 +1609,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                         type="text"
                         value={manualAddressForm.street}
                         onChange={(e) => setManualAddressForm(prev => ({ ...prev, street: e.target.value }))}
-                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-400 outline-none"
+                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-orange-400 outline-none"
                         placeholder="np. Zajęcza"
                       />
                     </div>
@@ -1622,7 +1622,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                         type="text"
                         value={manualAddressForm.buildingNo}
                         onChange={(e) => setManualAddressForm(prev => ({ ...prev, buildingNo: e.target.value }))}
-                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-400 outline-none"
+                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-orange-400 outline-none"
                         placeholder="9"
                       />
                     </div>
@@ -1635,7 +1635,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                         type="text"
                         value={manualAddressForm.postCode}
                         onChange={(e) => setManualAddressForm(prev => ({ ...prev, postCode: e.target.value }))}
-                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-400 outline-none"
+                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-orange-400 outline-none"
                         placeholder="00-000"
                         maxLength={6}
                       />
@@ -1649,7 +1649,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                         type="text"
                         value={manualAddressForm.city}
                         onChange={(e) => setManualAddressForm(prev => ({ ...prev, city: e.target.value }))}
-                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-400 outline-none"
+                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-orange-400 outline-none"
                         placeholder="Warszawa"
                       />
                     </div>
@@ -1669,7 +1669,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                       </button>
                       <button
                         onClick={confirmManualAddress}
-                        className="flex-1 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700"
+                        className="flex-1 py-3 bg-orange-600 text-white font-semibold rounded-xl hover:bg-orange-700"
                       >
                         Zapisz adres
                       </button>

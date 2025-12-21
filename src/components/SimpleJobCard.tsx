@@ -379,7 +379,7 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
               />
               <button
                 onClick={handleGeocodeAddress}
-                className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
+                className="px-4 py-3 bg-orange-600 text-white rounded-xl hover:bg-orange-700 transition-colors"
                 type="button"
                 title="Wymuś geokodowanie"
               >

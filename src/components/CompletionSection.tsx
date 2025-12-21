@@ -241,9 +241,9 @@ Montaż Reklam 24`;
         
         <div className="flex items-center gap-2">
           {reviewAlreadySent && (
-            <div className="flex items-center gap-2 bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">
+            <div className="flex items-center gap-2 bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs font-bold">
               ✅ Prośba wysłana
-              <span className="text-blue-500 font-normal">
+              <span className="text-orange-500 font-normal">
                 {new Date(job.reviewRequestSentAt!).toLocaleDateString('pl-PL')}
               </span>
             </div>

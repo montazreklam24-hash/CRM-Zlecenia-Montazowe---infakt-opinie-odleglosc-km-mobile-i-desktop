@@ -313,7 +313,7 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
         ) : (
           <button
             onClick={() => setIsEditing(true)}
-            className="p-2 bg-blue-500 rounded-xl text-white active:scale-95"
+            className="p-2 bg-orange-500 rounded-xl text-white active:scale-95"
           >
             <Edit className="w-6 h-6" />
           </button>
@@ -392,8 +392,8 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
         </div>
 
         {/* Address Section - Prominent */}
-        <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
-          <label className="text-xs text-blue-500 font-medium uppercase tracking-wider flex items-center gap-2 mb-2">
+        <div className="bg-orange-50 rounded-2xl p-4 border border-orange-100">
+          <label className="text-xs text-orange-500 font-medium uppercase tracking-wider flex items-center gap-2 mb-2">
             <MapPin className="w-4 h-4" />
             Adres montażu
           </label>
@@ -489,7 +489,7 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
           <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => onDuplicate(job.id)}
-              className="py-3 bg-blue-50 text-blue-600 rounded-xl font-medium text-sm flex flex-col items-center gap-1 active:scale-95"
+              className="py-3 bg-orange-50 text-orange-600 rounded-xl font-medium text-sm flex flex-col items-center gap-1 active:scale-95"
             >
               <Copy className="w-5 h-5" />
               Duplikuj
@@ -528,7 +528,7 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
                   key={idx}
                   onClick={() => setCurrentImageIndex(idx)}
                   className={`relative w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${
-                    currentImageIndex === idx ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-200'
+                    currentImageIndex === idx ? 'border-orange-500 ring-2 ring-blue-200' : 'border-slate-200'
                   }`}
                 >
                   <img 
@@ -669,7 +669,7 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
                         </button>
                         <button
                           onClick={() => galleryInputRef.current?.click()}
-                          className="w-20 h-20 border-2 border-dashed border-blue-300 rounded-xl flex flex-col items-center justify-center text-blue-600 active:bg-blue-50 bg-blue-50/50"
+                          className="w-20 h-20 border-2 border-dashed border-orange-300 rounded-xl flex flex-col items-center justify-center text-orange-600 active:bg-orange-50 bg-orange-50/50"
                         >
                           <ImagePlus className="w-6 h-6" />
                           <span className="text-[10px] font-medium mt-1">Galeria</span>
@@ -785,7 +785,7 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
           href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.data.address || '')}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 py-4 bg-blue-500 text-white rounded-2xl font-bold text-lg flex items-center justify-center gap-3 active:scale-95 shadow-lg shadow-blue-500/30"
+          className="flex-1 py-4 bg-orange-500 text-white rounded-2xl font-bold text-lg flex items-center justify-center gap-3 active:scale-95 shadow-lg shadow-orange-500/30"
         >
           <Navigation className="w-6 h-6" />
           NAWIGUJ

@@ -28,26 +28,30 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Top Navigation Bar - Pomarańczowy */}
-      <header className="fixed top-0 left-0 right-0 h-16 bg-gradient-to-r from-orange-600 to-orange-700 z-50 flex items-center justify-between px-4 md:px-6 shadow-lg">
+      {/* Top Navigation Bar - CZARNY */}
+      <header className="fixed top-0 left-0 right-0 h-16 bg-black z-50 flex items-center justify-between px-4 md:px-6 shadow-lg border-b border-gray-800">
         {/* Left: Logo + Menu */}
         <div className="flex items-center gap-4">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 text-white hover:bg-orange-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-orange-300"
+            className="p-2 text-white hover:bg-gray-800 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500"
             aria-label="Toggle menu"
           >
             {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
           
-          {/* Logo M24 */}
+          {/* Logo */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-md">
-              <span className="text-orange-600 font-bold text-lg">M24</span>
-            </div>
-            <div className="hidden md:flex flex-col">
-              <span className="text-white font-bold text-sm leading-tight">Montaż Reklam 24</span>
-              <span className="text-orange-100 text-xs">CRM 5.0 PC + MOBILE</span>
+            {/* Logo jako tekst z pomarańczowym akcentem */}
+            <div className="flex items-center gap-2">
+              <div className="text-white font-bold text-lg">
+                <span className="text-orange-500">montaż</span>
+                <span className="text-white"> reklam </span>
+                <span className="text-orange-500 text-xl">24</span>
+              </div>
+              <span className="hidden md:inline text-xs text-gray-400 font-semibold bg-gray-800 px-2 py-1 rounded">
+                CRM Beta
+              </span>
             </div>
           </div>
         </div>
@@ -55,13 +59,13 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
         {/* Right: View Toggles + User */}
         <div className="flex items-center gap-3">
           {/* PC/Mobile Toggle */}
-          <div className="hidden md:flex bg-orange-500 rounded-lg p-1">
+          <div className="hidden md:flex bg-gray-800 rounded-lg p-1 border border-gray-700">
             <button
               onClick={() => handleViewToggle('desktop')}
               className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
                 currentView === 'desktop'
-                  ? 'bg-white text-orange-600 shadow-sm'
-                  : 'text-white hover:bg-orange-400'
+                  ? 'bg-orange-500 text-white shadow-sm'
+                  : 'text-gray-300 hover:bg-gray-700'
               }`}
             >
               PC
@@ -70,8 +74,8 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
               onClick={() => handleViewToggle('mobile')}
               className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
                 currentView === 'mobile'
-                  ? 'bg-white text-orange-600 shadow-sm'
-                  : 'text-white hover:bg-orange-400'
+                  ? 'bg-orange-500 text-white shadow-sm'
+                  : 'text-gray-300 hover:bg-gray-700'
               }`}
             >
               Mobile
@@ -81,7 +85,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
           {/* Trello Classic Button */}
           <button
             onClick={() => window.open('https://trello.com', '_blank')}
-            className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-orange-500 hover:bg-orange-400 text-white text-xs font-semibold rounded-lg transition-colors"
+            className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition-colors"
           >
             Trello Classic
           </button>
@@ -90,7 +94,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
           <div className="relative">
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-orange-500 hover:bg-orange-400 text-white text-xs font-semibold rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-white text-xs font-semibold rounded-lg transition-colors border border-gray-700"
             >
               <span className="hidden md:inline">
                 ZALOGOWANO JAKO {user?.name || 'Administrator'} {user?.name || 'Admin'}
@@ -142,8 +146,8 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
         />
       </div>
 
-      {/* Main Content */}
-      <main className="flex-1 pt-24 p-4 md:p-8 min-h-screen transition-all duration-300 w-full">
+      {/* Main Content - Obniżony o 50px więcej */}
+      <main className="flex-1 pt-44 p-4 md:p-8 min-h-screen transition-all duration-300 w-full">
         <div className="max-w-7xl mx-auto">
            <Outlet />
         </div>

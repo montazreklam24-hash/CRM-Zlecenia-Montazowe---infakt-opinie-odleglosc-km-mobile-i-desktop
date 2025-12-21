@@ -192,7 +192,7 @@ const MobileJobCard: React.FC<MobileJobCardProps> = ({
           <button
             onClick={(e) => { e.stopPropagation(); onMoveUp?.(); }}
             disabled={!canMoveUp}
-            className={`p-2 rounded-lg transition-all ${canMoveUp ? 'bg-blue-100 text-blue-600 active:scale-95' : 'bg-slate-100 text-slate-300'}`}
+            className={`p-2 rounded-lg transition-all ${canMoveUp ? 'bg-orange-100 text-orange-600 active:scale-95' : 'bg-slate-100 text-slate-300'}`}
           >
             <ChevronUp className="w-5 h-5" />
           </button>
@@ -211,7 +211,7 @@ const MobileJobCard: React.FC<MobileJobCardProps> = ({
           <button
             onClick={(e) => { e.stopPropagation(); onMoveDown?.(); }}
             disabled={!canMoveDown}
-            className={`p-2 rounded-lg transition-all ${canMoveDown ? 'bg-blue-100 text-blue-600 active:scale-95' : 'bg-slate-100 text-slate-300'}`}
+            className={`p-2 rounded-lg transition-all ${canMoveDown ? 'bg-orange-100 text-orange-600 active:scale-95' : 'bg-slate-100 text-slate-300'}`}
           >
             <ChevronDown className="w-5 h-5" />
           </button>
@@ -226,7 +226,7 @@ const MobileJobCard: React.FC<MobileJobCardProps> = ({
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-700 font-bold text-sm active:bg-blue-100 border-r border-slate-100"
+          className="flex-1 flex items-center justify-center gap-2 py-3 bg-orange-50 text-orange-700 font-bold text-sm active:bg-orange-100 border-r border-slate-100"
         >
           <Navigation className="w-5 h-5" />
           NAWIGUJ
@@ -283,7 +283,7 @@ const MobileJobCard: React.FC<MobileJobCardProps> = ({
               <div className="border-t border-slate-100 my-1" />
               <button
                 onClick={() => { onDuplicate?.(); setShowMoveMenu(false); }}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 active:bg-slate-100 text-sm font-medium text-blue-600 flex items-center gap-2"
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 active:bg-slate-100 text-sm font-medium text-orange-600 flex items-center gap-2"
               >
                 <Copy className="w-4 h-4" />
                 Duplikuj

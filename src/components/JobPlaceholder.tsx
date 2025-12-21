@@ -46,7 +46,7 @@ const JobPlaceholder: React.FC<JobPlaceholderProps> = ({
   // Generuj stabilny kolor na podstawie ID zlecenia
   const gradientClass = useMemo(() => {
     const gradients = [
-      'from-blue-600 to-blue-400',
+      'from-orange-600 to-orange-400',
       'from-emerald-600 to-emerald-400',
       'from-orange-500 to-amber-500',
       'from-violet-600 to-purple-500',
@@ -61,12 +61,12 @@ const JobPlaceholder: React.FC<JobPlaceholderProps> = ({
       'from-yellow-500 to-yellow-300',
       'from-slate-600 to-slate-400',
       'from-stone-600 to-stone-400',
-      'from-sky-700 to-blue-500',
+      'from-orange-700 to-orange-500',
       'from-rose-500 to-orange-400',
       'from-purple-600 to-pink-500',
       'from-emerald-500 to-teal-400',
       'from-amber-600 to-orange-500',
-      'from-indigo-500 to-blue-400',
+      'from-orange-500 to-orange-400',
     ];
     // Użyj reszty z dzielenia
     const index = numericId ? numericId % gradients.length : Math.floor(Math.random() * gradients.length);

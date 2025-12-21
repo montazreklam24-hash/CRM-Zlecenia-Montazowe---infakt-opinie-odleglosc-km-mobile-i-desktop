@@ -222,7 +222,7 @@ const MobileGoogleMapView: React.FC<MobileGoogleMapViewProps> = ({ jobs, onBack,
           disabled={isLocating}
           className="absolute top-4 right-4 z-[10] p-3 bg-white text-slate-700 rounded-xl shadow-lg active:scale-95 disabled:opacity-70"
         >
-          {isLocating ? <Loader2 className="w-6 h-6 animate-spin text-blue-500" /> : <Locate className="w-6 h-6" />}
+          {isLocating ? <Loader2 className="w-6 h-6 animate-spin text-orange-500" /> : <Locate className="w-6 h-6" />}
         </button>
 
         {/* Loading overlay */}
@@ -268,7 +268,7 @@ const MobileGoogleMapView: React.FC<MobileGoogleMapViewProps> = ({ jobs, onBack,
                 href={`https://www.google.com/maps/dir/?api=1&destination=${selectedJob.data.coordinates?.lat},${selectedJob.data.coordinates?.lng}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-500 text-white font-bold rounded-xl active:bg-blue-600"
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-orange-500 text-white font-bold rounded-xl active:bg-orange-600"
               >
                 <Navigation className="w-5 h-5" />
                 NAWIGUJ

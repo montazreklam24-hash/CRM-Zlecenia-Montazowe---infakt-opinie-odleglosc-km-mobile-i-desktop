@@ -176,7 +176,7 @@ const JobContextMenu: React.FC<JobContextMenuProps> = ({
           <div className="p-2 border-b border-gray-100">
             <button 
               onClick={() => { onOpenJob(job); onClose(); }}
-              className="w-full py-2 px-3 rounded-lg text-sm font-medium bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors flex items-center justify-center gap-2"
+              className="w-full py-2 px-3 rounded-lg text-sm font-medium bg-orange-50 hover:bg-orange-100 text-orange-700 transition-colors flex items-center justify-center gap-2"
             >
               <ExternalLink className="w-4 h-4" />
               Otwórz szczegóły
