@@ -87,7 +87,7 @@ const ROWS_CONFIG: {
   { id: 'WED', title: 'ŚRODA', shortTitle: 'ŚR', headerBg: 'bg-gradient-to-r from-violet-500 to-violet-600', headerText: 'text-white', dotColor: 'text-violet-500', bodyBg: 'bg-violet-50/50', borderColor: 'border-violet-500', badgeBg: 'bg-violet-100', badgeText: 'text-violet-700' },
   { id: 'THU', title: 'CZWARTEK', shortTitle: 'CZW', headerBg: 'bg-gradient-to-r from-amber-400 to-amber-500', headerText: 'text-amber-900', dotColor: 'text-amber-500', bodyBg: 'bg-amber-50/50', borderColor: 'border-amber-400', badgeBg: 'bg-amber-100', badgeText: 'text-amber-800' },
   { id: 'FRI', title: 'PIĄTEK', shortTitle: 'PT', headerBg: 'bg-gradient-to-r from-orange-500 to-orange-600', headerText: 'text-white', dotColor: 'text-orange-500', bodyBg: 'bg-orange-50/50', borderColor: 'border-orange-500', badgeBg: 'bg-orange-100', badgeText: 'text-orange-700' },
-  { id: 'SAT', title: 'SOBOTA', shortTitle: 'SB', headerBg: 'bg-gradient-to-r from-indigo-500 to-indigo-600', headerText: 'text-white', dotColor: 'text-indigo-500', bodyBg: 'bg-indigo-50/50', borderColor: 'border-indigo-500', badgeBg: 'bg-indigo-100', badgeText: 'text-indigo-700' },
+  { id: 'SAT', title: 'SOBOTA', shortTitle: 'SB', headerBg: 'bg-gradient-to-r from-orange-500 to-orange-600', headerText: 'text-white', dotColor: 'text-orange-500', bodyBg: 'bg-orange-50/50', borderColor: 'border-orange-500', badgeBg: 'bg-orange-100', badgeText: 'text-orange-700' },
   { id: 'SUN', title: 'NIEDZIELA', shortTitle: 'ND', headerBg: 'bg-gradient-to-r from-purple-500 to-purple-600', headerText: 'text-white', dotColor: 'text-purple-500', bodyBg: 'bg-purple-50/50', borderColor: 'border-purple-500', badgeBg: 'bg-purple-100', badgeText: 'text-purple-700' },
   { id: 'COMPLETED', title: 'WYKONANE', shortTitle: 'OK', headerBg: 'bg-gradient-to-r from-green-600 to-green-700', headerText: 'text-white', dotColor: 'text-green-600', bodyBg: 'bg-green-50/50', borderColor: 'border-green-600', badgeBg: 'bg-green-100', badgeText: 'text-green-700' },
 ];
@@ -355,7 +355,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
             e.stopPropagation();
             onContextMenu?.(e, job);
           }}
-          className={`theme-card min-w-[160px] w-full min-h-[280px] h-full cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group relative flex flex-col overflow-visible touch-none ${showDropIndicator ? 'ring-2 ring-blue-400' : ''}`}
+          className={`theme-card min-w-[160px] w-full min-h-[280px] h-full cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group relative flex flex-col overflow-visible touch-none ${showDropIndicator ? 'ring-2 ring-orange-400' : ''}`}
         >
           {/* Click hint tooltip */}
           {showClickHint && (
@@ -436,10 +436,10 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           
           {/* Scheduled Date/Time Badge */}
           {job.data.scheduledDate && (
-            <div className="text-[9px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded font-medium mb-1 flex items-center gap-1 w-fit">
+            <div className="text-[9px] text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded font-medium mb-1 flex items-center gap-1 w-fit">
               📅 {new Date(job.data.scheduledDate).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
               {job.data.timeSlotStart && (
-                <span className="text-indigo-500">
+                <span className="text-orange-500">
                   {job.data.timeSlotStart}{job.data.timeSlotEnd && `-${job.data.timeSlotEnd}`}
                 </span>
               )}
@@ -595,7 +595,7 @@ const DroppableRow: React.FC<DroppableColumnProps> = ({ id, children, activeId }
     <div 
       ref={setNodeRef}
       className={`p-5 transition-all overflow-visible ${
-        isOver && activeId ? 'ring-2 ring-blue-400 ring-offset-2' : ''
+        isOver && activeId ? 'ring-2 ring-orange-400 ring-offset-2' : ''
       }`}
       style={{ 
         background: isOver && activeId ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-surface)', 
@@ -624,7 +624,7 @@ const DroppableColumn: React.FC<DroppableColumnProps> = ({ id, children, activeI
     <div 
       ref={setNodeRef}
       className={`p-3 min-h-[400px] flex-1 transition-all flex flex-col overflow-visible ${
-        isOver && activeId ? 'ring-2 ring-blue-400 ring-offset-2' : ''
+        isOver && activeId ? 'ring-2 ring-orange-400 ring-offset-2' : ''
       }`}
       style={{ 
         background: isOver && activeId ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-surface)', 
@@ -762,7 +762,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
           {...listeners}
           {...attributes}
           onDoubleClick={handleCardDoubleClick}
-          className={`theme-card cursor-grab active:cursor-grabbing transition-all hover:shadow-md relative overflow-hidden touch-none ${showDropIndicator ? 'ring-2 ring-blue-400' : ''}`}
+          className={`theme-card cursor-grab active:cursor-grabbing transition-all hover:shadow-md relative overflow-hidden touch-none ${showDropIndicator ? 'ring-2 ring-orange-400' : ''}`}
         >
         {/* PAYMENT STATUS BAR - na samej górze, kliknięcie otwiera mini-menu */}
         <div className="relative">
@@ -1725,7 +1725,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   return (
     <div className="animate-fade-in pb-20">
       {/* Header & Controls */}
-      <div className="flex flex-col gap-3 mb-4 mt-8">
+      <div className="flex flex-col gap-3 mb-4 mt-11">
         {/* Row 1: Tabs + New button */}
         <div className="flex justify-between items-center gap-2">
           <div className="theme-surface flex p-1 flex-shrink-0" style={{ borderRadius: 'var(--radius-lg)' }}>
@@ -2035,7 +2035,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                   const isToday = mapDayToId[today] === row.id;
 
                   return (
-                    <div key={row.id} className={`theme-surface flex flex-col min-h-[500px] transition-all ${isToday ? 'ring-2 ring-blue-500 shadow-xl z-20' : ''}`} style={{ borderRadius: 'var(--radius-lg)' }}>
+                    <div key={row.id} className={`theme-surface flex flex-col min-h-[500px] transition-all ${isToday ? 'ring-2 ring-orange-500 shadow-xl z-20' : ''}`} style={{ borderRadius: 'var(--radius-lg)' }}>
                       <div className={`${row.headerBg} ${row.headerText} px-3 py-3 flex justify-between items-center sticky top-0 z-10 relative`} style={{ borderTopLeftRadius: 'var(--radius-lg)', borderTopRightRadius: 'var(--radius-lg)' }}>
                          {isToday && (
                            <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center animate-bounce z-50 pointer-events-none">

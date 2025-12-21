@@ -788,7 +788,7 @@ const MobileJobCardCompact: React.FC<MobileJobCardCompactProps> = ({
                   onClick={() => handlePaymentChange(opt.value)}
                   className={`px-2 py-2 rounded-xl text-[10px] font-bold text-center transition-all ${
                     job.paymentStatus === opt.value 
-                      ? 'ring-2 ring-offset-1 ring-blue-500' 
+                      ? 'ring-2 ring-offset-1 ring-orange-500' 
                       : ''
                   }`}
                   style={{ 

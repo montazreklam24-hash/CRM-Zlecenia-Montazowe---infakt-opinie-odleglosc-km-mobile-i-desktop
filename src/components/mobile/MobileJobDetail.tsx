@@ -528,7 +528,7 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
                   key={idx}
                   onClick={() => setCurrentImageIndex(idx)}
                   className={`relative w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${
-                    currentImageIndex === idx ? 'border-orange-500 ring-2 ring-blue-200' : 'border-slate-200'
+                    currentImageIndex === idx ? 'border-orange-500 ring-2 ring-orange-200' : 'border-slate-200'
                   }`}
                 >
                   <img 

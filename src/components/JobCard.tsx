@@ -956,8 +956,8 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
           </div>
 
           {/* Scheduled Date & Time */}
-          <div className="bg-gradient-to-r from-indigo-50 to-orange-50 rounded-xl p-5 shadow-sm border border-indigo-200">
-            <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wide mb-3 flex items-center gap-2">
+          <div className="bg-gradient-to-r from-orange-50 to-orange-50 rounded-xl p-5 shadow-sm border border-orange-200">
+            <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wide mb-3 flex items-center gap-2">
               <Calendar className="w-4 h-4" /> TERMIN MONTAŻU
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -971,7 +971,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                     type="date"
                     value={editedData.scheduledDate || ''} 
                     onChange={(e) => handleDataChange('scheduledDate', e.target.value)} 
-                    className="w-full bg-white border border-indigo-200 rounded-lg p-2 text-sm mt-1"
+                    className="w-full bg-white border border-orange-200 rounded-lg p-2 text-sm mt-1"
                   />
                 ) : (
                   <p className="font-semibold text-slate-800 mt-1">
@@ -993,7 +993,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                     type="time"
                     value={editedData.timeSlotStart || ''} 
                     onChange={(e) => handleDataChange('timeSlotStart', e.target.value)} 
-                    className="w-full bg-white border border-indigo-200 rounded-lg p-2 text-sm mt-1"
+                    className="w-full bg-white border border-orange-200 rounded-lg p-2 text-sm mt-1"
                   />
                 ) : (
                   <p className="font-semibold text-slate-800 mt-1">
@@ -1012,7 +1012,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                     type="time"
                     value={editedData.timeSlotEnd || ''} 
                     onChange={(e) => handleDataChange('timeSlotEnd', e.target.value)} 
-                    className="w-full bg-white border border-indigo-200 rounded-lg p-2 text-sm mt-1"
+                    className="w-full bg-white border border-orange-200 rounded-lg p-2 text-sm mt-1"
                   />
                 ) : (
                   <p className="font-semibold text-slate-800 mt-1">
@@ -1024,7 +1024,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
             
             {/* Quick preview of scheduled time */}
             {!isEditing && editedData.scheduledDate && (
-              <div className="mt-3 pt-3 border-t border-indigo-200 flex items-center gap-2 text-indigo-700">
+              <div className="mt-3 pt-3 border-t border-orange-200 flex items-center gap-2 text-orange-700">
                 <Calendar className="w-4 h-4" />
                 <span className="font-bold">
                   {new Date(editedData.scheduledDate).toLocaleDateString('pl-PL', { weekday: 'short', day: 'numeric', month: 'short' })}
