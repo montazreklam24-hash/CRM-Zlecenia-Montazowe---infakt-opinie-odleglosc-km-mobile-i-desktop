@@ -28,14 +28,15 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
   const currentView = urlParams.get('mobile') === '1' ? 'mobile' : 'desktop';
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Top Navigation Bar - CZARNY */}
-      <header className="fixed top-0 left-0 right-0 h-16 bg-black z-50 flex items-center justify-between px-4 md:px-6 shadow-lg border-b border-gray-800">
+    <div className="min-h-screen flex flex-col">
+      {/* Top Navigation Bar */}
+      <header className="fixed top-0 left-0 right-0 h-16 theme-header z-50 flex items-center justify-between px-4 md:px-6 shadow-lg">
         {/* Left: Logo + Menu */}
         <div className="flex items-center gap-4">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 text-white hover:bg-gray-800 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500"
+            className="p-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] hover:bg-[var(--bg-surface)]"
+            style={{ color: 'var(--text-primary)' }}
             aria-label="Toggle menu"
           >
             {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
@@ -43,14 +44,14 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
           
           {/* Logo */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-            {/* Logo jako tekst z pomarańczowym akcentem */}
+            {/* Logo jako tekst */}
             <div className="flex items-center gap-2">
-              <div className="text-white font-bold text-lg">
-                <span className="text-orange-500">montaż</span>
-                <span className="text-white"> reklam </span>
-                <span className="text-orange-500 text-xl">24</span>
+              <div className="font-bold text-lg">
+                <span style={{ color: 'var(--accent-primary)' }}>montaż</span>
+                <span style={{ color: 'var(--text-primary)' }}> reklam </span>
+                <span style={{ color: 'var(--accent-primary)' }} className="text-xl">24</span>
               </div>
-              <span className="hidden md:inline text-xs text-gray-400 font-semibold bg-gray-800 px-2 py-1 rounded">
+              <span className="hidden md:inline text-xs font-semibold px-2 py-1 rounded" style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)' }}>
                 CRM Beta
               </span>
             </div>
@@ -60,14 +61,18 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
         {/* Right: View Toggles + User */}
         <div className="flex items-center gap-3">
           {/* PC/Mobile Toggle */}
-          <div className="hidden md:flex bg-gray-800 rounded-lg p-1 border border-gray-700">
+          <div className="hidden md:flex rounded-lg p-1 border" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-medium)' }}>
             <button
               onClick={() => handleViewToggle('desktop')}
               className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
                 currentView === 'desktop'
-                  ? 'bg-orange-500 text-white shadow-sm'
-                  : 'text-gray-300 hover:bg-gray-700'
+                  ? 'shadow-sm'
+                  : 'hover:opacity-80'
               }`}
+              style={{
+                background: currentView === 'desktop' ? 'var(--accent-primary)' : 'transparent',
+                color: currentView === 'desktop' ? 'var(--text-inverse)' : 'var(--text-secondary)'
+              }}
             >
               PC
             </button>
@@ -75,9 +80,13 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
               onClick={() => handleViewToggle('mobile')}
               className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
                 currentView === 'mobile'
-                  ? 'bg-orange-500 text-white shadow-sm'
-                  : 'text-gray-300 hover:bg-gray-700'
+                  ? 'shadow-sm'
+                  : 'hover:opacity-80'
               }`}
+              style={{
+                background: currentView === 'mobile' ? 'var(--accent-primary)' : 'transparent',
+                color: currentView === 'mobile' ? 'var(--text-inverse)' : 'var(--text-secondary)'
+              }}
             >
               Mobile
             </button>
@@ -92,7 +101,12 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
           <div className="relative">
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-white text-xs font-semibold rounded-lg transition-colors border border-gray-700"
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors border"
+              style={{ 
+                background: 'var(--bg-surface)', 
+                color: 'var(--text-primary)',
+                borderColor: 'var(--border-medium)'
+              }}
             >
               <span className="hidden md:inline">
                 ZALOGOWANO JAKO {user?.name || 'Administrator'} {user?.name || 'Admin'}
@@ -103,10 +117,16 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
 
             {/* Dropdown Menu */}
             {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
-                <div className="px-4 py-2 border-b border-gray-100">
-                  <p className="text-sm font-semibold text-gray-900">{user?.name || 'Administrator'}</p>
-                  <p className="text-xs text-gray-500">{user?.email || 'admin@montazreklam24.pl'}</p>
+              <div 
+                className="absolute right-0 mt-2 w-48 rounded-lg shadow-xl border py-2 z-50"
+                style={{ 
+                  background: 'var(--bg-card)', 
+                  borderColor: 'var(--border-medium)'
+                }}
+              >
+                <div className="px-4 py-2 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{user?.name || 'Administrator'}</p>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{user?.email || 'admin@montazreklam24.pl'}</p>
                 </div>
                 <button
                   onClick={() => {
@@ -133,9 +153,10 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
 
       {/* Sidebar Panel (Drawer) */}
       <div 
-        className={`fixed top-16 left-0 bottom-0 w-64 bg-white z-40 transform transition-transform duration-300 ease-in-out shadow-lg ${
+        className={`fixed top-16 left-0 bottom-0 w-64 z-40 transform transition-transform duration-300 ease-in-out shadow-lg ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
+        style={{ background: 'var(--bg-surface)' }}
       >
         <Sidebar 
           onLogout={onLogout} 

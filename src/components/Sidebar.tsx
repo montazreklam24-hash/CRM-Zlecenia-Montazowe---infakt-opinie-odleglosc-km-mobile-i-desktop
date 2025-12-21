@@ -62,12 +62,18 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
   ];
 
   return (
-    <aside className={`bg-white border-r border-gray-200 shadow-sm flex flex-col ${className}`}>
+    <aside 
+      className={`border-r shadow-sm flex flex-col ${className}`}
+      style={{ 
+        background: 'var(--bg-surface)', 
+        borderColor: 'var(--border-light)' 
+      }}
+    >
       {/* Logo */}
       {showLogo && (
-        <div className="p-6 border-b border-gray-100 flex items-center justify-center">
-          <h1 className="text-xl font-bold text-orange-600 tracking-tight">
-            MONTAŻ<span className="text-gray-800">24</span>
+        <div className="p-6 border-b flex items-center justify-center" style={{ borderColor: 'var(--border-light)' }}>
+          <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--accent-primary)' }}>
+            MONTAŻ<span style={{ color: 'var(--text-primary)' }}>24</span>
           </h1>
         </div>
       )}
@@ -83,35 +89,38 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
               {/* Section Header (Clickable) */}
               <button
                 onClick={() => toggleSection(sectionKey)}
-                className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 rounded-lg transition-colors group"
+                className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors group hover:opacity-80"
+                style={{ color: 'var(--text-primary)' }}
               >
                 <div className="flex items-center gap-2">
-                  <div className="text-gray-500 group-hover:text-gray-700 transition-colors">
+                  <div className="transition-colors" style={{ color: 'var(--text-secondary)' }}>
                     {section.icon}
                   </div>
                   <span>{section.title}</span>
                 </div>
                 {isExpanded ? (
-                  <ChevronDown size={16} className="text-gray-400" />
+                  <ChevronDown size={16} style={{ color: 'var(--text-muted)' }} />
                 ) : (
-                  <ChevronRight size={16} className="text-gray-400" />
+                  <ChevronRight size={16} style={{ color: 'var(--text-muted)' }} />
                 )}
               </button>
 
               {/* Section Items (Collapsible) */}
               {isExpanded && (
-                <div className="mt-1 ml-2 space-y-1 border-l-2 border-gray-100 pl-2">
+                <div className="mt-1 ml-2 space-y-1 border-l-2 pl-2" style={{ borderColor: 'var(--border-light)' }}>
                   {section.items.map((item) => (
                     <NavLink
                       key={item.to}
                       to={item.to}
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                          isActive
-                            ? 'bg-orange-50 text-orange-600 font-medium shadow-sm'
-                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+                          isActive ? 'shadow-sm font-medium' : 'hover:opacity-80'
                         }`
                       }
+                      style={({ isActive }) => ({
+                        background: isActive ? 'var(--accent-primary)' : 'transparent',
+                        color: isActive ? 'var(--text-inverse)' : 'var(--text-secondary)'
+                      })}
                     >
                       <div className="transition-transform duration-200 group-hover:scale-110">
                         {item.icon}
@@ -127,10 +136,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
       </nav>
 
       {/* User / Logout */}
-      <div className="p-4 border-t border-gray-100 mt-auto">
+      <div className="p-4 border-t mt-auto" style={{ borderColor: 'var(--border-light)' }}>
         <button
           onClick={onLogout}
-          className="flex items-center gap-3 w-full px-4 py-3 text-orange-500 hover:bg-orange-50 rounded-xl transition-colors"
+          className="flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-colors hover:opacity-80"
+          style={{ color: 'var(--accent-primary)' }}
         >
           <LogOut size={20} />
           <span>Wyloguj</span>
