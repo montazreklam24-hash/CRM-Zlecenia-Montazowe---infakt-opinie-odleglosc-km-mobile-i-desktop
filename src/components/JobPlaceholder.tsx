@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+﻿import React, { useMemo } from 'react';
 import { Job } from '../types';
 
 interface JobPlaceholderProps {
@@ -23,7 +23,7 @@ const JobPlaceholder: React.FC<JobPlaceholderProps> = ({
   // Weź tylko ulicę (przed przecinkiem) lub nazwę klienta jeśli brak adresu
   const street = rawAddress.split(',')[0].trim() || job?.data?.clientName || clientName || 'Zlecenie';
 
-  // 2. TREŚĆ (Priorytet: Zakres Prac -> Tytuł -> Notatki)
+  // 2. TREŚ─ć (Priorytet: Zakres Prac -> Tytuł -> Notatki)
   // User request: "ogólny opis zlecenia tak żeby się zmieścił"
   let description = job?.data?.scopeWorkText || job?.data?.jobTitle || title || '';
   
@@ -37,7 +37,7 @@ const JobPlaceholder: React.FC<JobPlaceholderProps> = ({
 
   // Jeśli opis jest bardzo krótki, a są notatki, dodaj je
   if (description.length < 30 && job?.adminNotes && !description.includes(job.adminNotes)) {
-     description += ` • ⚠️ ${job.adminNotes}`;
+     description += ` ÔÇó ÔÜá´ŞĆ ${job.adminNotes}`;
   }
 
   // ID jest stringiem w Job ('24' lub '#2024/001') -> konwersja na number dla koloru
@@ -46,27 +46,27 @@ const JobPlaceholder: React.FC<JobPlaceholderProps> = ({
   // Generuj stabilny kolor na podstawie ID zlecenia
   const gradientClass = useMemo(() => {
     const gradients = [
-      'from-orange-600 to-orange-400',
+      'from-blue-600 to-blue-400',
       'from-emerald-600 to-emerald-400',
       'from-orange-500 to-amber-500',
-      'from-orange-600 to-orange-500',
-      'from-orange-500 to-orange-400',
-      'from-orange-700 to-orange-500',
-      'from-orange-600 to-orange-400',
-      'from-orange-500 to-orange-300',
+      'from-violet-600 to-purple-500',
+      'from-pink-600 to-rose-400',
+      'from-cyan-600 to-sky-400',
+      'from-indigo-600 to-indigo-400',
+      'from-teal-600 to-teal-400',
       // Added more to reach 20 as requested
-      'from-orange-600 to-orange-400',
+      'from-red-600 to-red-400',
       'from-lime-600 to-lime-400',
-      'from-orange-500 to-orange-400',
+      'from-fuchsia-600 to-fuchsia-400',
       'from-yellow-500 to-yellow-300',
       'from-slate-600 to-slate-400',
       'from-stone-600 to-stone-400',
-      'from-orange-700 to-orange-500',
-      'from-orange-500 to-orange-400',
-      'from-orange-600 to-orange-500',
+      'from-sky-700 to-blue-500',
+      'from-rose-500 to-orange-400',
+      'from-purple-600 to-pink-500',
       'from-emerald-500 to-teal-400',
       'from-amber-600 to-orange-500',
-      'from-orange-500 to-orange-400',
+      'from-indigo-500 to-blue-400',
     ];
     // Użyj reszty z dzielenia
     const index = numericId ? numericId % gradients.length : Math.floor(Math.random() * gradients.length);
@@ -96,3 +96,4 @@ const JobPlaceholder: React.FC<JobPlaceholderProps> = ({
 };
 
 export default JobPlaceholder;
+

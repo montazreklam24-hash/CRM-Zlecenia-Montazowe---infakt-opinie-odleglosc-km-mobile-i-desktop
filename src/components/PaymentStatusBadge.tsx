@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { PaymentStatus } from '../types';
 
 interface PaymentStatusBadgeProps {
@@ -35,23 +35,23 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
       bg: 'bg-orange-50', 
       text: 'text-orange-700', 
       border: 'border-orange-200',
-      icon: '📄', 
+      icon: '­čôä', 
       label: 'Proforma',
       gradient: 'from-orange-400 to-orange-500'
     },
     [PaymentStatus.PARTIAL]: { 
-      bg: 'bg-orange-50', 
-      text: 'text-orange-700', 
-      border: 'border-orange-200',
-      icon: '💸', 
+      bg: 'bg-purple-50', 
+      text: 'text-purple-700', 
+      border: 'border-purple-200',
+      icon: '­čĺŞ', 
       label: 'Zaliczka',
-      gradient: 'from-orange-400 to-orange-500'
+      gradient: 'from-purple-400 to-purple-500'
     },
     [PaymentStatus.PAID]: { 
       bg: 'bg-green-50', 
       text: 'text-green-700', 
       border: 'border-green-200',
-      icon: '✅', 
+      icon: 'Ôťů', 
       label: 'Opłacone',
       gradient: 'from-green-400 to-green-500'
     },
@@ -59,17 +59,17 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
       bg: 'bg-yellow-50', 
       text: 'text-yellow-700', 
       border: 'border-yellow-200',
-      icon: '🤝', 
+      icon: '­čĄŁ', 
       label: 'Barter',
       gradient: 'from-yellow-400 to-yellow-500'
     },
     [PaymentStatus.OVERDUE]: { 
-      bg: 'bg-orange-50', 
-      text: 'text-orange-700', 
-      border: 'border-orange-200',
-      icon: '⚠️', 
+      bg: 'bg-red-50', 
+      text: 'text-red-700', 
+      border: 'border-red-200',
+      icon: 'ÔÜá´ŞĆ', 
       label: 'Przeterminowane',
-      gradient: 'from-orange-600 to-orange-700'
+      gradient: 'from-red-400 to-red-500'
     }
   };
 
@@ -106,7 +106,7 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
   );
 };
 
-// Wersja jako WYRAŹNY pasek na górze karty Kanban (jak w starej wersji)
+// Wersja jako WYRA┼╣NY pasek na górze karty Kanban (jak w starej wersji)
 // Pasek zajmuje ~8% wysokości i pokazuje etykietę statusu
 export const PaymentStatusBar: React.FC<{ 
   status: PaymentStatus; 
@@ -116,10 +116,10 @@ export const PaymentStatusBar: React.FC<{
   const config: Record<PaymentStatus, { bg: string; label: string }> = {
     [PaymentStatus.NONE]: { bg: '', label: '' },
     [PaymentStatus.PROFORMA]: { bg: 'bg-gradient-to-r from-orange-400 to-orange-500', label: 'PROFORMA' },
-    [PaymentStatus.PARTIAL]: { bg: 'bg-gradient-to-r from-orange-400 to-orange-500', label: 'ZALICZKA' },
+    [PaymentStatus.PARTIAL]: { bg: 'bg-gradient-to-r from-purple-400 to-purple-500', label: 'ZALICZKA' },
     [PaymentStatus.PAID]: { bg: 'bg-gradient-to-r from-green-400 to-green-500', label: 'OPŁACONE' },
-    [PaymentStatus.CASH]: { bg: 'bg-gradient-to-r from-yellow-400 to-yellow-500', label: 'GOTÓWKA' },
-    [PaymentStatus.OVERDUE]: { bg: 'bg-gradient-to-r from-orange-600 to-orange-700', label: 'DO ZAPŁATY' }
+    [PaymentStatus.CASH]: { bg: 'bg-gradient-to-r from-yellow-400 to-yellow-500', label: 'GOT├ôWKA' },
+    [PaymentStatus.OVERDUE]: { bg: 'bg-gradient-to-r from-red-400 to-red-500', label: 'DO ZAPŁATY' }
   };
 
   const cfg = config[status] || config[PaymentStatus.NONE];
@@ -157,11 +157,11 @@ export const PaymentStatusIcon: React.FC<{ status: PaymentStatus; className?: st
 }) => {
   const icons: Record<PaymentStatus, string> = {
     [PaymentStatus.NONE]: '',
-    [PaymentStatus.PROFORMA]: '📄',
-    [PaymentStatus.PARTIAL]: '💸',
-    [PaymentStatus.PAID]: '✅',
-    [PaymentStatus.CASH]: '🤝',
-    [PaymentStatus.OVERDUE]: '⚠️'
+    [PaymentStatus.PROFORMA]: '­čôä',
+    [PaymentStatus.PARTIAL]: '­čĺŞ',
+    [PaymentStatus.PAID]: 'Ôťů',
+    [PaymentStatus.CASH]: '­čĄŁ',
+    [PaymentStatus.OVERDUE]: 'ÔÜá´ŞĆ'
   };
 
   if (status === PaymentStatus.NONE) {
@@ -181,10 +181,10 @@ export const PaymentStatusMiniMenu: React.FC<{
   const statuses: { value: PaymentStatus; label: string; bg: string }[] = [
     { value: PaymentStatus.NONE, label: 'Brak', bg: 'bg-slate-400' },
     { value: PaymentStatus.PROFORMA, label: 'Proforma', bg: 'bg-orange-500' },
-    { value: PaymentStatus.PARTIAL, label: 'Zaliczka', bg: 'bg-orange-500' },
+    { value: PaymentStatus.PARTIAL, label: 'Zaliczka', bg: 'bg-purple-500' },
     { value: PaymentStatus.PAID, label: 'Opłacone', bg: 'bg-green-500' },
     { value: PaymentStatus.CASH, label: 'Gotówka', bg: 'bg-yellow-500' },
-    { value: PaymentStatus.OVERDUE, label: 'Do zapłaty', bg: 'bg-orange-600' },
+    { value: PaymentStatus.OVERDUE, label: 'Do zapłaty', bg: 'bg-red-500' },
   ];
 
   return (
@@ -219,6 +219,7 @@ export const PaymentStatusMiniMenu: React.FC<{
 };
 
 export default PaymentStatusBadge;
+
 
 
 

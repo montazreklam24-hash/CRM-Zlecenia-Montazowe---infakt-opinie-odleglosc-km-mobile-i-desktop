@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Job, JobColumnId, PaymentStatus } from '../types';
 import { Trash2, Archive, X, Check, ExternalLink, Copy } from 'lucide-react';
@@ -29,17 +29,17 @@ const PAYMENT_STATUSES: { value: PaymentStatus; label: string; bgColor: string; 
 
 // Kolumny/dni
 const COLUMNS: { id: JobColumnId; label: string; shortLabel: string; icon: string }[] = [
-  { id: 'PREPARE', label: 'Do przygotowania', shortLabel: 'Przyg.', icon: '📋' },
-  { id: 'MON', label: 'Poniedziałek', shortLabel: 'Pon', icon: '🔴' },
-  { id: 'TUE', label: 'Wtorek', shortLabel: 'Wt', icon: '🟢' },
-  { id: 'WED', label: 'Środa', shortLabel: 'Śr', icon: '🟣' },
-  { id: 'THU', label: 'Czwartek', shortLabel: 'Czw', icon: '🟡' },
-  { id: 'FRI', label: 'Piątek', shortLabel: 'Pt', icon: '🔵' },
-  { id: 'COMPLETED', label: 'Wykonane', shortLabel: 'OK', icon: '✅' },
+  { id: 'PREPARE', label: 'Do przygotowania', shortLabel: 'Przyg.', icon: '­čôő' },
+  { id: 'MON', label: 'Poniedziałek', shortLabel: 'Pon', icon: '­čö┤' },
+  { id: 'TUE', label: 'Wtorek', shortLabel: 'Wt', icon: '­ččó' },
+  { id: 'WED', label: 'Środa', shortLabel: 'Śr', icon: '­ččú' },
+  { id: 'THU', label: 'Czwartek', shortLabel: 'Czw', icon: '­ččí' },
+  { id: 'FRI', label: 'Piątek', shortLabel: 'Pt', icon: '­čöÁ' },
+  { id: 'COMPLETED', label: 'Wykonane', shortLabel: 'OK', icon: 'Ôťů' },
 ];
 
 /**
- * JobContextMenu - małe menu kontekstowe pozycjonowane przy kliknięciu (PPM lub przycisk ⋮)
+ * JobContextMenu - małe menu kontekstowe pozycjonowane przy kliknięciu (PPM lub przycisk Ôő«)
  * 
  * POPRAWIONE: Teraz naprawdę używa współrzędnych x, y do pozycjonowania,
  * zamiast renderować pełnoekranowy modal na środku ekranu.
@@ -176,7 +176,7 @@ const JobContextMenu: React.FC<JobContextMenuProps> = ({
           <div className="p-2 border-b border-gray-100">
             <button 
               onClick={() => { onOpenJob(job); onClose(); }}
-              className="w-full py-2 px-3 rounded-lg text-sm font-medium bg-orange-50 hover:bg-orange-100 text-orange-700 transition-colors flex items-center justify-center gap-2"
+              className="w-full py-2 px-3 rounded-lg text-sm font-medium bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors flex items-center justify-center gap-2"
             >
               <ExternalLink className="w-4 h-4" />
               Otwórz szczegóły
@@ -243,7 +243,7 @@ const JobContextMenu: React.FC<JobContextMenuProps> = ({
             {onDuplicate && (
               <button 
                 onClick={() => { onDuplicate(job.id); onClose(); }}
-                className="flex-1 py-2 px-2 rounded-lg text-xs font-medium bg-orange-50 hover:bg-orange-100 text-orange-700 transition-colors flex items-center justify-center gap-1"
+                className="flex-1 py-2 px-2 rounded-lg text-xs font-medium bg-violet-50 hover:bg-violet-100 text-violet-700 transition-colors flex items-center justify-center gap-1"
               >
                 <Copy className="w-3.5 h-3.5" />
                 Duplikuj
@@ -258,7 +258,7 @@ const JobContextMenu: React.FC<JobContextMenuProps> = ({
             </button>
             <button 
               onClick={() => { onDelete?.(job.id); onClose(); }}
-              className="flex-1 py-2 px-2 rounded-lg text-xs font-medium bg-orange-50 hover:bg-orange-100 text-orange-700 transition-colors flex items-center justify-center gap-1"
+              className="flex-1 py-2 px-2 rounded-lg text-xs font-medium bg-red-50 hover:bg-red-100 text-red-700 transition-colors flex items-center justify-center gap-1"
             >
               <Trash2 className="w-3.5 h-3.5" />
               Usuń
@@ -298,3 +298,4 @@ const JobContextMenu: React.FC<JobContextMenuProps> = ({
 };
 
 export default JobContextMenu;
+
