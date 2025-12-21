@@ -1,468 +1,245 @@
 /**
  * CRM Gmail Extension - Content Script
- * Uproszczona wersja z 2 przyciskami: ZACZYTAJ / WYŚLIJ DO CRM
+ * Wersja v5.1 - Fixed Syntax
  */
 
-(function() {
-  'use strict';
-  
-  console.log('[CRM] Content script loaded v2.0');
-  
-  let sidebar = null;
-  let currentEmailData = null;
-  let formData = {
-    title: '',
-    phone: '',
-    email: '',
-    contactPerson: '',
-    companyName: '',
-    nip: '',
-    address: '',
-    scopeOfWork: ''
-  };
-  
-  // =========================================================================
-  // OBSERWATOR GMAIL - wykrywa otwarcie maila
-  // =========================================================================
-  
-  const observer = new MutationObserver(() => {
-    checkForEmail();
-  });
-  
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
-  
-  // =========================================================================
-  // DETEKCJA OTWARTEGO EMAILA
-  // =========================================================================
-  
-  function checkForEmail() {
-    const emailView = document.querySelector('[data-message-id]');
+console.log('[CRM] Skrypt v5.1 załadowany!');
+
+// --- FLOATING BUTTON ---
+
+function createFloatingButton() {
+    if (document.getElementById('crm-floating-btn')) return;
+
+    const btn = document.createElement('div');
+    btn.id = 'crm-floating-btn';
+    btn.innerText = 'CRM';
     
-    if (emailView && !document.querySelector('.crm-btn')) {
-      addCrmButton();
-    }
-    
-    if (!emailView && sidebar) {
-      sidebar.classList.remove('open');
-    }
-  }
-  
-  // =========================================================================
-  // PRZYCISK CRM W TOOLBARZE GMAIL
-  // =========================================================================
-  
-  function addCrmButton() {
-    const toolbar = document.querySelector('[gh="mtb"]') || 
-                    document.querySelector('.ade') ||
-                    document.querySelector('[role="toolbar"]');
-    
-    if (!toolbar || toolbar.querySelector('.crm-btn')) return;
-    
-    const btn = document.createElement('button');
-    btn.className = 'crm-btn';
-    btn.innerHTML = `
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="3" width="18" height="18" rx="2"/>
-        <path d="M3 9h18"/>
-        <path d="M9 21V9"/>
-      </svg>
-      <span>CRM</span>
-    `;
-    btn.title = 'Otwórz panel CRM';
-    btn.onclick = openSidebar;
-    
-    toolbar.appendChild(btn);
-    console.log('[CRM] Button added to toolbar');
-  }
-  
-  // =========================================================================
-  // EKSTRAKCJA DANYCH Z EMAILA
-  // =========================================================================
-  
-  function extractEmailData() {
-    // Email nadawcy
-    const fromEl = document.querySelector('[email]');
-    const from = fromEl ? fromEl.getAttribute('email') : '';
-    const fromName = fromEl ? fromEl.getAttribute('name') || fromEl.textContent : '';
-    
-    // Temat
-    const subjectEl = document.querySelector('h2[data-thread-perm-id]') ||
-                      document.querySelector('[data-legacy-thread-id]')?.closest('tr')?.querySelector('td:nth-child(7)');
-    const subject = subjectEl ? subjectEl.textContent.trim() : '';
-    
-    // Data
-    const dateEl = document.querySelector('[title][data-tooltip]') ||
-                   document.querySelector('.g3');
-    const date = dateEl ? dateEl.getAttribute('title') || dateEl.textContent : '';
-    
-    // Treść maila (cały wątek)
-    const allMessages = document.querySelectorAll('[data-message-id] .a3s.aiL, [data-message-id] .ii.gt');
-    let body = '';
-    
-    if (allMessages.length > 0) {
-      body = Array.from(allMessages)
-        .map(el => el.innerText)
-        .join('\n\n---\n\n');
-    }
-    
-    // ID wątku
-    const threadEl = document.querySelector('[data-thread-perm-id]');
-    const threadId = threadEl ? threadEl.getAttribute('data-thread-perm-id') : null;
-    
-    console.log('[CRM] Extracted email:', { from, subject, bodyLength: body.length });
-    
-    return {
-      from,
-      fromName,
-      subject,
-      date,
-      body: body.substring(0, 15000), // Limit dla Gemini
-      threadId
-    };
-  }
-  
-  // =========================================================================
-  // SIDEBAR - PANEL BOCZNY
-  // =========================================================================
-  
-  function openSidebar() {
-    currentEmailData = extractEmailData();
-    
-    if (!sidebar) {
-      createSidebar();
-    }
-    
-    // Ustaw email z nagłówka
-    formData.email = currentEmailData.from || '';
-    
-    sidebar.classList.add('open');
-    renderSidebarContent();
-  }
-  
-  function createSidebar() {
-    sidebar = document.createElement('div');
-    sidebar.className = 'crm-sidebar';
-    sidebar.innerHTML = `
-      <div class="crm-sidebar-header">
-        <div class="crm-sidebar-title">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <path d="M3 9h18"/>
-            <path d="M9 21V9"/>
-          </svg>
-          CRM Montaż 24
-        </div>
-        <button class="crm-sidebar-close" title="Zamknij">✕</button>
-      </div>
-      <div class="crm-sidebar-content"></div>
-    `;
-    
-    document.body.appendChild(sidebar);
-    
-    sidebar.querySelector('.crm-sidebar-close').onclick = () => {
-      sidebar.classList.remove('open');
-    };
-  }
-  
-  function renderSidebarContent(state = 'form') {
-    const content = sidebar.querySelector('.crm-sidebar-content');
-    
-    if (state === 'loading') {
-      content.innerHTML = `
-        <div class="crm-loading">
-          <div class="crm-spinner"></div>
-          <p>Analizuję email z Gemini AI...</p>
-        </div>
-      `;
-      return;
-    }
-    
-    if (state === 'sending') {
-      content.innerHTML = `
-        <div class="crm-loading">
-          <div class="crm-spinner"></div>
-          <p>Tworzę zlecenie w CRM...</p>
-        </div>
-      `;
-      return;
-    }
-    
-    if (state === 'success') {
-      content.innerHTML = `
-        <div class="crm-success">
-          <div class="crm-success-icon">✅</div>
-          <h3>Zlecenie utworzone!</h3>
-          <p>Możesz teraz zamknąć panel.</p>
-          <button class="crm-btn-secondary crm-full-width" onclick="document.querySelector('.crm-sidebar').classList.remove('open')">
-            Zamknij
-          </button>
-        </div>
-      `;
-      return;
-    }
-    
-    if (state === 'error') {
-      content.innerHTML = `
-        <div class="crm-error">
-          <span class="crm-error-icon">⚠️</span>
-          <p>Wystąpił błąd. Sprawdź ustawienia rozszerzenia.</p>
-          <button class="crm-btn-secondary" id="crm-retry-btn">Spróbuj ponownie</button>
-        </div>
-      `;
-      content.querySelector('#crm-retry-btn').onclick = () => renderSidebarContent('form');
-      return;
-    }
-    
-    // FORMULARZ
-    content.innerHTML = `
-      <div class="crm-form">
-        <!-- 2 GŁÓWNE PRZYCISKI -->
-        <div class="crm-main-actions">
-          <button class="crm-btn-primary crm-full-width" id="crm-read-btn">
-            📧 ZACZYTAJ Z MAILA
-          </button>
-          <p class="crm-hint">Gemini AI przeanalizuje wątek i wypełni pola</p>
-        </div>
-        
-        <hr class="crm-divider">
-        
-        <!-- FORMULARZ Z POLAMI -->
-        <div class="crm-section">
-          <h4>📝 Dane zlecenia</h4>
-          
-          <div class="crm-field">
-            <label>Tytuł zlecenia</label>
-            <input type="text" id="crm-title" value="${escapeHtml(formData.title)}" placeholder="np. Montaż kaseton Żabka Mokotów">
-          </div>
-          
-          <div class="crm-field">
-            <label>Zakres prac</label>
-            <textarea id="crm-scope" rows="3" placeholder="Co trzeba zrobić...">${escapeHtml(formData.scopeOfWork)}</textarea>
-          </div>
-        </div>
-        
-        <div class="crm-section">
-          <h4>👤 Kontakt</h4>
-          
-          <div class="crm-field">
-            <label>Telefon</label>
-            <input type="tel" id="crm-phone" value="${escapeHtml(formData.phone)}" placeholder="500 100 200">
-          </div>
-          
-          <div class="crm-field">
-            <label>Email</label>
-            <input type="email" id="crm-email" value="${escapeHtml(formData.email)}" placeholder="klient@firma.pl">
-          </div>
-          
-          <div class="crm-field">
-            <label>Osoba kontaktowa</label>
-            <input type="text" id="crm-contact" value="${escapeHtml(formData.contactPerson)}" placeholder="Jan Kowalski">
-          </div>
-        </div>
-        
-        <div class="crm-section">
-          <h4>🏢 Firma</h4>
-          
-          <div class="crm-field">
-            <label>Nazwa firmy</label>
-            <input type="text" id="crm-company" value="${escapeHtml(formData.companyName)}" placeholder="Firma Sp. z o.o.">
-          </div>
-          
-          <div class="crm-field">
-            <label>NIP</label>
-            <input type="text" id="crm-nip" value="${escapeHtml(formData.nip)}" placeholder="123-456-78-90">
-          </div>
-        </div>
-        
-        <div class="crm-section">
-          <h4>📍 Adres montażu</h4>
-          
-          <div class="crm-field">
-            <label>Pełny adres</label>
-            <textarea id="crm-address" rows="2" placeholder="ul. Przykładowa 10, 00-001 Warszawa">${escapeHtml(formData.address)}</textarea>
-          </div>
-        </div>
-        
-        <hr class="crm-divider">
-        
-        <!-- PRZYCISK WYŚLIJ -->
-        <div class="crm-main-actions">
-          <button class="crm-btn-success crm-full-width" id="crm-send-btn">
-            🚀 WYŚLIJ DO CRM
-          </button>
-          <p class="crm-hint">Utworzy zlecenie w systemie CRM</p>
-        </div>
-      </div>
-    `;
-    
-    // Event listenery
-    content.querySelector('#crm-read-btn').onclick = handleReadFromEmail;
-    content.querySelector('#crm-send-btn').onclick = handleSendToCRM;
-    
-    // Zapisuj dane przy zmianie pól
-    const inputs = content.querySelectorAll('input, textarea');
-    inputs.forEach(input => {
-      input.addEventListener('input', (e) => {
-        const field = e.target.id.replace('crm-', '');
-        const mapping = {
-          'title': 'title',
-          'scope': 'scopeOfWork',
-          'phone': 'phone',
-          'email': 'email',
-          'contact': 'contactPerson',
-          'company': 'companyName',
-          'nip': 'nip',
-          'address': 'address'
-        };
-        if (mapping[field]) {
-          formData[mapping[field]] = e.target.value;
-        }
-      });
+    // Style
+    Object.assign(btn.style, {
+        position: 'fixed',
+        bottom: '20px',
+        right: '20px',
+        width: '64px',
+        height: '64px',
+        backgroundColor: '#2563eb',
+        color: 'white',
+        borderRadius: '50%',
+        boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontWeight: 'bold',
+        fontSize: '16px',
+        cursor: 'pointer',
+        zIndex: '2147483647',
+        transition: 'transform 0.2s',
+        userSelect: 'none',
+        fontFamily: 'Arial, sans-serif',
+        border: '2px solid white'
     });
-  }
-  
-  // =========================================================================
-  // AKCJA: ZACZYTAJ Z MAILA (Gemini)
-  // =========================================================================
-  
-  async function handleReadFromEmail() {
-    if (!currentEmailData || !currentEmailData.body) {
-      alert('Nie udało się odczytać treści maila. Otwórz email i spróbuj ponownie.');
-      return;
+
+    btn.onmouseover = () => btn.style.transform = 'scale(1.1)';
+    btn.onmouseout = () => btn.style.transform = 'scale(1.0)';
+
+    btn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openSidebar();
+    };
+
+    document.body.appendChild(btn);
+}
+
+// Sprawdzaj co sekundę
+setInterval(createFloatingButton, 1000);
+
+
+// --- SIDEBAR LOGIC ---
+
+let sidebar = null;
+let lastMessageId = null;
+
+function openSidebar() {
+    if (!document.querySelector('.crm-sidebar')) {
+        createSidebar();
     }
+    const sb = document.querySelector('.crm-sidebar');
+    sb.style.display = 'flex';
+    requestAnimationFrame(() => sb.classList.add('open'));
+    renderSidebar('form');
+}
+
+function createSidebar() {
+    const div = document.createElement('div');
+    div.className = 'crm-sidebar';
+    div.style.display = 'none';
+    div.innerHTML = `
+        <div class="crm-sidebar-header" style="background:#2563eb;color:white;padding:15px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-weight:bold;">CRM Montaż24</span>
+            <button id="crm-close" style="background:none;border:none;color:white;font-size:24px;cursor:pointer;">&times;</button>
+        </div>
+        <div class="crm-sidebar-content" style="padding:15px;overflow-y:auto;height:calc(100% - 60px);"></div>
+    `;
+    document.body.appendChild(div);
     
-    renderSidebarContent('loading');
+    div.querySelector('#crm-close').onclick = () => {
+        div.classList.remove('open');
+        setTimeout(() => div.style.display = 'none', 300);
+    };
+}
+
+function renderSidebar(state) {
+    const content = document.querySelector('.crm-sidebar-content');
+    if (!content) return;
     
-    try {
-      const result = await chrome.runtime.sendMessage({
-        action: 'analyzeEmail',
-        data: currentEmailData
-      });
-      
-      if (result.success && result.data) {
-        // Wypełnij formData danymi z Gemini
-        const d = result.data;
-        formData.title = d.suggestedTitle || '';
-        formData.phone = d.phone || '';
-        formData.email = d.email || currentEmailData.from || '';
-        formData.contactPerson = [d.firstName, d.lastName].filter(Boolean).join(' ') || '';
-        formData.companyName = d.companyName || '';
-        formData.nip = d.nip || '';
-        formData.scopeOfWork = d.scopeOfWork || '';
+    if (state === 'form') {
+        content.innerHTML = `
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                <button id="crm-read" style="width:100%;padding:12px;background:#3b82f6;color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;">
+                    ✨ Analizuj Maila (AI)
+                </button>
+                <hr style="border:0;border-top:1px solid #ddd;margin:5px 0;">
+                
+                <label style="font-size:12px;color:#666;font-weight:bold;">Tytuł:</label>
+                <input id="crm-input-title" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
+                
+                <label style="font-size:12px;color:#666;font-weight:bold;">Telefon:</label>
+                <input id="crm-input-phone" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
+                
+                <label style="font-size:12px;color:#666;font-weight:bold;">Email:</label>
+                <input id="crm-input-email" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
+
+                <label style="font-size:12px;color:#666;font-weight:bold;">Adres:</label>
+                <textarea id="crm-input-address" rows="2" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-family:sans-serif;"></textarea>
+                
+                <label style="font-size:12px;color:#666;font-weight:bold;">Zakres prac (Streszczenie):</label>
+                <textarea id="crm-input-scope" rows="4" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-family:sans-serif;"></textarea>
+                
+                <button id="crm-send" style="width:100%;padding:12px;background:#10b981;color:white;border:none;border-radius:6px;font-weight:bold;cursor:pointer;margin-top:10px;">
+                    🚀 Wyślij do CRM
+                </button>
+            </div>
+        `;
         
-        // Adres
-        if (d.address) {
-          const addr = d.address;
-          const parts = [];
-          if (addr.street) {
-            let street = addr.street;
-            if (addr.buildingNo) street += ' ' + addr.buildingNo;
-            if (addr.apartmentNo) street += '/' + addr.apartmentNo;
-            parts.push(street);
-          }
-          if (addr.postCode || addr.city) {
-            parts.push([addr.postCode, addr.city].filter(Boolean).join(' '));
-          }
-          if (addr.district) {
-            parts.push('(' + addr.district + ')');
-          }
-          formData.address = parts.join(', ');
-        }
-        
-        console.log('[CRM] Gemini parsed:', formData);
-        renderSidebarContent('form');
-        
-      } else {
-        console.error('[CRM] Gemini error:', result.error);
-        alert('Błąd analizy: ' + (result.error || 'Nieznany błąd'));
-        renderSidebarContent('form');
-      }
-      
-    } catch (error) {
-      console.error('[CRM] Error:', error);
-      alert('Błąd połączenia z Gemini. Sprawdź ustawienia.');
-      renderSidebarContent('form');
-    }
-  }
-  
-  // =========================================================================
-  // AKCJA: WYŚLIJ DO CRM
-  // =========================================================================
-  
-  async function handleSendToCRM() {
-    // Walidacja
-    if (!formData.title && !formData.phone && !formData.address) {
-      alert('Wypełnij przynajmniej tytuł, telefon lub adres!');
-      return;
-    }
-    
-    renderSidebarContent('sending');
-    
-    try {
-      const result = await chrome.runtime.sendMessage({
-        action: 'createJob',
-        data: {
-          title: formData.title || 'Zlecenie z Gmail',
-          clientName: formData.contactPerson || formData.companyName || 'Nieznany',
-          companyName: formData.companyName,
-          contactPerson: formData.contactPerson,
-          phone: formData.phone,
-          email: formData.email,
-          fullAddress: formData.address,
-          scopeOfWork: formData.scopeOfWork,
-          nip: formData.nip,
-          threadId: currentEmailData?.threadId
-        }
-      });
-      
-      if (result.success) {
-        console.log('[CRM] Job created:', result.job);
-        renderSidebarContent('success');
-        
-        // Wyczyść formularz
-        formData = {
-          title: '',
-          phone: '',
-          email: '',
-          contactPerson: '',
-          companyName: '',
-          nip: '',
-          address: '',
-          scopeOfWork: ''
+        // --- HANDLERS ---
+
+        // 1. ZACZYTAJ
+        content.querySelector('#crm-read').onclick = async () => {
+            const btn = content.querySelector('#crm-read');
+            const originalText = btn.innerText;
+            btn.innerText = '⏳ Analizuję...';
+            btn.disabled = true;
+
+            try {
+                const bodyText = document.body.innerText.substring(0, 15000); 
+                
+                // Pobierz ID
+                let messageId = null;
+                const urlParts = window.location.hash.split('/');
+                if (urlParts.length > 1) {
+                    const potentialId = urlParts[urlParts.length - 1];
+                    if (potentialId.length > 5 && !potentialId.includes('?')) {
+                        messageId = potentialId;
+                    }
+                }
+                // Fallback do DOM
+                if (!messageId) {
+                    const msgElement = document.querySelector('[data-message-id]');
+                    if (msgElement) messageId = msgElement.getAttribute('data-message-id');
+                }
+                
+                lastMessageId = messageId;
+                console.log('[CRM] ID:', lastMessageId);
+                
+                const response = await chrome.runtime.sendMessage({
+                    action: 'analyzeEmail',
+                    data: { 
+                        body: bodyText, 
+                        subject: document.title,
+                        messageId: messageId,
+                        from: '', // Opcjonalne, wyciągane w BG lub tutaj
+                        date: new Date().toISOString()
+                    }
+                });
+                
+                if (response.success && response.data) {
+                    const d = response.data;
+                    document.getElementById('crm-input-title').value = d.suggestedTitle || '';
+                    document.getElementById('crm-input-phone').value = d.phone || ''; 
+                    document.getElementById('crm-input-email').value = d.email || '';
+                    document.getElementById('crm-input-address').value = d.address || '';
+                    document.getElementById('crm-input-scope').value = d.scopeWorkText || d.scopeOfWork || '';
+                } else {
+                    alert('Błąd AI: ' + (response.error || 'Brak danych'));
+                }
+            } catch (e) {
+                alert('Błąd: ' + e.message);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
         };
-        
-      } else {
-        console.error('[CRM] Create job error:', result.error);
-        alert('Błąd tworzenia zlecenia: ' + (result.error || 'Nieznany błąd'));
-        renderSidebarContent('form');
-      }
-      
-    } catch (error) {
-      console.error('[CRM] Error:', error);
-      alert('Błąd połączenia z CRM. Sprawdź ustawienia.');
-      renderSidebarContent('form');
+
+        // 2. WYŚLIJ
+        content.querySelector('#crm-send').onclick = async () => {
+            const btn = content.querySelector('#crm-send');
+            const originalText = btn.innerText;
+            btn.innerText = '🚀 Wysyłam...';
+            btn.disabled = true;
+
+            const title = document.getElementById('crm-input-title').value;
+            const phone = document.getElementById('crm-input-phone').value;
+            const email = document.getElementById('crm-input-email').value;
+            const address = document.getElementById('crm-input-address').value;
+            const scope = document.getElementById('crm-input-scope').value;
+            
+            // ID - solidna ekstrakcja
+            let messageId = lastMessageId;
+            if (!messageId) {
+                 const urlParts = window.location.hash.split('/');
+                 messageId = urlParts[urlParts.length - 1];
+            }
+            
+            // Oczyszczanie ID z ewentualnych śmieci (np. #, ?, &)
+            if (messageId) {
+                // Usuń wszystko co nie jest znakiem alfanumerycznym
+                // Google Message ID to zazwyczaj [a-zA-Z0-9_-]+
+                messageId = messageId.replace(/[^a-zA-Z0-9_\-]/g, '');
+            }
+
+            try {
+                const res = await chrome.runtime.sendMessage({
+                    action: 'createJob',
+                    data: { 
+                        title, 
+                        phone, 
+                        email,
+                        fullAddress: address, 
+                        description: scope,
+                        gmailMessageId: messageId
+                    }
+                });
+                if (res.success) {
+                    let message = '<h3 style="color:green;text-align:center;padding:20px;">✅ Zlecenie wysłane!</h3>';
+                    if (res.warning) {
+                        message += '<p style="color:orange;text-align:center;font-size:12px;padding:0 10px;">⚠️ ' + res.warning + '</p>';
+                    }
+                    content.innerHTML = message;
+                    setTimeout(() => {
+                        document.querySelector('.crm-sidebar').classList.remove('open');
+                        renderSidebar('form'); // Reset formularza
+                    }, res.warning ? 4000 : 2000); // Dłużej jeśli jest ostrzeżenie
+                } else {
+                    alert('Błąd CRM: ' + res.error);
+                }
+            } catch (e) {
+                alert('Błąd sieci: ' + e.message);
+            } finally {
+                if (btn) {
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                }
+            }
+        };
     }
-  }
-  
-  // =========================================================================
-  // HELPERS
-  // =========================================================================
-  
-  function escapeHtml(str) {
-    if (!str) return '';
-    return String(str).replace(/[&<>"']/g, (m) => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    })[m]);
-  }
-  
-  // Start
-  checkForEmail();
-  
-})();
+}
