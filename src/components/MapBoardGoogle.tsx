@@ -380,11 +380,6 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
         Overlay.setMap(googleMapRef.current);
         overlayRef.current = Overlay;
 
-        // Nasłuchiwanie zmian bounds/zoomu żeby zamknąć popup lub go przesunąć (dla uproszczenia zamykamy)
-        googleMapRef.current.addListener('bounds_changed', () => {
-          setHoveredJob(null);
-        });
-        
         // Cleanup listeners
         return () => {
           mapDiv.removeEventListener('wheel', handleWheel);

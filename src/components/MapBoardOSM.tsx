@@ -138,17 +138,18 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob }) => {
 
       marker.bindPopup(popupContent, {
         closeOnClick: false,
-        autoPan: true,  // Zawsze centrujemy dymek (popytane przez użytkownika)
-        autoPanPadding: new L.Point(50, 50)
+        autoPan: false  // Wyłączamy autoPan Leafleta, bo robimy własne centrowanie panTo
       });
       
-      marker.on('mouseover', function (this: L.Marker) { 
+      const handleInteraction = function(this: L.Marker) {
         this.openPopup();
-        // Opcjonalnie: wymuś centrowanie przy najechaniu
         if (mapInstanceRef.current) {
           mapInstanceRef.current.panTo(this.getLatLng());
         }
-      });
+      };
+
+      marker.on('mouseover', handleInteraction);
+      marker.on('click', handleInteraction);
       marker.on('mouseout', function (this: L.Marker) { this.closePopup(); }); // Zamknij po zjechaniu myszką
 
       markersLayerRef.current?.addLayer(marker);

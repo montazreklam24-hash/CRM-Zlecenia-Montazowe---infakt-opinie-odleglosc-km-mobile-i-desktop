@@ -36,7 +36,7 @@
 
 ## Mapy (Google & OSM)
 - ZAWSZE przy kliknięciu lub najechaniu (hover) na marker dymek/karta MUSI zostać wyśrodkowana na mapie.
-- W Google Maps używaj `googleMapRef.current.panTo(marker.getPosition())`.
-- W OSM używaj `autoPan: true` oraz `map.panTo(latlng)`.
+- W Google Maps używaj `googleMapRef.current.panTo(marker.getPosition())`. WAŻNE: Nie dodawaj listenera `bounds_changed`, który czyści stan dymka, bo `panTo` go wywoła i zamknie dymek.
+- W OSM używaj `autoPan: false` w `bindPopup` i ręcznie wywołuj `map.panTo(marker.getLatLng())` w zdarzeniach `mouseover` i `click`.
 - To kluczowe dla UX na urządzeniach mobilnych i małych ekranach.
 
