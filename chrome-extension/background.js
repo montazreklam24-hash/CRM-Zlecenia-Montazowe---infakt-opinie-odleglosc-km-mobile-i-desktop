@@ -109,6 +109,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendResponse({ success: false, error: error.message || 'Nieznany błąd' });
         });
       return true; // async response
+
+    case 'lookupGus':
+      lookupGusInCRM(request.nip).then(sendResponse);
+      return true;
+
+    case 'getGmailAttachments':
+      getGmailAttachments(request.messageId).then(sendResponse);
+      return true;
+
+    case 'getAttachmentData':
+      getAttachmentData(request.messageId, request.attachmentId).then(sendResponse);
+      return true;
   }
 });
 
@@ -898,16 +910,94 @@ async function getAuthToken() {
   });
 }
 
-async function importAttachments(messageId) {
-  await logDebug('info', 'import', 'Starting attachment import', { messageId, messageIdLength: messageId?.length });
+/**
+ * Pobiera listę załączników dla danej wiadomości bezpośrednio z Gmail API
+ */
+async function getAttachmentData(messageId, attachmentId) {
+  try {
+    const token = await getAuthToken();
+    const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${attachmentId}`;
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    if (!response.ok) throw new Error(`Gmail API error: ${response.status}`);
+    
+    const data = await response.json();
+    return { success: true, data: data.data }; // Base64url data
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+  await logDebug('info', 'getAttachments', 'Fetching attachments list', { messageId });
+  
+  try {
+    const token = await getAuthToken();
+    const realId = await getRealMessageId(messageId);
+    
+    // Pobierz szczegóły wiadomości
+    const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${realId}`;
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Gmail API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const attachments = [];
+    
+    function findAttachments(parts) {
+      if (!parts) return;
+      for (const part of parts) {
+        if (part.filename && part.body && (part.body.attachmentId || part.body.data)) {
+          attachments.push({
+            id: part.body.attachmentId || `inline-${Math.random().toString(36).substr(2, 9)}`,
+            name: part.filename,
+            mimeType: part.mimeType,
+            size: part.body.size,
+            isInline: !!part.headers?.find(h => h.name === 'Content-ID' || (h.name === 'Content-Disposition' && h.value.includes('inline')))
+          });
+        }
+        if (part.parts) findAttachments(part.parts);
+      }
+    }
+    
+    if (data.payload && data.payload.parts) {
+      findAttachments(data.payload.parts);
+    } else if (data.payload && data.payload.body && (data.payload.body.attachmentId || data.payload.body.data)) {
+        // Pojedyncza część
+        findAttachments([data.payload]);
+    }
+    
+    await logDebug('info', 'getAttachments', 'Found attachments', { count: attachments.length });
+    return { success: true, attachments };
+  } catch (e) {
+    await logDebug('error', 'getAttachments', 'Error fetching attachments', { error: e.message });
+    return { success: false, error: e.message };
+  }
+}
+
+async function importAttachments(messageId, selectedIds = null) {
+  await logDebug('info', 'import', 'Starting attachment import', { 
+    messageId, 
+    messageIdLength: messageId?.length,
+    selectedCount: selectedIds ? selectedIds.length : 'ALL'
+  });
   
   try {
     const googleToken = await getAuthToken();
-    await logDebug('info', 'import', 'Sending import request to API', { messageId, hasToken: !!googleToken });
+    await logDebug('info', 'import', 'Sending import request to API', { 
+      messageId, 
+      hasToken: !!googleToken,
+      selectedIds 
+    });
     
     const result = await apiRequest('import_gmail.php', 'POST', {
       messageId: messageId,
-      token: googleToken
+      token: googleToken,
+      selectedIds: selectedIds // Przekaż listę wybranych ID do API
     });
     
     await logDebug('info', 'import', 'Import API response received', { 
@@ -1045,27 +1135,22 @@ async function createJobInCRM(jobData) {
     await logDebug('info', 'createJob', 'Checking import settings', { 
       importAttachments: settings.importAttachments,
       hasMessageId: !!finalMessageId,
-      messageId: finalMessageId 
+      messageId: finalMessageId,
+      selectedIds: jobData.selectedAttachmentIds 
     });
     
     if (settings.importAttachments) {
-        await logDebug('info', 'createJob', 'Import attachments enabled, processing', { 
-          hasMessageId: !!finalMessageId,
-          messageId: finalMessageId 
-        });
-        
         if (finalMessageId) {
-            await logDebug('info', 'createJob', 'Resolving message ID', { original: finalMessageId });
             finalMessageId = await getRealMessageId(finalMessageId);
-            await logDebug('info', 'createJob', 'Message ID resolved', { resolved: finalMessageId });
-        } else {
-            await logDebug('warn', 'createJob', 'Brak messageId w jobData', { jobDataKeys: Object.keys(jobData) });
         }
 
         if (finalMessageId) {
           try {
-            await logDebug('info', 'createJob', 'Calling importAttachments', { messageId: finalMessageId });
-            const importedFiles = await importAttachments(finalMessageId);
+            await logDebug('info', 'createJob', 'Calling importAttachments', { 
+                messageId: finalMessageId,
+                selectedIds: jobData.selectedAttachmentIds 
+            });
+            const importedFiles = await importAttachments(finalMessageId, jobData.selectedAttachmentIds);
             
             await logDebug('info', 'createJob', 'Import completed', { 
               importedFilesCount: importedFiles?.length || 0,
@@ -1189,6 +1274,38 @@ async function testConnection(settings) {
     }
   } catch (error) {
     return { success: false, error: 'Nie można połączyć z serwerem' };
+  }
+}
+
+async function lookupGusInCRM(nip) {
+  try {
+    await logDebug('info', 'gus', 'Starting GUS lookup', { nip });
+    const settings = await getSettings();
+    if (!settings.crmUrl) throw new Error('Brak adresu CRM w ustawieniach');
+    
+    // Używamy endpointu /api/gus/nip/{nip}
+    const url = settings.crmUrl.replace(/\/$/, '') + '/api/gus/nip/' + nip;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer ' + settings.crmToken,
+        'Accept': 'application/json'
+      }
+    });
+    
+    const data = await response.json();
+    
+    if (response.ok) {
+      await logDebug('info', 'gus', 'GUS lookup successful', { company: data.company?.name });
+      return { success: true, company: data.company };
+    } else {
+      await logDebug('warn', 'gus', 'GUS lookup failed', { error: data.error });
+      return { success: false, error: data.error || 'Nie znaleziono firmy' };
+    }
+  } catch (error) {
+    await logDebug('error', 'gus', 'GUS lookup error', { error: error.message });
+    return { success: false, error: error.message };
   }
 }
 

@@ -344,7 +344,6 @@ function updateAttachmentsButton() {
 }
 
 function openAttachmentsModal() {
-    // Usuń stary modal jeśli istnieje
     const existing = document.querySelector('.crm-modal-overlay');
     if (existing) existing.remove();
 
@@ -356,27 +355,28 @@ function openAttachmentsModal() {
     
     modal.innerHTML = `
         <div class="crm-modal-header">
-            <h2>Wybierz załączniki z maila</h2>
-            <button class="crm-modal-close">&times;</button>
+            <h2>Wybierz załączniki</h2>
+            <button class="crm-modal-close" style="font-size: 30px; line-height: 1;">&times;</button>
         </div>
         <div class="crm-modal-body">
-            <p style="font-size: 13px; color: #64748b; margin-bottom: 16px;">
-                Zaznacz pliki, które chcesz dodać do zlecenia. Odznacz logotypy ze stopek i inne zbędne grafiki.
-            </p>
-            
-            <div class="crm-modal-actions">
-                <button id="crm-att-select-all" class="crm-btn-text">Zaznacz wszystkie</button>
-                <span style="color: #cbd5e1;">|</span>
-                <button id="crm-att-select-none" class="crm-btn-text">Odznacz wszystkie</button>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div class="crm-modal-actions">
+                    <button id="crm-att-select-all" class="crm-btn-text">Zaznacz wszystko</button>
+                    <span style="color: #cbd5e1;">|</span>
+                    <button id="crm-att-select-none" class="crm-btn-text">Odznacz wszystko</button>
+                </div>
+                <div style="font-size: 12px; color: #64748b; font-weight: 600;">
+                    Wybrano: <span id="crm-selected-count-modal">0</span> / ${gmailAttachments.length}
+                </div>
             </div>
             
             <div class="crm-att-grid">
-                <!-- Załączniki zostaną wyrenderowane tutaj -->
+                <!-- Grid wyrenderowany przez JS -->
             </div>
         </div>
         <div class="crm-modal-footer">
-            <button class="crm-btn-secondary crm-modal-cancel" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">Anuluj</button>
-            <button class="crm-btn-primary crm-modal-save">Zastosuj wybór</button>
+            <button class="crm-btn-secondary crm-modal-cancel" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; width: auto; padding: 10px 24px;">Anuluj</button>
+            <button class="crm-btn-primary crm-modal-save" style="width: auto; padding: 10px 32px;">Zastosuj wybór</button>
         </div>
     `;
 
@@ -384,46 +384,99 @@ function openAttachmentsModal() {
     document.body.appendChild(overlay);
 
     const grid = modal.querySelector('.crm-att-grid');
+    const selectedCountSpan = modal.querySelector('#crm-selected-count-modal');
     
+    function updateCountDisplay() {
+        if (selectedCountSpan) selectedCountSpan.innerText = selectedAttachmentIds.length;
+    }
+
     function renderGrid() {
         grid.innerHTML = '';
         gmailAttachments.forEach(att => {
             const isSelected = selectedAttachmentIds.includes(att.id);
             const card = document.createElement('div');
             card.className = `crm-att-card ${isSelected ? 'selected' : ''}`;
+            card.dataset.id = att.id;
             
-            const ext = att.name.split('.').pop().toLowerCase();
-            let icon = '📄';
-            if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) icon = '🖼️';
-            if (ext === 'pdf') icon = '📕';
-            if (['doc', 'docx'].includes(ext)) icon = '📝';
-            if (['xls', 'xlsx'].includes(ext)) icon = '📊';
+            const isImage = att.mimeType.startsWith('image/');
+            const ext = att.name.split('.').pop().toUpperCase();
 
             card.innerHTML = `
-                <div class="crm-att-icon">${icon}</div>
-                <div class="crm-att-info">
-                    <div class="crm-att-filename">${att.name}</div>
-                    <div class="crm-att-meta">${Math.round(att.size / 1024)} KB • ${att.mimeType} ${att.isInline ? '(inline)' : ''}</div>
-                </div>
-                <input type="checkbox" ${isSelected ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: #f97316;">
+                <div class="crm-att-checkbox"></div>
+                <div class="crm-att-zoom-btn" title="Powiększ">🔍</div>
+                ${isImage ? `
+                    <img class="crm-att-preview" src="" alt="Ładowanie..." data-id="${att.id}">
+                ` : `
+                    <div class="crm-att-file-icon">
+                        <span>${ext === 'PDF' ? '📕' : '📄'}</span>
+                        <span>${ext}</span>
+                    </div>
+                `}
+                <div class="crm-att-label">${att.name}</div>
             `;
 
-            card.onclick = () => {
-                const checkbox = card.querySelector('input');
-                checkbox.checked = !checkbox.checked;
-                toggleAttachment(att.id, checkbox.checked);
-                card.classList.toggle('selected', checkbox.checked);
+            // Obsługa zaznaczania
+            card.onclick = (e) => {
+                // Jeśli kliknięto w lupę, nie zaznaczaj
+                if (e.target.classList.contains('crm-att-zoom-btn')) return;
+                
+                const selected = !selectedAttachmentIds.includes(att.id);
+                toggleAttachment(att.id, selected);
+                card.classList.toggle('selected', selected);
+                updateCountDisplay();
             };
 
-            // Zapobiegaj podwójnemu toggle przy kliknięciu bezpośrednio w checkbox
-            card.querySelector('input').onclick = (e) => {
-                e.stopPropagation();
-                toggleAttachment(att.id, e.target.checked);
-                card.classList.toggle('selected', e.target.checked);
-            };
+            // Obsługa powiększania
+            const zoomBtn = card.querySelector('.crm-att-zoom-btn');
+            if (zoomBtn) {
+                zoomBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    showLargePreview(att);
+                };
+            }
 
             grid.appendChild(card);
+            
+            // Jeśli to obrazek, zacznij go ładować
+            if (isImage) {
+                loadThumbnail(att.id, card.querySelector('.crm-att-preview'));
+            }
         });
+        updateCountDisplay();
+    }
+
+    async function loadThumbnail(attachmentId, imgElement) {
+        // Spróbuj pobrać z cache jeśli już pobieraliśmy
+        const response = await chrome.runtime.sendMessage({
+            action: 'getAttachmentData',
+            messageId: lastMessageId,
+            attachmentId: attachmentId
+        });
+
+        if (response.success && response.data) {
+            // Konwertuj base64url na base64
+            const base64 = response.data.replace(/-/g, '+').replace(/_/g, '/');
+            imgElement.src = `data:image/jpeg;base64,${base64}`;
+        } else {
+            imgElement.alt = "Błąd wczytywania";
+        }
+    }
+
+    function showLargePreview(att) {
+        const zoomOverlay = document.createElement('div');
+        zoomOverlay.className = 'crm-zoom-overlay';
+        
+        const zoomImg = document.createElement('img');
+        zoomImg.className = 'crm-zoom-image';
+        zoomImg.src = ''; // Na razie puste
+        
+        zoomOverlay.appendChild(zoomImg);
+        document.body.appendChild(zoomOverlay);
+
+        // Załaduj pełny obrazek
+        loadThumbnail(att.id, zoomImg);
+
+        zoomOverlay.onclick = () => zoomOverlay.remove();
     }
 
     function toggleAttachment(id, selected) {
