@@ -1,4 +1,4 @@
-/* Custom fonts - must be first */
+﻿/* Custom fonts - must be first */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
@@ -6,14 +6,14 @@
 @tailwind utilities;
 
 /* ============================================
-   THEME SYSTEM - 3 MOTYWY
+   THEME SYSTEM - 4 MOTYWY
    ============================================ */
 
-/* MOTYW 1: Glass Minimal (domyślny) - styl Notion/Linear */
+/* MOTYW 1: Glass Minimal (domy┼Ťlny) - styl Notion/Linear */
 :root, [data-theme="glass"] {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   
-  /* Tła - ZDJĘCIE MIASTA Z BILLBOARDAMI */
+  /* T┼éa - ZDJ─śCIE MIASTA Z BILLBOARDAMI */
   --bg-page: url('https://images.unsplash.com/photo-1534430480872-3498386e7856?w=1920&q=80') center/cover fixed;
   --bg-card: rgba(255, 255, 255, 0.55);
   --bg-card-hover: rgba(255, 255, 255, 0.7);
@@ -46,13 +46,13 @@
   --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.12);
   --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.06);
   
-  /* Zaokrąglenia - minimalne */
+  /* Zaokr─ůglenia - minimalne */
   --radius-sm: 2px;
   --radius-md: 3px;
   --radius-lg: 3px;
   --radius-xl: 4px;
   
-  /* Blur - mocny efekt szkła */
+  /* Blur - mocny efekt szk┼éa */
   --blur: blur(20px);
   
   /* Glass border */
@@ -248,7 +248,7 @@ body {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
-/* Glass theme - Warszawa Pałac Kultury i Nauki */
+/* Glass theme - Warszawa Pa┼éac Kultury i Nauki */
 :root body,
 [data-theme="glass"] body,
 body[data-theme="glass"] {
@@ -256,7 +256,7 @@ body[data-theme="glass"] {
   position: relative;
 }
 
-/* Przyciemnienie dla czytelności - delikatne 10-15% */
+/* Przyciemnienie dla czytelno┼Ťci - delikatne 10-15% */
 :root body::before,
 [data-theme="glass"] body::before,
 body[data-theme="glass"]::before {
@@ -598,3 +598,4 @@ html {
     padding-bottom: max(16px, env(safe-area-inset-bottom));
   }
 }
+
