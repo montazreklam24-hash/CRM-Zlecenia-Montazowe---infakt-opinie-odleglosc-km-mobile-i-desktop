@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Map, Receipt, Users, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Map, Receipt, Users, Settings, LogOut, ChevronDown, ChevronRight, FileText, BarChart3, Calendar, Archive } from 'lucide-react';
 
 interface SidebarProps {
   onLogout?: () => void;
@@ -8,13 +8,57 @@ interface SidebarProps {
   showLogo?: boolean;
 }
 
+interface NavSection {
+  title: string;
+  icon: React.ReactNode;
+  items: {
+    icon: React.ReactNode;
+    label: string;
+    to: string;
+  }[];
+}
+
 const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex', showLogo = true }) => {
-  const navItems = [
-    { icon: <LayoutDashboard size={20} />, label: 'Pulpit', to: '/' },
-    { icon: <Map size={20} />, label: 'Mapa', to: '/map' },
-    { icon: <Receipt size={20} />, label: 'Faktury', to: '/invoices' },
-    { icon: <Users size={20} />, label: 'Klienci', to: '/clients' },
-    // { icon: <Settings size={20} />, label: 'Ustawienia', to: '/settings' },
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    'main': true, // Domyślnie rozwinięte
+    'reports': false,
+    'archive': false
+  });
+
+  const toggleSection = (sectionKey: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey]
+    }));
+  };
+
+  const sections: NavSection[] = [
+    {
+      title: 'Główne',
+      icon: <LayoutDashboard size={18} />,
+      items: [
+        { icon: <LayoutDashboard size={18} />, label: 'Pulpit', to: '/' },
+        { icon: <Map size={18} />, label: 'Mapa', to: '/map' },
+        { icon: <Receipt size={18} />, label: 'Faktury', to: '/invoices' },
+        { icon: <Users size={18} />, label: 'Klienci', to: '/clients' },
+      ]
+    },
+    {
+      title: 'Raporty',
+      icon: <BarChart3 size={18} />,
+      items: [
+        { icon: <FileText size={18} />, label: 'Raport zleceń', to: '/reports/jobs' },
+        { icon: <Calendar size={18} />, label: 'Raport miesięczny', to: '/reports/monthly' },
+      ]
+    },
+    {
+      title: 'Archiwum',
+      icon: <Archive size={18} />,
+      items: [
+        { icon: <Archive size={18} />, label: 'Zlecenia zakończone', to: '/archive/completed' },
+        { icon: <FileText size={18} />, label: 'Dokumenty', to: '/archive/documents' },
+      ]
+    }
   ];
 
   return (
@@ -29,25 +73,57 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
-                isActive
-                  ? 'bg-blue-50 text-blue-600 font-medium shadow-sm'
-                  : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
-              }`
-            }
-          >
-            <div className="transition-transform duration-200 group-hover:scale-110">
-              {item.icon}
+      <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+        {sections.map((section, sectionIndex) => {
+          const sectionKey = section.title.toLowerCase().replace(/\s+/g, '-');
+          const isExpanded = expandedSections[sectionKey] ?? false;
+
+          return (
+            <div key={sectionIndex} className="mb-2">
+              {/* Section Header (Clickable) */}
+              <button
+                onClick={() => toggleSection(sectionKey)}
+                className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 rounded-lg transition-colors group"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="text-gray-500 group-hover:text-gray-700 transition-colors">
+                    {section.icon}
+                  </div>
+                  <span>{section.title}</span>
+                </div>
+                {isExpanded ? (
+                  <ChevronDown size={16} className="text-gray-400" />
+                ) : (
+                  <ChevronRight size={16} className="text-gray-400" />
+                )}
+              </button>
+
+              {/* Section Items (Collapsible) */}
+              {isExpanded && (
+                <div className="mt-1 ml-2 space-y-1 border-l-2 border-gray-100 pl-2">
+                  {section.items.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                          isActive
+                            ? 'bg-blue-50 text-blue-600 font-medium shadow-sm'
+                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+                        }`
+                      }
+                    >
+                      <div className="transition-transform duration-200 group-hover:scale-110">
+                        {item.icon}
+                      </div>
+                      <span className="text-sm">{item.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
             </div>
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
+          );
+        })}
       </nav>
 
       {/* User / Logout */}

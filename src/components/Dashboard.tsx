@@ -1725,7 +1725,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   return (
     <div className="animate-fade-in pb-20">
       {/* Header & Controls */}
-      <div className="flex flex-col gap-3 mb-4 mt-2">
+      <div className="flex flex-col gap-3 mb-4 mt-4">
         {/* Row 1: Tabs + New button */}
         <div className="flex justify-between items-center gap-2">
           <div className="theme-surface flex p-1 flex-shrink-0" style={{ borderRadius: 'var(--radius-lg)' }}>

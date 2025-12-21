@@ -202,7 +202,7 @@ const App: React.FC = () => {
   return (
     <>
       <Routes>
-        <Route element={<Layout onLogout={handleLogout} />}>
+        <Route element={<Layout onLogout={handleLogout} user={state.user || undefined} />}>
           <Route path="/" element={
             <Dashboard 
               role={userRole} 
