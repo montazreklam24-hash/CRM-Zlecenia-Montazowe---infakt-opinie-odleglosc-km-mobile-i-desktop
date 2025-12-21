@@ -30,6 +30,111 @@ declare global {
   }
 }
 
+const getFileExtension = (url: string) => {
+  if (!url) return '';
+  // Handle data URLs
+  if (url.startsWith('data:')) {
+    const mime = url.split(';')[0].split(':')[1];
+    if (mime === 'application/pdf') return 'pdf';
+    if (mime === 'application/postscript') return 'eps';
+    return mime.split('/')[1];
+  }
+  
+  // Handle standard URLs (remove query params)
+  const cleanUrl = url.split('?')[0];
+  const ext = cleanUrl.split('.').pop()?.toLowerCase() || '';
+  return ext;
+};
+
+const isImageFile = (url: string) => {
+  const ext = getFileExtension(url);
+  return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext);
+};
+
+interface AttachmentPreviewProps {
+  url: string;
+  idx: number;
+  isEditing: boolean;
+  isAdmin: boolean;
+  onClick: (url: string) => void;
+  setCoverImage: (index: number) => void;
+  rotateProjectImage: (index: number) => void;
+  removeProjectImage: (index: number) => void;
+}
+
+const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({ 
+  url, idx, isEditing, isAdmin, onClick, setCoverImage, rotateProjectImage, removeProjectImage 
+}) => {
+  const [imgError, setImgError] = useState(false);
+  const extension = getFileExtension(url);
+  const isImg = isImageFile(url);
+  
+  // Try to show thumbnail if it's not a standard image
+  const showThumbnail = !isImg && !imgError && ['pdf', 'eps', 'ai', 'psd'].includes(extension);
+  const displayUrl = showThumbnail ? `${url}.jpg` : url;
+
+  return (
+    <div className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 group bg-slate-50">
+      <div onClick={() => !isImg ? window.open(url, '_blank') : onClick(url)} className={`w-full h-full ${isImg ? 'cursor-zoom-in' : 'cursor-pointer'}`}>
+        {(!isImg && !showThumbnail) || (showThumbnail && imgError) ? (
+          <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 p-4 bg-slate-100">
+            <FileText className="w-12 h-12 mb-2 text-slate-400" />
+            <span className="text-[10px] font-bold bg-white px-2 py-1 rounded-lg shadow-sm uppercase text-slate-600 border border-slate-200">
+              {extension || 'PLIK'}
+            </span>
+          </div>
+        ) : (
+          <img 
+            src={displayUrl} 
+            className="w-full h-full object-cover" 
+            alt="attachment" 
+            loading="lazy"
+            onError={() => setImgError(true)}
+          />
+        )}
+      </div>
+
+      {(isEditing || isAdmin) && (
+        <div className={`absolute inset-0 flex flex-col justify-between p-2 pointer-events-none transition-all duration-200 ${
+          isEditing ? 'bg-black/10' : 'bg-black/40'
+        }`}>
+          <div className="flex justify-between pointer-events-auto">
+            <button 
+              onClick={(e) => {e.stopPropagation(); setCoverImage(idx)}} 
+              className={`p-2 rounded-lg shadow-md transition-transform active:scale-95 ${
+                idx === 0 ? 'bg-amber-400 text-amber-900' : 'bg-white text-slate-400 hover:text-amber-600'
+              }`}
+              title="Ustaw jako okładkę"
+            >
+              <Star className={`w-5 h-5 ${idx === 0 ? 'fill-current' : ''}`} />
+            </button>
+            <div className="flex gap-1">
+              {/* Obróć - tylko dla obrazów, nie PDF */}
+              {isImageFile(url) && (
+                <button 
+                  onClick={(e) => {e.stopPropagation(); rotateProjectImage(idx)}} 
+                  className="p-2 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600"
+                  title="Obróć o 90┬░"
+                >
+                  <RotateCw className="w-5 h-5" />
+                </button>
+              )}
+              <button 
+                onClick={(e) => {e.stopPropagation(); removeProjectImage(idx)}} 
+                className="p-2 bg-red-500 text-white rounded-lg shadow-md hover:bg-red-600"
+                title="Usuń"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+          {idx === 0 && <span className="bg-amber-400 text-amber-900 text-[10px] font-black text-center py-1.5 rounded-lg shadow-sm uppercase tracking-wider">Okładka</span>}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role, onBack, onJobSaved, onArchive, onDelete }) => {
   const isAdmin = role === UserRole.ADMIN;
   const [isEditing, setIsEditing] = useState(!job);
@@ -554,13 +659,6 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
       setIsProcessing(false);
     }
   };
-
-  const isPdf = (url: string) => {
-    if (!url) return false;
-    return url.startsWith('data:application/pdf') || 
-           url.toLowerCase().endsWith('.pdf') || 
-           url.toLowerCase().includes('.pdf?');
-  };
   
   const setCoverImage = async (index: number) => {
     const newImages = [...projectImages];
@@ -627,7 +725,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
           </button>
           
           <div className="relative w-full h-full flex items-center justify-center pointer-events-none" onClick={(e) => e.stopPropagation()}>
-            {isPdf(lightboxImage) 
+            {getFileExtension(lightboxImage) === 'pdf' 
               ? <iframe src={lightboxImage} className="w-full h-[85vh] max-w-5xl bg-white rounded-lg shadow-2xl pointer-events-auto" title="pdf" /> 
               : <img 
                   src={lightboxImage} 
@@ -1323,56 +1421,17 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
             {projectImages.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {projectImages.map((img, idx) => (
-                  <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 group bg-slate-50">
-                    <div onClick={() => setLightboxImage(img)} className="w-full h-full cursor-zoom-in">
-                      {isPdf(img) ? (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 p-4">
-                          <FileText className="w-12 h-12 mb-2" />
-                          <span className="text-[10px] font-bold bg-white px-2 py-1 rounded-lg shadow-sm">PDF</span>
-                        </div>
-                      ) : (
-                        <img src={img} className="w-full h-full object-cover" alt="attachment" loading="lazy" />
-                      )}
-                    </div>
-
-                    {(isEditing || isAdmin) && (
-                      <div className={`absolute inset-0 flex flex-col justify-between p-2 pointer-events-none transition-all duration-200 ${
-                        isEditing ? 'bg-black/10' : 'bg-black/40'
-                      }`}>
-                        <div className="flex justify-between pointer-events-auto">
-                          <button 
-                            onClick={(e) => {e.stopPropagation(); setCoverImage(idx)}} 
-                            className={`p-2 rounded-lg shadow-md transition-transform active:scale-95 ${
-                              idx === 0 ? 'bg-amber-400 text-amber-900' : 'bg-white text-slate-400 hover:text-amber-600'
-                            }`}
-                            title="Ustaw jako okładkę"
-                          >
-                            <Star className={`w-5 h-5 ${idx === 0 ? 'fill-current' : ''}`} />
-                          </button>
-                          <div className="flex gap-1">
-                            {/* Obróć - tylko dla obrazów, nie PDF */}
-                            {!isPdf(img) && (
-                              <button 
-                                onClick={(e) => {e.stopPropagation(); rotateProjectImage(idx)}} 
-                                className="p-2 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600"
-                                title="Obróć o 90┬░"
-                              >
-                                <RotateCw className="w-5 h-5" />
-                              </button>
-                            )}
-                            <button 
-                              onClick={(e) => {e.stopPropagation(); removeProjectImage(idx)}} 
-                              className="p-2 bg-red-500 text-white rounded-lg shadow-md hover:bg-red-600"
-                              title="Usuń"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </button>
-                          </div>
-                        </div>
-                        {idx === 0 && <span className="bg-amber-400 text-amber-900 text-[10px] font-black text-center py-1.5 rounded-lg shadow-sm uppercase tracking-wider">Okładka</span>}
-                      </div>
-                    )}
-                  </div>
+                  <AttachmentPreview
+                    key={idx}
+                    url={img}
+                    idx={idx}
+                    isEditing={isEditing}
+                    isAdmin={isAdmin}
+                    onClick={setLightboxImage}
+                    setCoverImage={setCoverImage}
+                    rotateProjectImage={rotateProjectImage}
+                    removeProjectImage={removeProjectImage}
+                  />
                 ))}
               </div>
             ) : (

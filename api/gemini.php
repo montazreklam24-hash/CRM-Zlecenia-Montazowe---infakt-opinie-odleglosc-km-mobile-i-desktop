@@ -182,8 +182,14 @@ WYTYCZNE SZCZEGÓŁOWE:
 
 2. OSOBA KONTAKTOWA I TELEFON:
 - Znajdź numer telefonu do osoby, która będzie na miejscu lub koordynuje montaż. Szukaj w stopkach!
+- UWAGA: Ignoruj numery firmowe: 888 201 250 oraz 22 213 95 96. To są nasze numery. Jeśli klient podaje swój numer w treści (nawet jeśli piszemy z firmowego), wybierz numer klienta.
 
-3. STRESZCZENIE (scopeWorkText) - BARDZO WAŻNE:
+3. EMAIL KONTAKTOWY:
+- Szukaj adresu email klienta. 
+- UWAGA: Ignoruj maile z domen @montazreklam24.pl, @montazreklam24.com oraz @newoffice.pl. To są nasze maile firmowe.
+- Szukaj maila klienta w treści wiadomości, jeśli nadawca (From) jest jednym z naszych maili.
+
+4. STRESZCZENIE (scopeWorkText) - BARDZO WAŻNE:
 - Nie kopiuj maila! Napisz zwięzłe, żołnierskie streszczenie w punktach.
 - Co konkretnie trzeba zrobić? (np. "1. Demontaż starego szyldu. 2. Montaż kasetonu 3x1m. 3. Wyklejenie witryny").
 - Wypisz wymiary i materiały, jeśli są podane.

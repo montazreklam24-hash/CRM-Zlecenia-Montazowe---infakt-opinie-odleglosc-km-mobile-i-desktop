@@ -73,6 +73,9 @@ function collectAttachmentsFromPart(array $part, string $messageId, array &$out)
   $body = $part['body'] ?? [];
   $attachmentId = $body['attachmentId'] ?? null;
   $inlineData = $body['data'] ?? null;
+  
+  // DEBUG: Log structure
+  debugImport("Part: Mime=$mimeType, File=$filename, AttId=" . ($attachmentId ? 'YES' : 'NO') . ", Data=" . ($inlineData ? 'YES' : 'NO'));
 
   if ($attachmentId) {
     $isInlineImage = (strpos($mimeType, 'image/') === 0);
@@ -117,27 +120,55 @@ try {
   debugImport("=== START IMPORT (ID: $id) ===");
   $attachmentsMeta = [];
 
-  // 1) Próbujemy jako THREAD
-  $threadUrl = "https://www.googleapis.com/gmail/v1/users/me/threads/{$id}?format=full";
-  $threadRes = googleApiGetRaw($threadUrl, $token);
-
-  if ($threadRes['ok'] && !empty($threadRes['json']['messages'])) {
-    debugImport("Resolved as Thread with " . count($threadRes['json']['messages']) . " messages");
-    foreach ($threadRes['json']['messages'] as $msg) {
-      if (is_array($msg)) collectAttachmentsFromMessage($msg, $attachmentsMeta);
-    }
+  // 1) Pobierz WIADOMOŚĆ, aby uzyskać threadId
+  $msgUrl = "https://www.googleapis.com/gmail/v1/users/me/messages/{$id}?format=full";
+  $msgRes = googleApiGetRaw($msgUrl, $token);
+  
+  if (!$msgRes['ok']) {
+      // Spróbuj jako wątek (fallback)
+      $threadUrl = "https://www.googleapis.com/gmail/v1/users/me/threads/{$id}?format=full";
+      $threadRes = googleApiGetRaw($threadUrl, $token);
+      
+      if (!$threadRes['ok']) {
+          throw new Exception("Nie udało się pobrać wiadomości ani wątku. msgHTTP={$msgRes['code']}");
+      }
+      
+      debugImport("Resolved directly as Thread");
+      foreach ($threadRes['json']['messages'] as $msg) {
+          if (is_array($msg)) collectAttachmentsFromMessage($msg, $attachmentsMeta);
+      }
   } else {
-    // 2) Fallback jako MESSAGE
-    $msgUrl = "https://www.googleapis.com/gmail/v1/users/me/messages/{$id}?format=full";
-    $msgRes = googleApiGetRaw($msgUrl, $token);
-    if (!$msgRes['ok']) {
-      throw new Exception("Nie udało się pobrać ani wątku ani wiadomości. threadHTTP={$threadRes['code']} msgHTTP={$msgRes['code']}");
-    }
-    debugImport("Resolved as Message");
-    collectAttachmentsFromMessage($msgRes['json'], $attachmentsMeta);
+      // Mamy wiadomość, pobieramy threadId
+      $threadId = $msgRes['json']['threadId'] ?? null;
+      debugImport("Resolved as Message, Thread ID: " . ($threadId ?? 'NULL'));
+      
+      if ($threadId) {
+          // Pobierz CAŁY wątek
+          $threadUrl = "https://www.googleapis.com/gmail/v1/users/me/threads/{$threadId}?format=full";
+          $threadRes = googleApiGetRaw($threadUrl, $token);
+          
+          if ($threadRes['ok'] && !empty($threadRes['json']['messages'])) {
+              debugImport("Fetched full thread with " . count($threadRes['json']['messages']) . " messages");
+              foreach ($threadRes['json']['messages'] as $msg) {
+                  if (is_array($msg)) collectAttachmentsFromMessage($msg, $attachmentsMeta);
+              }
+          } else {
+              // Fallback: tylko ta wiadomość
+              debugImport("Failed to fetch thread, using single message");
+              collectAttachmentsFromMessage($msgRes['json'], $attachmentsMeta);
+          }
+      } else {
+          // Brak threadId, tylko ta wiadomość
+          collectAttachmentsFromMessage($msgRes['json'], $attachmentsMeta);
+      }
   }
 
   debugImport("Found " . count($attachmentsMeta) . " attachment(s) in meta");
+
+  if (count($attachmentsMeta) === 0) {
+      debugImport("WARNING: No attachments found. Dumping message structure:");
+      debugImport(json_encode($msgRes['json'], JSON_PRETTY_PRINT));
+  }
 
   // 3) Pobierz pliki
   $saved = [];
@@ -165,10 +196,17 @@ try {
     
     if (file_put_contents($filePath, $dataBinary)) {
         debugImport("Saved file: $filePath (" . strlen($dataBinary) . " bytes)");
+        
+        // Generuj miniaturkę dla PDF/EPS
+        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        if (in_array($ext, ['pdf', 'eps', 'ai', 'psd'])) {
+            generateThumbnail($filePath);
+        }
+
         $saved[] = [
           'filename' => $finalFilename,
           'originalName' => $filename,
-          'path' => UPLOADS_URL . '/' . $finalFilename,
+          'path' => rtrim(UPLOADS_URL, '/') . '/' . $finalFilename,
           'mimeType' => $a['mimeType'] ?? 'application/octet-stream'
         ];
     } else {

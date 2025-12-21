@@ -7,8 +7,13 @@ RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     zip \
     unzip \
+    ghostscript \
+    imagemagick \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) gd mysqli pdo_mysql
+
+# Konfiguracja ImageMagick (odblokowanie PDF)
+RUN sed -i 's/rights="none" pattern="PDF"/rights="read|write" pattern="PDF"/' /etc/ImageMagick-6/policy.xml || true
 
 # Włączenie mod_rewrite i mod_headers dla Apache
 RUN a2enmod rewrite headers
@@ -23,6 +28,8 @@ WORKDIR /var/www/html
 # Uprawnienia (ważne, aby Apache mógł zapisywać pliki, np. uploady)
 # W kontenerze Apache działa zazwyczaj jako www-data
 RUN chown -R www-data:www-data /var/www/html
+
+
 
 
 

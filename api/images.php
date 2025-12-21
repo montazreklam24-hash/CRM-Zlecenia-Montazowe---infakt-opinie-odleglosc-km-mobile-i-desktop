@@ -49,7 +49,43 @@ function saveImageToFile($base64Data, $jobId, $type, $order) {
         return null;
     }
     
-    return UPLOADS_URL . '/' . $filename;
+    // Generuj miniaturkę dla PDF/EPS
+    if (in_array(strtolower($extension), ['pdf', 'eps', 'ai', 'psd'])) {
+        generateThumbnail($filepath);
+    }
+    
+    return rtrim(UPLOADS_URL, '/') . '/' . $filename;
+}
+
+/**
+ * Generuje miniaturkę JPG dla plików PDF/EPS/AI/PSD
+ * Wymaga Ghostscript i ImageMagick
+ */
+function generateThumbnail($sourcePath) {
+    if (!file_exists($sourcePath)) return false;
+    
+    $thumbPath = $sourcePath . '.jpg';
+    
+    // Komenda ImageMagick (convert)
+    // -density 150 : jakość renderowania (DPI)
+    // -colorspace sRGB : konwersja CMYK -> RGB (ważne dla EPS)
+    // -background white -alpha remove : usuwa przezroczystość (białe tło)
+    // -resize 800x : skalowanie do szerokości 800px
+    // [0] : bierze tylko pierwszą stronę/klatkę
+    $cmd = sprintf(
+        'convert -density 150 -colorspace sRGB -background white -alpha remove -resize 800x %s[0] %s 2>&1',
+        escapeshellarg($sourcePath),
+        escapeshellarg($thumbPath)
+    );
+    
+    exec($cmd, $output, $returnCode);
+    
+    if ($returnCode !== 0) {
+        error_log("Thumbnail generation failed for $sourcePath. Command: $cmd. Output: " . implode("\n", $output));
+        return false;
+    }
+    
+    return true;
 }
 
 /**
