@@ -62,20 +62,20 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
                <img 
                  src="/logo.png" 
                  alt="Montaż24"
-                 className="h-[85px] w-auto object-contain absolute top-0 left-0 transition-transform hover:scale-105"
+                 className="h-[60px] w-auto object-contain absolute left-0 transition-transform hover:scale-105"
                  style={{ 
-                   top: '-5px', 
+                   top: '12px', 
                    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
                    zIndex: 60
                  }}
                  onError={(e) => {
                    // Jeśli brak logo, pokaż placeholder tekstowy
-                   e.currentTarget.style.opacity = '0.3'; // Tylko przyciemnij zamiast ukrywać, żeby było widać że brakuje pliku
+                   e.currentTarget.style.opacity = '0.3';
                  }}
                />
                
                {/* Tekst obok logo - margines zależy od szerokości logo */}
-               <div className="flex flex-col justify-center ml-[140px] hidden sm:flex z-50">
+               <div className="flex flex-col justify-center ml-[120px] hidden sm:flex z-50">
                   <span className="text-orange-500 font-bold text-lg leading-tight tracking-wide">
                     CRM.MontazReklam24.pl
                   </span>
