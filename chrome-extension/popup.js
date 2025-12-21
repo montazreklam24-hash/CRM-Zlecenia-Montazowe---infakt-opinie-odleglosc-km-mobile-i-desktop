@@ -97,6 +97,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             function getCurrentMessageId() {
               // Strategia 1: Sprawdź wszystkie elementy z data-message-id
               const messageElements = document.querySelectorAll('[data-message-id]');
+              
+              // Strategia 1b: Sprawdź data-legacy-message-id (często zawiera Hex ID gdy data-message-id jest wewnętrzne)
+              const legacyElements = document.querySelectorAll('div[data-legacy-message-id]');
+              if (legacyElements.length > 0) {
+                  for (let i = legacyElements.length - 1; i >= 0; i--) {
+                      const id = legacyElements[i].getAttribute('data-legacy-message-id');
+                       if (id && !id.startsWith('FM') && !id.includes('#') && id.length >= 10) {
+                           return { id, source: 'data-legacy-message-id', valid: true };
+                      }
+                  }
+              }
+
               const foundIds = [];
               
               for (let i = messageElements.length - 1; i >= 0; i--) {

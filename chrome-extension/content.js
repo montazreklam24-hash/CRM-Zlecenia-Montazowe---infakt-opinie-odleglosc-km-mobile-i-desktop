@@ -316,7 +316,35 @@ function renderFileList() {
 function getCurrentMessageId() {
     console.log('[CRM Content] Getting message ID...');
     
-    // Strategia 1: Sprawdź URL hash (Najpewniejsza metoda na ThreadID/MessageID)
+    // Strategia 1: DOM (Najpewniejsza dla API - szukamy Hex ID)
+    // Szukamy elementów wiadomości
+    const messageElements = document.querySelectorAll('div[data-message-id]');
+    
+    // Strategia 1b: Sprawdź data-legacy-message-id (często zawiera Hex ID gdy data-message-id jest wewnętrzne)
+    const legacyElements = document.querySelectorAll('div[data-legacy-message-id]');
+    if (legacyElements.length > 0) {
+        for (let i = legacyElements.length - 1; i >= 0; i--) {
+            const id = legacyElements[i].getAttribute('data-legacy-message-id');
+             if (id && !id.startsWith('FM') && !id.includes('#') && id.length >= 10) {
+                 console.log('[CRM Content] Found valid Hex ID from data-legacy-message-id:', id);
+                 return id;
+            }
+        }
+    }
+
+    if (messageElements.length > 0) {
+        // Sprawdzamy od ostatniego elementu (najnowsza wiadomość w wątku)
+        for (let i = messageElements.length - 1; i >= 0; i--) {
+            const id = messageElements[i].getAttribute('data-message-id');
+            // Szukamy ID, które NIE zaczyna się od "FM" i nie ma "#" (czysty hex)
+            if (id && !id.startsWith('FM') && !id.includes('#') && id.length >= 10) {
+                 console.log('[CRM Content] Found valid Hex ID from DOM:', id);
+                 return id;
+            }
+        }
+    }
+
+    // Strategia 2: Sprawdź URL hash (Fallback)
     const hash = window.location.hash;
     if (hash) {
         // Parsuj hash: #inbox/18123abc...
@@ -334,7 +362,7 @@ function getCurrentMessageId() {
         }
     }
 
-    // Strategia 2: Sprawdź parametry URL (np. view=msg&th=...)
+    // Strategia 3: Sprawdź parametry URL (np. view=msg&th=...)
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('th')) {
         const th = urlParams.get('th');
@@ -342,14 +370,12 @@ function getCurrentMessageId() {
         return th;
     }
     
-    // Strategia 3: Fallback do DOM (mniej pewne)
-    const messageElements = document.querySelectorAll('div[data-message-id]');
+    // Strategia 4: Ostateczny fallback do DOM (nawet jeśli to FM id)
     if (messageElements.length > 0) {
-        // Weź ostatni element (często właściwa wiadomość w wątku)
         const lastMsg = messageElements[messageElements.length - 1];
         const id = lastMsg.getAttribute('data-message-id');
         if (id) {
-             console.log('[CRM Content] Found ID from DOM (fallback):', id);
+             console.log('[CRM Content] Found fallback ID from DOM:', id);
              return id;
         }
     }
