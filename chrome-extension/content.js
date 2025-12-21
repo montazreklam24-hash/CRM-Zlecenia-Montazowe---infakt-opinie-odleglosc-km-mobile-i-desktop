@@ -129,9 +129,14 @@ function renderSidebar(state) {
     if (state === 'form') {
         content.innerHTML = `
             <div class="crm-form">
-                <button id="crm-read" class="crm-btn-primary crm-full-width">
-                    ✨ Analizuj Maila (AI)
-                </button>
+                <div class="crm-top-buttons">
+                    <button id="crm-read" class="crm-btn-primary crm-btn-half">
+                        ✨ Analizuj Maila (AI)
+                    </button>
+                    <button id="crm-send" class="crm-btn-success crm-btn-half">
+                        🚀 Wyślij do CRM
+                    </button>
+                </div>
                 
                 <hr class="crm-divider" style="margin: 2px 0;">
                 
@@ -169,10 +174,6 @@ function renderSidebar(state) {
                     </div>
                     <div id="crm-file-list" class="crm-file-list"></div>
                 </div>
-                
-                <button id="crm-send" class="crm-btn-success crm-full-width" style="margin-top:4px;">
-                    🚀 Wyślij do CRM
-                </button>
             </div>
         `;
         

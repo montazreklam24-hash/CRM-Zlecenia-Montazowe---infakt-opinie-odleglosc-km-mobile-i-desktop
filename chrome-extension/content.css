@@ -304,6 +304,17 @@
   width: 100%;
 }
 
+.crm-top-buttons {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 0;
+}
+
+.crm-btn-half {
+  flex: 1;
+  width: auto;
+}
+
 .crm-hint {
   font-size: 11px;
   color: #94a3b8;
