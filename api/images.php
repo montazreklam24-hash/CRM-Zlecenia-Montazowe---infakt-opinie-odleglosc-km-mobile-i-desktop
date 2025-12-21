@@ -1,6 +1,6 @@
 <?php
 /**
- * Obsługa obrazów (wspólna dla jobs.php i jobs_simple.php)
+ * Obsługa obrazów (ujednolicone - tylko jobs_ai)
  */
 require_once __DIR__ . '/config.php';
 
@@ -50,30 +50,45 @@ function saveImageToFile($base64Data, $jobId, $type, $order) {
 
 /**
  * Zapisuje obrazy do tabeli job_images
+ * jobType parametr jest deprecated - zachowany dla kompatybilności
  */
 function saveJobImages($jobId, $images, $type = 'project', $jobType = 'ai') {
     if (empty($images) || !is_array($images)) return;
     
     $pdo = getDB();
     
-    // Pobierz stare obrazy
-    $stmt = $pdo->prepare('SELECT file_path FROM job_images WHERE job_id = ? AND type = ? AND job_type = ?');
-    $stmt->execute(array($jobId, $type, $jobType));
+    // Pobierz stare obrazy (bez filtrowania po job_type - wszystko w jednej tabeli)
+    $stmt = $pdo->prepare('SELECT file_path FROM job_images WHERE job_id = ? AND type = ?');
+    $stmt->execute(array($jobId, $type));
     $oldImages = $stmt->fetchAll();
     
-    // Usuń stare pliki
+    // Zbieramy nazwy plików, które są przesyłane w inpucie i mają pozostać
+    $filesToKeep = array();
+    foreach ($images as $imgData) {
+        // Sprawdzamy czy to URL (ścieżka), a nie base64
+        if (is_string($imgData) && strpos($imgData, 'data:image') !== 0 && 
+            (strpos($imgData, '/uploads') !== false || strpos($imgData, '/api/uploads') !== false)) {
+            $filesToKeep[] = basename($imgData);
+        }
+    }
+    
+    // Usuń stare pliki, ale tylko te, których nie ma w nowym zestawie
     foreach ($oldImages as $old) {
         if (!empty($old['file_path'])) {
-            $oldFile = UPLOADS_DIR . '/' . basename($old['file_path']);
-            if (file_exists($oldFile)) @unlink($oldFile);
+            $filename = basename($old['file_path']);
+            // Jeśli pliku nie ma na liście do zachowania -> usuń go fizycznie
+            if (!in_array($filename, $filesToKeep)) {
+                $oldFile = UPLOADS_DIR . '/' . $filename;
+                if (file_exists($oldFile)) @unlink($oldFile);
+            }
         }
     }
     
     // Usuń stare rekordy
-    $stmt = $pdo->prepare('DELETE FROM job_images WHERE job_id = ? AND type = ? AND job_type = ?');
-    $stmt->execute(array($jobId, $type, $jobType));
+    $stmt = $pdo->prepare('DELETE FROM job_images WHERE job_id = ? AND type = ?');
+    $stmt->execute(array($jobId, $type));
     
-    // Wstaw nowe - uwzględniamy file_data jako NULL (dla kompatybilności)
+    // Wstaw nowe - job_type zawsze 'ai' (dla kompatybilności z bazą)
     $stmt = $pdo->prepare('
         INSERT INTO job_images (job_id, type, file_path, file_data, is_cover, sort_order, job_type)
         VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -86,7 +101,8 @@ function saveJobImages($jobId, $images, $type = 'project', $jobType = 'ai') {
             if ($filePath) {
                 $isCover = ($order === 0) ? 1 : 0;
                 // Przekazujemy pusty string do file_data (bo baza nie pozwala na NULL)
-                $stmt->execute(array($jobId, $type, $filePath, '', $isCover, $order, $jobType));
+                // job_type zawsze 'ai' po konsolidacji
+                $stmt->execute(array($jobId, $type, $filePath, '', $isCover, $order, 'ai'));
                 $order++;
             }
         }
@@ -95,17 +111,19 @@ function saveJobImages($jobId, $images, $type = 'project', $jobType = 'ai') {
 
 /**
  * Pobiera obrazy dla zlecenia
+ * jobType parametr jest deprecated - zachowany dla kompatybilności
  */
 function getJobImages($jobId, $type = 'project', $jobType = 'ai') {
     $pdo = getDB();
     
     try {
+        // Bez filtrowania po job_type - wszystko w jednej tabeli
         $stmt = $pdo->prepare('
             SELECT file_path, file_data FROM job_images 
-            WHERE job_id = ? AND type = ? AND job_type = ?
+            WHERE job_id = ? AND type = ?
             ORDER BY sort_order ASC
         ');
-        $stmt->execute(array($jobId, $type, $jobType));
+        $stmt->execute(array($jobId, $type));
         $rows = $stmt->fetchAll();
         
         $images = array();
