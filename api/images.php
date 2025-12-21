@@ -90,7 +90,13 @@ function saveJobImages($jobId, $images, $type = 'project', $jobType = 'ai') {
             $filename = basename($old['file_path']);
             // Jeśli pliku nie ma na liście do zachowania -> usuń go fizycznie
             if (!in_array($filename, $filesToKeep)) {
-                $oldFile = UPLOADS_DIR . '/' . $filename;
+                // Sprawdź czy plik jest w podfolderze (np. gmail/)
+                if (strpos($old['file_path'], '/gmail/') !== false) {
+                    $oldFile = UPLOADS_DIR . '/gmail/' . $filename;
+                } else {
+                    $oldFile = UPLOADS_DIR . '/' . $filename;
+                }
+                
                 if (file_exists($oldFile)) @unlink($oldFile);
             }
         }

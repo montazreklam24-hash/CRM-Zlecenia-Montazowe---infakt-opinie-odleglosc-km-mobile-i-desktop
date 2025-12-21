@@ -555,7 +555,12 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
     }
   };
 
-  const isPdf = (url: string) => url.startsWith('data:application/pdf');
+  const isPdf = (url: string) => {
+    if (!url) return false;
+    return url.startsWith('data:application/pdf') || 
+           url.toLowerCase().endsWith('.pdf') || 
+           url.toLowerCase().includes('.pdf?');
+  };
   
   const setCoverImage = async (index: number) => {
     const newImages = [...projectImages];

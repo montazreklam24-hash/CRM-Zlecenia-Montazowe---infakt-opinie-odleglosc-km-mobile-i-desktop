@@ -203,6 +203,13 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
     }
   };
   
+  const isPdf = (url: string) => {
+    if (!url) return false;
+    return url.startsWith('data:application/pdf') || 
+           url.toLowerCase().endsWith('.pdf') || 
+           url.toLowerCase().includes('.pdf?');
+  };
+
   const handleSave = async () => {
     if (isSaving) return;
     setIsSaving(true);
@@ -508,12 +515,19 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
             <div className="flex flex-wrap gap-3">
               {projectImages.map((img, idx) => (
                 <div key={idx} className="relative group">
-                  <img
-                    src={img}
-                    alt={`Zdjęcie ${idx + 1}`}
-                    className="w-24 h-24 object-cover rounded-lg border-2 border-slate-200"
-                    loading="lazy"
-                  />
+                  {isPdf(img) ? (
+                    <div className="w-24 h-24 flex flex-col items-center justify-center bg-slate-100 rounded-lg border-2 border-slate-200 text-slate-400">
+                      <span className="text-2xl">📄</span>
+                      <span className="text-[10px] font-bold">PDF</span>
+                    </div>
+                  ) : (
+                    <img
+                      src={img}
+                      alt={`Zdjęcie ${idx + 1}`}
+                      className="w-24 h-24 object-cover rounded-lg border-2 border-slate-200"
+                      loading="lazy"
+                    />
+                  )}
                   <button
                     onClick={() => setProjectImages(prev => prev.filter((_, i) => i !== idx))}
                     className="absolute -top-2 -right-2 w-6 h-6 bg-orange-500 text-white rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity"

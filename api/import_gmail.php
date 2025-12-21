@@ -1,8 +1,12 @@
 <?php
+/**
+ * Import wiadomości z Gmaila (wraz z załącznikami) - Poprawiona wersja z obsługą threadId i inline images
+ */
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/images.php';
+
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+handleCORS();
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -11,8 +15,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   exit;
 }
 
+// DEBUG LOGGING
+function debugImport($msg) {
+    $logDir = __DIR__ . '/logs';
+    if (!is_dir($logDir)) mkdir($logDir, 0777, true);
+    file_put_contents($logDir . '/debug_import.log', date('Y-m-d H:i:s') . " | " . $msg . "\n", FILE_APPEND);
+}
+
 $input = json_decode(file_get_contents('php://input'), true);
-$id = $input['messageId'] ?? $input['id'] ?? null; // wspieramy oba pola
+$id = $input['messageId'] ?? $input['id'] ?? null;
 $token = $input['token'] ?? null;
 
 if (!$id || !$token) {
@@ -30,6 +41,7 @@ function base64url_decode_safe(string $data): string {
 }
 
 function googleApiGetRaw(string $url, string $token): array {
+  debugImport("API Request: $url");
   $ch = curl_init();
   curl_setopt_array($ch, [
     CURLOPT_URL => $url,
@@ -47,9 +59,11 @@ function googleApiGetRaw(string $url, string $token): array {
   curl_close($ch);
 
   if ($response === false) {
+    debugImport("Curl error: $err");
     return ['ok' => false, 'code' => 0, 'error' => $err ?: 'Curl error', 'json' => null];
   }
   $json = json_decode($response, true);
+  debugImport("API Response: HTTP $httpCode");
   return ['ok' => ($httpCode >= 200 && $httpCode < 300), 'code' => $httpCode, 'error' => null, 'json' => $json];
 }
 
@@ -60,8 +74,6 @@ function collectAttachmentsFromPart(array $part, string $messageId, array &$out)
   $attachmentId = $body['attachmentId'] ?? null;
   $inlineData = $body['data'] ?? null;
 
-  // 1) Załącznik po attachmentId (klasyczny)
-  // - bierzemy też obrazki inline nawet gdy filename jest puste
   if ($attachmentId) {
     $isInlineImage = (strpos($mimeType, 'image/') === 0);
     if ($filename || $isInlineImage) {
@@ -75,7 +87,6 @@ function collectAttachmentsFromPart(array $part, string $messageId, array &$out)
     }
   }
 
-  // 2) Inline data bez attachmentId (rzadziej, ale bywa)
   if (!$attachmentId && $inlineData && strpos($mimeType, 'image/') === 0) {
     $out[] = [
       'messageId' => $messageId,
@@ -87,7 +98,6 @@ function collectAttachmentsFromPart(array $part, string $messageId, array &$out)
     ];
   }
 
-  // Rekurencja po częściach
   if (!empty($part['parts']) && is_array($part['parts'])) {
     foreach ($part['parts'] as $sub) {
       if (is_array($sub)) collectAttachmentsFromPart($sub, $messageId, $out);
@@ -100,22 +110,19 @@ function collectAttachmentsFromMessage(array $message, array &$out): void {
   if (!$messageId) return;
   $payload = $message['payload'] ?? null;
   if (!$payload || !is_array($payload)) return;
-
-  // payload może być "single" albo mieć parts
   collectAttachmentsFromPart($payload, $messageId, $out);
 }
 
 try {
-  $uploadDir = __DIR__ . '/../uploads/gmail';
-  if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
-
+  debugImport("=== START IMPORT (ID: $id) ===");
   $attachmentsMeta = [];
 
-  // 1) Najpierw próbujemy jako THREAD
+  // 1) Próbujemy jako THREAD
   $threadUrl = "https://www.googleapis.com/gmail/v1/users/me/threads/{$id}?format=full";
   $threadRes = googleApiGetRaw($threadUrl, $token);
 
   if ($threadRes['ok'] && !empty($threadRes['json']['messages'])) {
+    debugImport("Resolved as Thread with " . count($threadRes['json']['messages']) . " messages");
     foreach ($threadRes['json']['messages'] as $msg) {
       if (is_array($msg)) collectAttachmentsFromMessage($msg, $attachmentsMeta);
     }
@@ -126,18 +133,19 @@ try {
     if (!$msgRes['ok']) {
       throw new Exception("Nie udało się pobrać ani wątku ani wiadomości. threadHTTP={$threadRes['code']} msgHTTP={$msgRes['code']}");
     }
+    debugImport("Resolved as Message");
     collectAttachmentsFromMessage($msgRes['json'], $attachmentsMeta);
   }
+
+  debugImport("Found " . count($attachmentsMeta) . " attachment(s) in meta");
 
   // 3) Pobierz pliki
   $saved = [];
   foreach ($attachmentsMeta as $a) {
-    $filename = $a['filename'] ?: ('image_' . $a['messageId'] . '_' . $a['attachmentId'] . '.png');
+    $filename = $a['filename'] ?: ('image_' . $a['messageId'] . '_' . ($a['attachmentId'] ?? 'inline') . '.png');
     $safeFilename = preg_replace('/[^a-zA-Z0-9\._-]/', '_', $filename);
-
     $dataBinary = '';
 
-    // inlineData bez attachmentId
     if (!empty($a['inlineData'])) {
       $dataBinary = base64url_decode_safe($a['inlineData']);
     } else {
@@ -151,20 +159,28 @@ try {
 
     if ($dataBinary === '') continue;
 
-    $filePath = $uploadDir . '/' . time() . '_' . $safeFilename;
-    file_put_contents($filePath, $dataBinary);
-
-    $saved[] = [
-      'filename' => basename($filePath),
-      'originalName' => $filename,
-      'path' => '/uploads/gmail/' . basename($filePath),
-      'mimeType' => $a['mimeType'] ?? 'application/octet-stream'
-    ];
+    // Używamy standardowego UPLOAD_DIR z config.php
+    $finalFilename = time() . '_' . $safeFilename;
+    $filePath = UPLOAD_DIR . '/' . $finalFilename;
+    
+    if (file_put_contents($filePath, $dataBinary)) {
+        debugImport("Saved file: $filePath (" . strlen($dataBinary) . " bytes)");
+        $saved[] = [
+          'filename' => $finalFilename,
+          'originalName' => $filename,
+          'path' => UPLOADS_URL . '/' . $finalFilename,
+          'mimeType' => $a['mimeType'] ?? 'application/octet-stream'
+        ];
+    } else {
+        debugImport("Failed to save file: $filePath");
+    }
   }
 
+  debugImport("=== IMPORT COMPLETE (Saved: " . count($saved) . ") ===");
   echo json_encode(['success' => true, 'attachments' => $saved]);
 
 } catch (Exception $e) {
+  debugImport("ERROR: " . $e->getMessage());
   http_response_code(500);
   echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }
