@@ -40,30 +40,55 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Top Navigation Bar */}
-      <header className="fixed top-0 left-0 right-0 h-16 theme-header z-50 flex items-center justify-between px-4 md:px-6 shadow-lg">
+      <header 
+        className="fixed top-0 left-0 right-0 h-16 z-50 flex items-center justify-between px-4 md:px-6 shadow-lg"
+        style={{ background: '#000000', borderBottom: '2px solid #f97316' }}
+      >
         {/* Left: Logo + Menu */}
         <div className="flex items-center gap-4">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] hover:bg-[var(--bg-surface)]"
-            style={{ color: 'var(--text-primary)' }}
+            className="p-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 hover:bg-gray-900"
+            style={{ color: '#f97316' }}
             aria-label="Toggle menu"
           >
             {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
           
           {/* Logo */}
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-            {/* Logo jako tekst */}
-            <div className="flex items-center gap-2">
-              <div className="font-bold text-lg">
-                <span style={{ color: 'var(--accent-primary)' }}>montaż</span>
-                <span style={{ color: 'var(--text-primary)' }}> reklam </span>
-                <span style={{ color: 'var(--accent-primary)' }} className="text-xl">24</span>
-              </div>
-              <span className="hidden md:inline text-xs font-semibold px-2 py-1 rounded" style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)' }}>
-                CRM Beta
-              </span>
+          <div className="flex items-center cursor-pointer relative h-16" onClick={() => navigate('/')}>
+            <div className="relative h-full flex items-center">
+               {/* Logo PNG wystające w dół */}
+               <img 
+                 src="/logo.png" 
+                 alt="Montaż24"
+                 className="h-[75px] w-auto object-contain absolute top-0 left-0 transition-transform hover:scale-105"
+                 style={{ 
+                   top: '-5px', 
+                   filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'
+                 }}
+                 onError={(e) => {
+                   e.currentTarget.style.display = 'none';
+                   // Pokaż fallback text jeśli brak logo
+                   const fallback = document.getElementById('logo-fallback');
+                   if (fallback) fallback.style.display = 'flex';
+                 }}
+               />
+               
+               {/* Fallback (ukryty domyślnie) */}
+               <div id="logo-fallback" className="hidden items-center gap-2">
+                  <div className="font-bold text-lg">
+                    <span style={{ color: '#f97316' }}>montaż</span>
+                    <span className="text-white"> reklam </span>
+                    <span style={{ color: '#f97316' }} className="text-xl">24</span>
+                  </div>
+               </div>
+
+               {/* Tekst obok logo - margines zależy od szerokości logo, zakładam ok 180px na logo */}
+               <div className="flex flex-col justify-center ml-[180px] hidden sm:flex">
+                  <span className="text-orange-500 font-bold text-sm lowercase leading-tight tracking-wide">crm.montazreklam24.pl</span>
+                  <span className="text-gray-400 text-[10px] lowercase leading-tight">wersja beta</span>
+               </div>
             </div>
           </div>
         </div>
@@ -71,7 +96,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
         {/* Right: View Toggles + User */}
         <div className="flex items-center gap-3">
           {/* PC/Mobile Toggle */}
-          <div className="hidden md:flex rounded-lg p-1 border" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-medium)' }}>
+          <div className="hidden md:flex rounded-lg p-1 border border-gray-700 bg-gray-900">
             <button
               onClick={() => handleViewToggle('desktop')}
               className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
@@ -80,8 +105,8 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
                   : 'hover:opacity-80'
               }`}
               style={{
-                background: currentView === 'desktop' ? 'var(--accent-primary)' : 'transparent',
-                color: currentView === 'desktop' ? 'var(--text-inverse)' : 'var(--text-secondary)'
+                background: currentView === 'desktop' ? '#f97316' : 'transparent',
+                color: currentView === 'desktop' ? '#fff' : '#9ca3af'
               }}
             >
               PC
@@ -94,8 +119,8 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
                   : 'hover:opacity-80'
               }`}
               style={{
-                background: currentView === 'mobile' ? 'var(--accent-primary)' : 'transparent',
-                color: currentView === 'mobile' ? 'var(--text-inverse)' : 'var(--text-secondary)'
+                background: currentView === 'mobile' ? '#f97316' : 'transparent',
+                color: currentView === 'mobile' ? '#fff' : '#9ca3af'
               }}
             >
               Mobile
@@ -111,11 +136,9 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
           <div className="relative">
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors border"
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors border bg-gray-900 border-gray-700 hover:bg-gray-800"
               style={{ 
-                background: 'var(--bg-surface)', 
-                color: 'var(--text-primary)',
-                borderColor: 'var(--border-medium)'
+                color: '#e5e7eb'
               }}
             >
               <span className="hidden md:inline">
