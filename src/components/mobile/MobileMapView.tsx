@@ -361,7 +361,7 @@ const MobileMapView: React.FC<MobileMapViewProps> = ({ jobs, onBack, onOpenJob }
             <span className="w-3 h-3 rounded-full bg-yellow-500" /> Barter
           </div>
           <div className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-red-500" /> Do zapłaty
+            <span className="w-3 h-3 rounded-full bg-orange-500" /> Do zapłaty
           </div>
         </div>
       </div>

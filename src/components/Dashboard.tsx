@@ -82,13 +82,13 @@ const ROWS_CONFIG: {
   badgeText: string;
 }[] = [
   { id: 'PREPARE', title: 'DO PRZYGOTOWANIA', shortTitle: 'PRZYG.', headerBg: 'bg-gradient-to-r from-slate-700 to-slate-800', headerText: 'text-white', dotColor: 'text-slate-600', bodyBg: 'bg-slate-50/50', borderColor: 'border-slate-600', badgeBg: 'bg-slate-100', badgeText: 'text-slate-700' },
-  { id: 'MON', title: 'PONIEDZIAŁEK', shortTitle: 'PN', headerBg: 'bg-gradient-to-r from-rose-500 to-rose-600', headerText: 'text-white', dotColor: 'text-rose-500', bodyBg: 'bg-rose-50/50', borderColor: 'border-rose-500', badgeBg: 'bg-rose-100', badgeText: 'text-rose-700' },
+  { id: 'MON', title: 'PONIEDZIAŁEK', shortTitle: 'PN', headerBg: 'bg-gradient-to-r from-orange-500 to-orange-600', headerText: 'text-white', dotColor: 'text-orange-500', bodyBg: 'bg-orange-50/50', borderColor: 'border-orange-500', badgeBg: 'bg-orange-100', badgeText: 'text-orange-700' },
   { id: 'TUE', title: 'WTOREK', shortTitle: 'WT', headerBg: 'bg-gradient-to-r from-emerald-500 to-emerald-600', headerText: 'text-white', dotColor: 'text-emerald-500', bodyBg: 'bg-emerald-50/50', borderColor: 'border-emerald-500', badgeBg: 'bg-emerald-100', badgeText: 'text-emerald-700' },
-  { id: 'WED', title: 'ŚRODA', shortTitle: 'ŚR', headerBg: 'bg-gradient-to-r from-violet-500 to-violet-600', headerText: 'text-white', dotColor: 'text-violet-500', bodyBg: 'bg-violet-50/50', borderColor: 'border-violet-500', badgeBg: 'bg-violet-100', badgeText: 'text-violet-700' },
+  { id: 'WED', title: 'ŚRODA', shortTitle: 'ŚR', headerBg: 'bg-gradient-to-r from-orange-500 to-orange-600', headerText: 'text-white', dotColor: 'text-orange-500', bodyBg: 'bg-orange-50/50', borderColor: 'border-orange-500', badgeBg: 'bg-orange-100', badgeText: 'text-orange-700' },
   { id: 'THU', title: 'CZWARTEK', shortTitle: 'CZW', headerBg: 'bg-gradient-to-r from-amber-400 to-amber-500', headerText: 'text-amber-900', dotColor: 'text-amber-500', bodyBg: 'bg-amber-50/50', borderColor: 'border-amber-400', badgeBg: 'bg-amber-100', badgeText: 'text-amber-800' },
   { id: 'FRI', title: 'PIĄTEK', shortTitle: 'PT', headerBg: 'bg-gradient-to-r from-orange-500 to-orange-600', headerText: 'text-white', dotColor: 'text-orange-500', bodyBg: 'bg-orange-50/50', borderColor: 'border-orange-500', badgeBg: 'bg-orange-100', badgeText: 'text-orange-700' },
   { id: 'SAT', title: 'SOBOTA', shortTitle: 'SB', headerBg: 'bg-gradient-to-r from-orange-500 to-orange-600', headerText: 'text-white', dotColor: 'text-orange-500', bodyBg: 'bg-orange-50/50', borderColor: 'border-orange-500', badgeBg: 'bg-orange-100', badgeText: 'text-orange-700' },
-  { id: 'SUN', title: 'NIEDZIELA', shortTitle: 'ND', headerBg: 'bg-gradient-to-r from-purple-500 to-purple-600', headerText: 'text-white', dotColor: 'text-purple-500', bodyBg: 'bg-purple-50/50', borderColor: 'border-purple-500', badgeBg: 'bg-purple-100', badgeText: 'text-purple-700' },
+  { id: 'SUN', title: 'NIEDZIELA', shortTitle: 'ND', headerBg: 'bg-gradient-to-r from-orange-500 to-orange-600', headerText: 'text-white', dotColor: 'text-orange-500', bodyBg: 'bg-orange-50/50', borderColor: 'border-orange-500', badgeBg: 'bg-orange-100', badgeText: 'text-orange-700' },
   { id: 'COMPLETED', title: 'WYKONANE', shortTitle: 'OK', headerBg: 'bg-gradient-to-r from-green-600 to-green-700', headerText: 'text-white', dotColor: 'text-green-600', bodyBg: 'bg-green-50/50', borderColor: 'border-green-600', badgeBg: 'bg-green-100', badgeText: 'text-green-700' },
 ];
 
@@ -197,9 +197,9 @@ const getPaymentStatusColor = (status: PaymentStatus): string => {
   switch (status) {
     case PaymentStatus.PAID: return '#22c55e'; // green
     case PaymentStatus.PROFORMA: return '#f97316'; // orange
-    case PaymentStatus.PARTIAL: return '#a855f7'; // purple
+    case PaymentStatus.PARTIAL: return '#f97316'; // orange
     case PaymentStatus.CASH: return '#eab308'; // yellow
-    case PaymentStatus.OVERDUE: return '#ef4444'; // red
+    case PaymentStatus.OVERDUE: return '#ea580c'; // dark orange
     default: return 'transparent';
   }
 };
@@ -523,7 +523,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
                 <button 
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); onDelete(job.id, e); }} 
-                  className="p-1 hover:text-red-500 hover:bg-slate-100 rounded"
+                  className="p-1 hover:text-orange-500 hover:bg-slate-100 rounded"
                   style={{ color: 'var(--text-muted)' }}
                   title="Usuń"
                 >
@@ -882,7 +882,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
                 <button 
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); onDelete(job.id, e); }} 
-                  className="p-0.5 rounded hover:bg-slate-100 hover:text-red-500"
+                  className="p-0.5 rounded hover:bg-slate-100 hover:text-orange-500"
                   style={{ color: 'var(--text-muted)' }}
                   title="Usuń"
                 >
@@ -1931,7 +1931,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             className={`p-2 rounded-lg transition-all hover:scale-110 ${
                               reviewRequestSent 
                                 ? 'bg-green-100 text-green-600 hover:bg-green-200' 
-                                : 'bg-red-100 text-red-600 hover:bg-red-200'
+                                : 'bg-orange-100 text-orange-600 hover:bg-orange-200'
                             }`}
                             title={reviewRequestSent ? 'Prośba o opinię wysłana (kliknij aby odznaczyć)' : 'Prośba o opinię nie wysłana (kliknij aby oznaczyć)'}
                           >
@@ -2039,10 +2039,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                       <div className={`${row.headerBg} ${row.headerText} px-3 py-3 flex justify-between items-center sticky top-0 z-10 relative`} style={{ borderTopLeftRadius: 'var(--radius-lg)', borderTopRightRadius: 'var(--radius-lg)' }}>
                          {isToday && (
                            <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center animate-bounce z-50 pointer-events-none">
-                             <div className="bg-red-600 text-white px-3 py-1 rounded-full text-[10px] font-black shadow-lg uppercase tracking-wider flex items-center gap-1 border-2 border-white">
+                             <div className="bg-orange-600 text-white px-3 py-1 rounded-full text-[10px] font-black shadow-lg uppercase tracking-wider flex items-center gap-1 border-2 border-white">
                                DZISIAJ
                              </div>
-                             <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-red-600"></div>
+                             <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-orange-600"></div>
                            </div>
                          )}
                          <h3 className="font-bold tracking-wide text-xs sm:text-[10px] flex items-center gap-2">

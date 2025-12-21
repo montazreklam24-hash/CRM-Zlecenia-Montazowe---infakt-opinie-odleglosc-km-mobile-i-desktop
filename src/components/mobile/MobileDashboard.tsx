@@ -702,7 +702,7 @@ const MobileJobCardCompact: React.FC<MobileJobCardCompactProps> = ({
         <div className="flex items-center pr-2">
           <button
             onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
-            className="px-2 py-1.5 bg-purple-500 text-white rounded-lg active:scale-95 text-[10px] font-bold flex items-center gap-1"
+            className="px-2 py-1.5 bg-orange-500 text-white rounded-lg active:scale-95 text-[10px] font-bold flex items-center gap-1"
           >
             📅 Przenieś
           </button>
@@ -843,7 +843,7 @@ const MobileJobCardCompact: React.FC<MobileJobCardCompactProps> = ({
                   </button>
                   <button
                     onClick={() => { onDelete(); setShowMenu(false); }}
-                    className="flex flex-col items-center gap-1 px-3 py-3 rounded-xl bg-red-50 text-red-600 active:bg-red-100"
+                    className="flex flex-col items-center gap-1 px-3 py-3 rounded-xl bg-orange-50 text-orange-600 active:bg-orange-100"
                   >
                     <Trash2 className="w-5 h-5" />
                     <span className="text-[10px] font-bold">Usuń</span>

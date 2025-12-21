@@ -115,7 +115,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
                     setShowUserMenu(false);
                     if (onLogout) onLogout();
                   }}
-                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  className="w-full text-left px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 transition-colors"
                 >
                   Wyloguj
                 </button>

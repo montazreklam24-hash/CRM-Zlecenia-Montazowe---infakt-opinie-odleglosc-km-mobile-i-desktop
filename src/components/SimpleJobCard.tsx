@@ -282,7 +282,7 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
           {/* Tytuł zlecenia */}
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Tytuł zlecenia <span className="text-red-500">*</span>
+              Tytuł zlecenia <span className="text-orange-500">*</span>
             </label>
             <input
               type="text"
@@ -324,7 +324,7 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
             
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Telefon <span className="text-red-500">*</span>
+                Telefon <span className="text-orange-500">*</span>
               </label>
               <input
                 type="tel"
@@ -516,7 +516,7 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
                   />
                   <button
                     onClick={() => setProjectImages(prev => prev.filter((_, i) => i !== idx))}
-                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-orange-500 text-white rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     ×
                   </button>
@@ -554,7 +554,7 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
                   </div>
                   <button
                     onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}
-                    className="text-red-500 hover:text-red-700"
+                    className="text-orange-500 hover:text-orange-700"
                   >
                     🗑️
                   </button>
@@ -583,7 +583,7 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
             {job && onDelete && (
               <button
                 onClick={() => setShowDeleteConfirm(true)}
-                className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="px-4 py-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
               >
                 🗑️ Usuń
               </button>
@@ -621,7 +621,7 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
                 >
                   Usuń
                 </button>

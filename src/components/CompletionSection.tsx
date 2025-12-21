@@ -283,7 +283,7 @@ Montaż Reklam 24`;
           {/* Step 1: Photos - with drag & drop and paste support */}
           <div className="mb-4" data-completion-section>
             <label className="block text-sm font-bold text-slate-700 mb-2">
-              📷 Zdjęcia z realizacji {!isAdmin && <span className="text-red-500">*</span>}
+              📷 Zdjęcia z realizacji {!isAdmin && <span className="text-orange-500">*</span>}
               <span className="text-slate-400 font-normal ml-2">
                 ({completionImages.length}/10)
               </span>
@@ -318,7 +318,7 @@ Montaż Reklam 24`;
                 <img src={img} alt={`Zdjęcie ${index + 1}`} className="w-full h-full object-cover" loading="lazy" />
                 <button
                   onClick={() => removeImage(index)}
-                  className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+                  className="absolute top-0.5 right-0.5 w-5 h-5 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-orange-600 transition-colors"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -391,7 +391,7 @@ Montaż Reklam 24`;
 
       {/* Error message */}
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+        <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-700 flex items-center gap-2">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           {error}
         </div>

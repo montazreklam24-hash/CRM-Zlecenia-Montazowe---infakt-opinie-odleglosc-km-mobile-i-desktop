@@ -243,7 +243,7 @@ const JobContextMenu: React.FC<JobContextMenuProps> = ({
             {onDuplicate && (
               <button 
                 onClick={() => { onDuplicate(job.id); onClose(); }}
-                className="flex-1 py-2 px-2 rounded-lg text-xs font-medium bg-violet-50 hover:bg-violet-100 text-violet-700 transition-colors flex items-center justify-center gap-1"
+                className="flex-1 py-2 px-2 rounded-lg text-xs font-medium bg-orange-50 hover:bg-orange-100 text-orange-700 transition-colors flex items-center justify-center gap-1"
               >
                 <Copy className="w-3.5 h-3.5" />
                 Duplikuj
@@ -258,7 +258,7 @@ const JobContextMenu: React.FC<JobContextMenuProps> = ({
             </button>
             <button 
               onClick={() => { onDelete?.(job.id); onClose(); }}
-              className="flex-1 py-2 px-2 rounded-lg text-xs font-medium bg-red-50 hover:bg-red-100 text-red-700 transition-colors flex items-center justify-center gap-1"
+              className="flex-1 py-2 px-2 rounded-lg text-xs font-medium bg-orange-50 hover:bg-orange-100 text-orange-700 transition-colors flex items-center justify-center gap-1"
             >
               <Trash2 className="w-3.5 h-3.5" />
               Usuń

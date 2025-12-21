@@ -232,7 +232,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing, onSwitchT
                   onClick={isListening ? stopListening : startListening}
                   className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all ${
                     isListening 
-                      ? 'bg-red-100 text-red-600 animate-pulse' 
+                      ? 'bg-orange-100 text-orange-600 animate-pulse' 
                       : 'bg-slate-100 text-slate-500 hover:bg-orange-50 hover:text-orange-600'
                   }`}
                 >
@@ -301,7 +301,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing, onSwitchT
                   >
                     {isPdf(img) ? (
                       <div className="flex flex-col items-center justify-center w-full h-full bg-slate-50 p-2">
-                        <FileText className="w-8 h-8 text-red-400 mb-1" />
+                        <FileText className="w-8 h-8 text-orange-400 mb-1" />
                         <span className="text-[8px] font-bold text-slate-500">PDF</span>
                       </div>
                     ) : (
@@ -325,7 +325,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isProcessing, onSwitchT
                       <button 
                         type="button" 
                         onClick={() => removeImage(idx)} 
-                        className="p-1.5 bg-red-500 rounded-lg text-white shadow-lg hover:bg-red-600"
+                        className="p-1.5 bg-orange-500 rounded-lg text-white shadow-lg hover:bg-orange-600"
                         title="Usuń"
                       >
                         <X className="w-3 h-3" />

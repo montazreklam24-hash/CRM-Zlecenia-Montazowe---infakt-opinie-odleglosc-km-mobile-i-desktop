@@ -655,7 +655,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                 <img 
                   src={projectImages[deleteImageIndex]} 
                   alt="Do usunięcia" 
-                  className="w-24 h-24 object-cover rounded-lg border-2 border-red-200"
+                  className="w-24 h-24 object-cover rounded-lg border-2 border-orange-200"
                 />
               </div>
             )}
@@ -669,7 +669,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
               </button>
               <button
                 onClick={confirmDeleteImage}
-                className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
               >
                 <Trash2 className="w-4 h-4" />
                 Usuń
@@ -688,7 +688,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
         <div className="flex gap-2 flex-wrap justify-end">
           {isAdmin && job && !isEditing && (
             <>
-              <button onClick={handleDuplicate} className="bg-violet-500 hover:bg-violet-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-lg shadow-violet-500/25 flex items-center gap-1.5">
+              <button onClick={handleDuplicate} className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-lg shadow-orange-500/25 flex items-center gap-1.5">
                 <Copy className="w-3.5 h-3.5" /> Duplikuj
               </button>
               <button 
@@ -709,7 +709,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                     onBack();
                   }
                 }} 
-                className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-lg shadow-red-500/25 flex items-center gap-1.5"
+                className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-lg shadow-orange-500/25 flex items-center gap-1.5"
               >
                 <Trash2 className="w-3.5 h-3.5" /> Usuń
               </button>
@@ -836,26 +836,26 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
 
           {/* Re-analysis AI Section - tylko w trybie edycji */}
           {isEditing && (
-            <div className="bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl p-5 shadow-sm border border-violet-200">
+            <div className="bg-gradient-to-r from-orange-50 to-orange-50 rounded-xl p-5 shadow-sm border border-orange-200">
               <button
                 onClick={() => setShowReanalysis(!showReanalysis)}
                 className="w-full flex justify-between items-center text-left"
               >
-                <p className="text-xs font-bold text-violet-600 uppercase tracking-wide flex items-center gap-2">
+                <p className="text-xs font-bold text-orange-600 uppercase tracking-wide flex items-center gap-2">
                   <RotateCw className="w-4 h-4" /> RE-ANALIZA AI - WKLEJ NOWY MAIL / WĄTEK
                 </p>
-                <ChevronDown className={`w-5 h-5 text-violet-500 transition-transform ${showReanalysis ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-5 h-5 text-orange-500 transition-transform ${showReanalysis ? 'rotate-180' : ''}`} />
               </button>
               
               {showReanalysis && (
                 <div className="mt-4 space-y-3">
-                  <p className="text-xs text-violet-600">
+                  <p className="text-xs text-orange-600">
                     Wklej poniżej nową treść maila lub zaktualizowany wątek, a AI ponownie przeanalizuje i wypełni wszystkie pola.
                   </p>
                   <textarea
                     value={reanalysisText}
                     onChange={(e) => setReanalysisText(e.target.value)}
-                    className="w-full min-h-[150px] bg-white border border-violet-300 rounded-lg p-3 text-sm text-slate-800 placeholder:text-slate-400"
+                    className="w-full min-h-[150px] bg-white border border-orange-300 rounded-lg p-3 text-sm text-slate-800 placeholder:text-slate-400"
                     placeholder="Wklej tutaj treść maila, wątku konwersacji lub nowe informacje o zleceniu..."
                   />
                   <div className="flex gap-2">
@@ -890,7 +890,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                         }
                       }}
                       disabled={isProcessing || !reanalysisText.trim()}
-                      className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 text-white px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all"
+                      className="flex-1 bg-orange-600 hover:bg-orange-700 disabled:bg-slate-300 text-white px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all"
                     >
                       {isProcessing ? (
                         <>
@@ -1102,7 +1102,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                     onClick={() => toggleVoice('scopeWorkText')}
                     className={`p-1.5 rounded-lg transition-all ${
                       isListening && activeVoiceField === 'scopeWorkText'
-                        ? 'bg-red-100 text-red-600 animate-pulse'
+                        ? 'bg-orange-100 text-orange-600 animate-pulse'
                         : 'bg-white text-slate-400 hover:text-orange-600'
                     }`}
                     title="Nagraj głosowo"
@@ -1128,9 +1128,9 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
 
           {/* AI Analysis */}
           {(editedData.scopeWorkImages || isEditing) && (
-            <div className="bg-violet-50 border border-violet-100 rounded-xl p-5 shadow-sm">
+            <div className="bg-orange-50 border border-orange-100 rounded-xl p-5 shadow-sm">
               <div className="flex justify-between items-center mb-3">
-                <p className="text-xs font-bold text-violet-600 uppercase tracking-wide flex items-center gap-2">
+                <p className="text-xs font-bold text-orange-600 uppercase tracking-wide flex items-center gap-2">
                   <ScanEye className="w-4 h-4" /> ANALIZA TECHNICZNA
                 </p>
                 <div className="flex gap-2">
@@ -1152,7 +1152,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                           setIsProcessing(false);
                         }
                       }}
-                      className="p-1.5 rounded-lg bg-white text-violet-500 hover:bg-violet-100 transition-all"
+                      className="p-1.5 rounded-lg bg-white text-orange-500 hover:bg-orange-100 transition-all"
                       title="Ponowna analiza AI"
                     >
                       <RotateCw className="w-4 h-4" />
@@ -1163,8 +1163,8 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                       onClick={() => toggleVoice('scopeWorkImages')}
                       className={`p-1.5 rounded-lg transition-all ${
                         isListening && activeVoiceField === 'scopeWorkImages'
-                          ? 'bg-red-100 text-red-600 animate-pulse'
-                          : 'bg-white text-slate-400 hover:text-violet-600'
+                          ? 'bg-orange-100 text-orange-600 animate-pulse'
+                          : 'bg-white text-slate-400 hover:text-orange-600'
                       }`}
                       title="Nagraj głosowo"
                     >
@@ -1177,7 +1177,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                 <textarea 
                   value={editedData.scopeWorkImages || ''} 
                   onChange={(e) => handleDataChange('scopeWorkImages', e.target.value)}
-                  className="w-full min-h-[80px] bg-white border border-violet-200 rounded-lg p-3 text-sm text-slate-800"
+                  className="w-full min-h-[80px] bg-white border border-orange-200 rounded-lg p-3 text-sm text-slate-800"
                   placeholder="Wymiary, materiały odczytane z rysunków..."
                 />
               ) : (
@@ -1197,7 +1197,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                   onClick={() => toggleVoice('adminNotes')}
                   className={`p-1.5 rounded-lg transition-all ${
                     isListening && activeVoiceField === 'adminNotes'
-                      ? 'bg-red-100 text-red-600 animate-pulse'
+                      ? 'bg-orange-100 text-orange-600 animate-pulse'
                       : 'bg-white text-slate-400 hover:text-amber-600'
                   }`}
                   title="Nagraj głosowo"
@@ -1257,7 +1257,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                     {item.task}
                   </span>
                   {isEditing && (
-                    <button onClick={() => removeChecklistItem(item.id)} className="text-red-400 hover:text-red-600 p-1">
+                    <button onClick={() => removeChecklistItem(item.id)} className="text-orange-400 hover:text-orange-600 p-1">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
@@ -1357,7 +1357,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                             )}
                             <button 
                               onClick={(e) => {e.stopPropagation(); removeProjectImage(idx)}} 
-                              className="p-2 bg-red-500 text-white rounded-lg shadow-md hover:bg-red-600"
+                              className="p-2 bg-orange-500 text-white rounded-lg shadow-md hover:bg-orange-600"
                               title="Usuń"
                             >
                               <Trash2 className="w-5 h-5" />
@@ -1398,7 +1398,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                 <button 
                   onClick={() => setShowCompletionSection(!showCompletionSection)} 
                   disabled={isProcessing}
-                  className="flex-1 py-4 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold rounded-xl shadow-xl flex items-center justify-center gap-3 transition-colors text-lg disabled:opacity-50"
+                  className="flex-1 py-4 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-500 hover:to-orange-600 text-white font-bold rounded-xl shadow-xl flex items-center justify-center gap-3 transition-colors text-lg disabled:opacity-50"
                 >
                   <CheckCircle2 className="w-5 h-5" />
                   {showCompletionSection ? 'UKRYJ' : (job.status === JobStatus.ARCHIVED ? 'OPINIA' : 'ZAKOŃCZ')}
@@ -1408,7 +1408,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
               <button 
                 onClick={() => setShowCompletionSection(!showCompletionSection)} 
                 disabled={isProcessing}
-                className="w-full py-4 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold rounded-xl shadow-xl flex items-center justify-center gap-3 transition-colors text-lg disabled:opacity-50"
+                className="w-full py-4 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-500 hover:to-orange-600 text-white font-bold rounded-xl shadow-xl flex items-center justify-center gap-3 transition-colors text-lg disabled:opacity-50"
               >
                 <CheckCircle2 className="w-5 h-5" />
                 {showCompletionSection 
@@ -1603,7 +1603,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                   <div className="grid grid-cols-2 gap-3">
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Ulica <span className="text-red-500">*</span>
+                        Ulica <span className="text-orange-500">*</span>
                       </label>
                       <input
                         type="text"
@@ -1643,7 +1643,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                     
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Miasto <span className="text-red-500">*</span>
+                        Miasto <span className="text-orange-500">*</span>
                       </label>
                       <input
                         type="text"

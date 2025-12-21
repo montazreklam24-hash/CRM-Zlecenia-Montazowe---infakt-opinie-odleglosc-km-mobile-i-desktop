@@ -40,12 +40,12 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
       gradient: 'from-orange-400 to-orange-500'
     },
     [PaymentStatus.PARTIAL]: { 
-      bg: 'bg-purple-50', 
-      text: 'text-purple-700', 
-      border: 'border-purple-200',
+      bg: 'bg-orange-50', 
+      text: 'text-orange-700', 
+      border: 'border-orange-200',
       icon: '💸', 
       label: 'Zaliczka',
-      gradient: 'from-purple-400 to-purple-500'
+      gradient: 'from-orange-400 to-orange-500'
     },
     [PaymentStatus.PAID]: { 
       bg: 'bg-green-50', 
@@ -64,12 +64,12 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
       gradient: 'from-yellow-400 to-yellow-500'
     },
     [PaymentStatus.OVERDUE]: { 
-      bg: 'bg-red-50', 
-      text: 'text-red-700', 
-      border: 'border-red-200',
+      bg: 'bg-orange-50', 
+      text: 'text-orange-700', 
+      border: 'border-orange-200',
       icon: '⚠️', 
       label: 'Przeterminowane',
-      gradient: 'from-red-400 to-red-500'
+      gradient: 'from-orange-600 to-orange-700'
     }
   };
 
@@ -116,10 +116,10 @@ export const PaymentStatusBar: React.FC<{
   const config: Record<PaymentStatus, { bg: string; label: string }> = {
     [PaymentStatus.NONE]: { bg: '', label: '' },
     [PaymentStatus.PROFORMA]: { bg: 'bg-gradient-to-r from-orange-400 to-orange-500', label: 'PROFORMA' },
-    [PaymentStatus.PARTIAL]: { bg: 'bg-gradient-to-r from-purple-400 to-purple-500', label: 'ZALICZKA' },
+    [PaymentStatus.PARTIAL]: { bg: 'bg-gradient-to-r from-orange-400 to-orange-500', label: 'ZALICZKA' },
     [PaymentStatus.PAID]: { bg: 'bg-gradient-to-r from-green-400 to-green-500', label: 'OPŁACONE' },
     [PaymentStatus.CASH]: { bg: 'bg-gradient-to-r from-yellow-400 to-yellow-500', label: 'GOTÓWKA' },
-    [PaymentStatus.OVERDUE]: { bg: 'bg-gradient-to-r from-red-400 to-red-500', label: 'DO ZAPŁATY' }
+    [PaymentStatus.OVERDUE]: { bg: 'bg-gradient-to-r from-orange-600 to-orange-700', label: 'DO ZAPŁATY' }
   };
 
   const cfg = config[status] || config[PaymentStatus.NONE];
@@ -181,10 +181,10 @@ export const PaymentStatusMiniMenu: React.FC<{
   const statuses: { value: PaymentStatus; label: string; bg: string }[] = [
     { value: PaymentStatus.NONE, label: 'Brak', bg: 'bg-slate-400' },
     { value: PaymentStatus.PROFORMA, label: 'Proforma', bg: 'bg-orange-500' },
-    { value: PaymentStatus.PARTIAL, label: 'Zaliczka', bg: 'bg-purple-500' },
+    { value: PaymentStatus.PARTIAL, label: 'Zaliczka', bg: 'bg-orange-500' },
     { value: PaymentStatus.PAID, label: 'Opłacone', bg: 'bg-green-500' },
     { value: PaymentStatus.CASH, label: 'Gotówka', bg: 'bg-yellow-500' },
-    { value: PaymentStatus.OVERDUE, label: 'Do zapłaty', bg: 'bg-red-500' },
+    { value: PaymentStatus.OVERDUE, label: 'Do zapłaty', bg: 'bg-orange-600' },
   ];
 
   return (

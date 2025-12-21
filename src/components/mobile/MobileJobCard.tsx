@@ -297,7 +297,7 @@ const MobileJobCard: React.FC<MobileJobCardProps> = ({
               </button>
               <button
                 onClick={() => { onDelete?.(); setShowMoveMenu(false); }}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 active:bg-red-100 text-sm font-medium text-red-600 flex items-center gap-2"
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-orange-50 active:bg-orange-100 text-sm font-medium text-orange-600 flex items-center gap-2"
               >
                 <Trash2 className="w-4 h-4" />
                 Usuń

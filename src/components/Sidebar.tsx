@@ -130,7 +130,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
       <div className="p-4 border-t border-gray-100 mt-auto">
         <button
           onClick={onLogout}
-          className="flex items-center gap-3 w-full px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+          className="flex items-center gap-3 w-full px-4 py-3 text-orange-500 hover:bg-orange-50 rounded-xl transition-colors"
         >
           <LogOut size={20} />
           <span>Wyloguj</span>

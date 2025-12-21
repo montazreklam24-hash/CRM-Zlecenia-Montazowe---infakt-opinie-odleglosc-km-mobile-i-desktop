@@ -28,8 +28,8 @@
   --text-inverse: #ffffff;
   
   /* Akcenty */
-  --accent-primary: #6366f1;
-  --accent-primary-hover: #4f46e5;
+  --accent-primary: #f97316;
+  --accent-primary-hover: #ea580c;
   --accent-success: #10b981;
   --accent-warning: #f59e0b;
   --accent-danger: #ef4444;
@@ -65,13 +65,13 @@
   
   /* Kanban kolumny */
   --column-prepare: #475569;
-  --column-mon: #e11d48;
-  --column-tue: #059669;
-  --column-wed: #7c3aed;
-  --column-thu: #d97706;
-  --column-fri: #2563eb;
+  --column-mon: #f97316;
+  --column-tue: #ea580c;
+  --column-wed: #d97706;
+  --column-thu: #c2410c;
+  --column-fri: #f97316;
   --column-sat: #ea580c;
-  --column-sun: #b45309;
+  --column-sun: #d97706;
   --column-done: #16a34a;
 }
 

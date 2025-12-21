@@ -507,7 +507,7 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
                   onDelete(job.id);
                 }
               }}
-              className="py-3 bg-red-50 text-red-600 rounded-xl font-medium text-sm flex flex-col items-center gap-1 active:scale-95"
+              className="py-3 bg-orange-50 text-orange-600 rounded-xl font-medium text-sm flex flex-col items-center gap-1 active:scale-95"
             >
               <Trash2 className="w-5 h-5" />
               Usuń
@@ -638,7 +638,7 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
                 {/* Step 1: Photos */}
                 <div className="mb-4">
                   <label className="block text-sm font-bold text-slate-700 mb-2">
-                    📷 Zdjęcia z realizacji <span className="text-red-500">*</span>
+                    📷 Zdjęcia z realizacji <span className="text-orange-500">*</span>
                     <span className="text-slate-400 font-normal ml-2">
                       ({completionImages.length}/10)
                     </span>
@@ -650,7 +650,7 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
                         <img src={img} alt={`Zdjęcie ${index + 1}`} className="w-full h-full object-cover" loading="lazy" />
                         <button
                           onClick={() => setCompletionImages(prev => prev.filter((_, i) => i !== index))}
-                          className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs shadow"
+                          className="absolute top-1 right-1 w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs shadow"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -736,7 +736,7 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
 
                 {/* Error */}
                 {completionError && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 flex items-center gap-2">
+                  <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-xl text-sm text-orange-700 flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
                     {completionError}
                   </div>
