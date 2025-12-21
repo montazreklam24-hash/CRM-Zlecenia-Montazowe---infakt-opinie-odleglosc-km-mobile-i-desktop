@@ -180,6 +180,69 @@
 }
 
 /* =========================================================================
+   DRAG & DROP ZONE
+   ========================================================================= */
+
+.crm-drop-zone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  color: #64748b;
+  font-size: 13px;
+  background: #f8fafc;
+  transition: all 0.2s;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.crm-drop-zone.active {
+  border-color: #f97316;
+  background: rgba(249, 115, 22, 0.05);
+  color: #c2410c;
+}
+
+.crm-drop-zone svg {
+  width: 32px;
+  height: 32px;
+  margin-bottom: 8px;
+  color: #94a3b8;
+  display: block;
+  margin: 0 auto 8px auto;
+}
+
+.crm-file-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.crm-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f1f5f9;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.crm-file-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.crm-file-remove {
+  color: #ef4444;
+  cursor: pointer;
+  margin-left: 8px;
+  font-weight: bold;
+}
+
+/* =========================================================================
    PRZYCISKI
    ========================================================================= */
 

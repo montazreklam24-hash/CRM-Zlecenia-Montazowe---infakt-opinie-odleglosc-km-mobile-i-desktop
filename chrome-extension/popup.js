@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const crmTokenInput = document.getElementById('crmToken');
   const geminiApiKeyInput = document.getElementById('geminiApiKey');
   const autoAnalyzeCheckbox = document.getElementById('autoAnalyze');
+  const importAttachmentsCheckbox = document.getElementById('importAttachments');
   const saveBtn = document.getElementById('saveBtn');
   const testBtn = document.getElementById('testBtn');
   const openCrmBtn = document.getElementById('openCrm');
@@ -22,14 +23,54 @@ document.addEventListener('DOMContentLoaded', async () => {
   crmTokenInput.value = settings.crmToken || '';
   geminiApiKeyInput.value = settings.geminiApiKey || '';
   autoAnalyzeCheckbox.checked = settings.autoAnalyze !== false;
+  importAttachmentsCheckbox.checked = settings.importAttachments === true; // Domyślnie false
   
   // Update status
   await checkConnection(settings);
   
+  // Manual Injection Button
+  const injectBtn = document.getElementById('injectPanel');
+  if (injectBtn) {
+      injectBtn.onclick = async () => {
+          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (!tab) return;
+          
+          if (!tab.url.includes('mail.google.com')) {
+              showMessage('To działa tylko na Gmailu!', 'error');
+              return;
+          }
+          
+          try {
+              await chrome.scripting.executeScript({
+                  target: { tabId: tab.id },
+                  files: ['content.js']
+              });
+              // Również wstrzyknij CSS jeśli trzeba
+              await chrome.scripting.insertCSS({
+                  target: { tabId: tab.id },
+                  files: ['content.css']
+              });
+              
+              showMessage('Panel wstrzyknięty!', 'success');
+              // Zamknij popup
+              setTimeout(() => window.close(), 1000);
+          } catch (e) {
+              showMessage('Błąd: ' + e.message, 'error');
+          }
+      };
+  }
+
   // Open CRM link
   openCrmBtn.onclick = (e) => {
     e.preventDefault();
-    const url = crmUrlInput.value || 'https://montazreklam24.pl/crm';
+    let url = crmUrlInput.value || 'https://montazreklam24.pl/crm';
+    
+    // HACK dla wersji lokalnej:
+    // Jeśli URL wskazuje na backend (8080), a my chcemy otworzyć frontend (3003)
+    if (url.includes(':8080')) {
+        url = url.replace(':8080', ':3000');
+    }
+    
     chrome.tabs.create({ url });
   };
   
@@ -39,7 +80,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       crmUrl: crmUrlInput.value.trim(),
       crmToken: crmTokenInput.value.trim(),
       geminiApiKey: geminiApiKeyInput.value.trim(),
-      autoAnalyze: autoAnalyzeCheckbox.checked
+      autoAnalyze: autoAnalyzeCheckbox.checked,
+      importAttachments: importAttachmentsCheckbox.checked
     };
     
     // Validate

@@ -1,0 +1,55 @@
+services:
+  # Serwer WWW (Apache + PHP)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crm_app
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - db
+    networks:
+      - crm_network
+
+  # Baza Danych (MySQL/MariaDB)
+  db:
+    image: mariadb:10.6
+    container_name: crm_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: crm_db
+      MYSQL_USER: crm_user
+      MYSQL_PASSWORD: crm_password
+    volumes:
+      - db_data:/var/lib/mysql
+      # Automatyczne importowanie plików .sql wrzuconych do katalogu docker-entrypoint-initdb.d
+      # Odkomentuj linię poniżej i wskaż plik SQL, jeśli chcesz zaimportować bazę przy pierwszym starcie
+      # - ./monciu_crm2_14_grudnia.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - crm_network
+
+  # phpMyAdmin (Opcjonalnie - do zarządzania bazą)
+  pma:
+    image: phpmyadmin/phpmyadmin
+    container_name: crm_pma
+    environment:
+      PMA_HOST: db
+      PMA_USER: crm_user
+      PMA_PASSWORD: crm_password
+    ports:
+      - "8081:80"
+    depends_on:
+      - db
+    networks:
+      - crm_network
+
+volumes:
+  db_data:
+
+networks:
+  crm_network:
+

@@ -21,7 +21,51 @@ System CRM do zarządzania zleceniami montażowymi z widokiem Kanban, mapą i in
 
 ## 📦 Instalacja
 
-### 1. Frontend (development)
+### Metoda 1: Docker (ZALECANE dla deweloperów)
+
+Najprostsza metoda - wszystko uruchamia się jednym poleceniem.
+
+**Wymagania:**
+- Docker Desktop zainstalowany i uruchomiony
+- WSL2 (Windows Subsystem for Linux) - instaluje się automatycznie z Dockerem
+
+**Uruchomienie:**
+
+```bash
+# 1. Sklonuj repo i wejdź do folderu
+cd "CRM Zlecenia Montazowe"
+
+# 2. Skopiuj przykładowy config (jednorazowo)
+cp api/config.example.php api/config.php
+# Edytuj api/config.php i ustaw:
+#   - DB_HOST na 'db' (nazwa kontenera)
+#   - DB_NAME na 'crm_db'
+#   - DB_USER na 'crm_user'
+#   - DB_PASS na 'crm_password'
+
+# 3. Uruchom wszystko (backend + baza + phpMyAdmin)
+docker-compose up -d
+
+# 4. Zainstaluj zależności frontendu i uruchom dev server
+npm install
+npm run dev
+```
+
+**Dostępne adresy:**
+- Frontend (Vite dev): http://localhost:3000
+- Backend (Apache/PHP): http://localhost:8080
+- phpMyAdmin: http://localhost:8081
+
+**Zatrzymanie:**
+```bash
+docker-compose down
+```
+
+---
+
+### Metoda 2: Tradycyjna (bez Dockera)
+
+#### 2.1 Frontend (development)
 
 ```bash
 # Zainstaluj zależności
@@ -31,7 +75,7 @@ npm install
 npm run dev
 ```
 
-### 2. Backend (PHP)
+#### 2.2 Backend (PHP)
 
 1. Skopiuj folder `api/` na serwer FTP
 2. Edytuj `api/config.php`:
@@ -48,13 +92,13 @@ define('GEMINI_API_KEY', 'twoj_klucz_gemini');
 define('DEV_MODE', false);
 ```
 
-### 3. Baza danych MySQL
+#### 2.3 Baza danych MySQL
 
 1. Zaloguj się do phpMyAdmin
 2. Utwórz nową bazę danych (np. `montaz_crm`)
 3. Zaimportuj plik `backend/database.sql`
 
-### 4. Build produkcyjny
+#### 2.4 Build produkcyjny
 
 ```bash
 # Zbuduj aplikację
@@ -63,7 +107,7 @@ npm run build
 # Pliki znajdziesz w folderze dist/
 ```
 
-### 5. Deployment na FTP
+#### 2.5 Deployment na FTP
 
 Struktura na serwerze:
 ```

@@ -27,10 +27,12 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost',
+        target: 'http://localhost:8080',
         changeOrigin: true,
-        // Proxy przekierowuje /api/jobs.php na http://localhost/api/jobs.php
-        // Nie przepisuj ścieżki - zostaw /api
+      },
+      '/uploads': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
       }
     }
   }

@@ -22,12 +22,8 @@ function saveImageToFile($base64Data, $jobId, $type, $order) {
         return $base64Data;
     }
     
-    // Dla completion images używamy osobnego folderu po_montazu/
-    $subfolder = ($type === 'completion') ? 'po_montazu' : '';
-    $targetDir = $subfolder ? UPLOADS_DIR . '/' . $subfolder : UPLOADS_DIR;
-    
-    if (!is_dir($targetDir)) {
-        mkdir($targetDir, 0755, true);
+    if (!is_dir(UPLOADS_DIR)) {
+        mkdir(UPLOADS_DIR, 0755, true);
     }
     
     if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $matches)) {
@@ -42,23 +38,21 @@ function saveImageToFile($base64Data, $jobId, $type, $order) {
     if ($imageData === false) return null;
     
     $filename = sprintf('job_%d_%s_%d_%d.%s', $jobId, $type, $order, time(), $extension);
-    $filepath = $targetDir . '/' . $filename;
+    $filepath = UPLOADS_DIR . '/' . $filename;
     
     if (file_put_contents($filepath, $imageData) === false) {
         error_log("Nie można zapisać obrazu: $filepath");
         return null;
     }
     
-    // Zwróć ścieżkę z subfolderem jeśli jest
-    return $subfolder ? UPLOADS_URL . '/' . $subfolder . '/' . $filename : UPLOADS_URL . '/' . $filename;
+    return UPLOADS_URL . '/' . $filename;
 }
 
 /**
  * Zapisuje obrazy do tabeli job_images
- * UWAGA: Jeśli $images jest pustą tablicą [], usuwa wszystkie istniejące obrazy
  */
 function saveJobImages($jobId, $images, $type = 'project', $jobType = 'ai') {
-    if (!is_array($images)) return; // Tylko sprawdź czy to tablica, nie czy jest pusta!
+    if (empty($images) || !is_array($images)) return;
     
     $pdo = getDB();
     
@@ -70,10 +64,7 @@ function saveJobImages($jobId, $images, $type = 'project', $jobType = 'ai') {
     // Usuń stare pliki
     foreach ($oldImages as $old) {
         if (!empty($old['file_path'])) {
-            // Sprawdź czy to ścieżka z po_montazu/ czy główny folder
-            $oldFile = strpos($old['file_path'], '/po_montazu/') !== false
-                ? UPLOADS_DIR . '/po_montazu/' . basename($old['file_path'])
-                : UPLOADS_DIR . '/' . basename($old['file_path']);
+            $oldFile = UPLOADS_DIR . '/' . basename($old['file_path']);
             if (file_exists($oldFile)) @unlink($oldFile);
         }
     }
@@ -82,15 +73,10 @@ function saveJobImages($jobId, $images, $type = 'project', $jobType = 'ai') {
     $stmt = $pdo->prepare('DELETE FROM job_images WHERE job_id = ? AND type = ? AND job_type = ?');
     $stmt->execute(array($jobId, $type, $jobType));
     
-    // Jeśli tablica jest pusta - tylko usuń stare obrazy (już zrobione powyżej)
-    if (empty($images)) {
-        return;
-    }
-    
-    // Wstaw nowe
+    // Wstaw nowe - uwzględniamy file_data jako NULL (dla kompatybilności)
     $stmt = $pdo->prepare('
-        INSERT INTO job_images (job_id, type, file_path, is_cover, sort_order, job_type)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO job_images (job_id, type, file_path, file_data, is_cover, sort_order, job_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     ');
     
     $order = 0;
@@ -99,7 +85,8 @@ function saveJobImages($jobId, $images, $type = 'project', $jobType = 'ai') {
             $filePath = saveImageToFile($imageData, $jobId, $type, $order);
             if ($filePath) {
                 $isCover = ($order === 0) ? 1 : 0;
-                $stmt->execute(array($jobId, $type, $filePath, $isCover, $order, $jobType));
+                // Przekazujemy pusty string do file_data (bo baza nie pozwala na NULL)
+                $stmt->execute(array($jobId, $type, $filePath, '', $isCover, $order, $jobType));
                 $order++;
             }
         }
@@ -108,8 +95,6 @@ function saveJobImages($jobId, $images, $type = 'project', $jobType = 'ai') {
 
 /**
  * Pobiera obrazy dla zlecenia
- * Sprawdza czy plik istnieje na dysku przed zwróceniem ścieżki
- * Jeśli plik nie istnieje, próbuje użyć file_data (Base64) jako fallback
  */
 function getJobImages($jobId, $type = 'project', $jobType = 'ai') {
     $pdo = getDB();
@@ -125,41 +110,14 @@ function getJobImages($jobId, $type = 'project', $jobType = 'ai') {
         
         $images = array();
         foreach ($rows as $row) {
-            // Priorytet: file_path jeśli plik istnieje na dysku
             if (!empty($row['file_path'])) {
-                // Sprawdź czy plik faktycznie istnieje
-                $filePath = $row['file_path'];
-                $localFile = null;
-                
-                // Konwertuj URL na lokalną ścieżkę
-                if (strpos($filePath, '/uploads/') !== false) {
-                    if (strpos($filePath, '/po_montazu/') !== false) {
-                        $localFile = UPLOADS_DIR . '/po_montazu/' . basename($filePath);
-                    } else {
-                        $localFile = UPLOADS_DIR . '/' . basename($filePath);
-                    }
-                }
-                
-                // Jeśli plik istnieje - użyj ścieżki
-                if ($localFile && file_exists($localFile)) {
-                    $images[] = $filePath;
-                } 
-                // Jeśli plik nie istnieje, ale mamy Base64 - użyj Base64 jako fallback
-                elseif (!empty($row['file_data'])) {
-                    $images[] = $row['file_data'];
-                    // Opcjonalnie: można tutaj spróbować odtworzyć plik z Base64
-                    // ale na razie tylko zwracamy Base64
-                }
-                // Jeśli nie ma ani pliku ani Base64 - pomijamy (obraz zniknął)
-            } 
-            // Fallback: użyj Base64 jeśli nie ma file_path
-            elseif (!empty($row['file_data'])) {
+                $images[] = $row['file_path'];
+            } elseif (!empty($row['file_data'])) {
                 $images[] = $row['file_data'];
             }
         }
         return $images;
     } catch (PDOException $e) {
-        error_log("Error getting job images: " . $e->getMessage());
         return array();
     }
 }

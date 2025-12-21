@@ -1,30 +1,35 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import InputForm from './components/InputForm';
 import JobCard from './components/JobCard';
 import { SimpleJobCard } from './components/SimpleJobCard';
-import ThemeSwitcher from './components/ThemeSwitcher';
-import { geminiService, authService, settingsService, jobsService } from './services/apiService';
+import Layout from './components/Layout';
+import InvoiceModule from './components/InvoiceModule';
+import ClientModule from './components/ClientModule';
+import MapPage from './pages/MapPage';
+import { geminiService, authService, jobsService } from './services/apiService';
 import { User, UserRole, Job, JobOrderData, JobStatus } from './types';
-import { AlertCircle, LogOut, Loader2, Monitor, Smartphone } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useDeviceType } from './hooks/useDeviceType';
 
 // Lazy load MobileApp for better desktop performance
 const MobileApp = lazy(() => import('./MobileApp'));
 
 interface AppState {
-  currentView: 'LOGIN' | 'DASHBOARD' | 'CREATE' | 'VIEW_JOB' | 'CREATE_SIMPLE';
+  currentView: 'LOGIN' | 'APP'; // Uproszczony stan - resztą zarządza Router
   user: User | null;
+  // Modale (nadal sterowane stanem dla płynności)
+  activeModal: 'NONE' | 'CREATE' | 'CREATE_SIMPLE' | 'VIEW_JOB';
   selectedJob: Job | null;
   tempJobData: JobOrderData | null;
   selectedImages: string[];
   isProcessing: boolean;
   error: string | null;
-  returnToArchive?: boolean; // Flaga - wróć do archiwum po zamknięciu karty
+  returnToArchive?: boolean;
 }
 
-// Automatyczny użytkownik - bez logowania
 const AUTO_USER: User = {
   id: 1,
   email: 'admin@montazreklam24.pl',
@@ -37,8 +42,9 @@ const AUTO_USER: User = {
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
-    currentView: 'DASHBOARD', // Od razu Dashboard
-    user: AUTO_USER, // Automatycznie zalogowany
+    currentView: 'APP',
+    user: AUTO_USER,
+    activeModal: 'NONE',
     selectedJob: null,
     tempJobData: null,
     selectedImages: [],
@@ -46,36 +52,17 @@ const App: React.FC = () => {
     error: null
   });
 
-  const [appLogo, setAppLogo] = useState<string | null>(null);
-  const [isInitializing, setIsInitializing] = useState(false); // Start as false - no loading screen
-  const [dashboardRefreshTrigger, setDashboardRefreshTrigger] = useState(0); // Trigger do odświeżania Dashboard
-
+  const [dashboardRefreshTrigger, setDashboardRefreshTrigger] = useState(0);
+  
   // Mobile detection
   const { isMobile, isTablet, isTouchDevice } = useDeviceType();
-  
-  // Allow forcing mobile/desktop view via URL param ?mobile=1 or ?desktop=1
   const urlParams = new URLSearchParams(window.location.search);
   const forceMobile = urlParams.get('mobile') === '1';
   const forceDesktop = urlParams.get('desktop') === '1';
   const showMobileView = forceDesktop ? false : (forceMobile || isMobile || (isTablet && isTouchDevice));
 
-  // Navigation helpers
-  const goToDashboard = () => {
-    setState(prev => ({ 
-      ...prev, 
-      currentView: 'DASHBOARD', 
-      tempJobData: null, 
-      error: null, 
-      selectedJob: null,
-      selectedImages: []
-      // returnToArchive zostaje zachowane z poprzedniego stanu
-    }));
-    // Odśwież Dashboard gdy wracamy do niego (np. po utworzeniu zlecenia)
-    setDashboardRefreshTrigger(prev => prev + 1);
-  };
-
   const handleLogin = (user: User) => {
-    setState(prev => ({ ...prev, user, currentView: 'DASHBOARD' }));
+    setState(prev => ({ ...prev, user, currentView: 'APP' }));
   };
 
   const handleLogout = async () => {
@@ -83,38 +70,33 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, user: null, currentView: 'LOGIN' }));
   };
 
+  const closeModal = () => {
+    setState(prev => ({
+      ...prev,
+      activeModal: 'NONE',
+      selectedJob: null,
+      tempJobData: null,
+      selectedImages: [],
+      error: null
+    }));
+    setDashboardRefreshTrigger(prev => prev + 1);
+  };
+
   const handleStartCreate = () => {
-    setState(prev => ({ ...prev, currentView: 'CREATE' }));
+    setState(prev => ({ ...prev, activeModal: 'CREATE' }));
   };
 
   const handleStartCreateSimple = () => {
-    setState(prev => ({ ...prev, currentView: 'CREATE_SIMPLE', selectedJob: null }));
+    setState(prev => ({ ...prev, activeModal: 'CREATE_SIMPLE', selectedJob: null }));
   };
 
-  const handleSaveSimpleJob = async (jobData: Partial<Job>) => {
-    try {
-      if (jobData.id) {
-        // Update existing - use jobsService to handle prefixes automatically
-        const { realId } = jobData.id.startsWith('simple-') ? { realId: jobData.id.substring(7) } : { realId: jobData.id };
-        // We need to use updateJob but pass 'simple' explicitly if ID doesn't have prefix yet,
-        // OR rely on updateJob's parsing if we pass the prefixed ID.
-        // Let's rely on jobsService.updateJob handling prefixes.
-        await jobsService.updateJob(jobData.id, jobData, 'simple');
-      } else {
-        // Create new
-        await fetch('/api/jobs-simple', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(jobData)
-        });
-      }
-      // Odśwież Dashboard po utworzeniu/aktualizacji zlecenia
-      setDashboardRefreshTrigger(prev => prev + 1);
-      goToDashboard();
-    } catch (error) {
-      console.error('Error saving simple job:', error);
-      alert('Błąd zapisu zlecenia');
-    }
+  const handleSelectJob = (job: Job, fromArchive?: boolean) => {
+    setState(prev => ({ 
+      ...prev, 
+      activeModal: 'VIEW_JOB', 
+      selectedJob: job,
+      returnToArchive: fromArchive ?? false
+    }));
   };
 
   const handleGenerate = async (title: string, text: string, images: string[]) => {
@@ -137,7 +119,7 @@ const App: React.FC = () => {
         isProcessing: false,
         tempJobData: jobData,
         selectedImages: images,
-        currentView: 'VIEW_JOB'
+        activeModal: 'VIEW_JOB'
       }));
     } catch (error) {
       setState(prev => ({
@@ -148,29 +130,23 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSelectJob = (job: Job, fromArchive?: boolean) => {
-    setState(prev => ({ 
-      ...prev, 
-      currentView: 'VIEW_JOB', 
-      selectedJob: job,
-      returnToArchive: fromArchive ?? false
-    }));
+  const handleSaveSimpleJob = async (jobData: Partial<Job>) => {
+    try {
+      if (jobData.id) {
+        await jobsService.updateJob(jobData.id, jobData, 'simple');
+      } else {
+        await fetch('/api/jobs-simple', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(jobData)
+        });
+      }
+      closeModal();
+    } catch (error) {
+      console.error('Error saving simple job:', error);
+      alert('Błąd zapisu zlecenia');
+    }
   };
-
-  // Loading screen
-  if (isInitializing) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="p-4 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl shadow-2xl shadow-orange-500/20">
-            <span className="text-3xl font-black text-white">M24</span>
-          </div>
-          <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
-          <p className="text-slate-400 text-sm">Ładowanie...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Login view
   if (state.currentView === 'LOGIN' || !state.user) {
@@ -179,81 +155,38 @@ const App: React.FC = () => {
 
   const userRole = state.user.role as UserRole;
 
-  // Mobile View - completely different layout optimized for touch
+  // --- MOBILE VIEW ---
   if (showMobileView) {
     return (
-      <Suspense fallback={
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-4">
-            <div className="p-4 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl shadow-2xl shadow-orange-500/20">
-              <span className="text-2xl font-black text-white">M24</span>
-            </div>
-            <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
-            <p className="text-slate-400 text-sm">Ładowanie widoku mobilnego...</p>
-          </div>
-        </div>
-      }>
-        {/* Mobile views that need desktop forms */}
-        {state.currentView === 'CREATE' && (
+      <Suspense fallback={<div className="flex items-center justify-center h-screen bg-slate-900 text-white">Ładowanie...</div>}>
+        {/* Mobile Modals */}
+        {state.activeModal === 'CREATE' && (
           <div className="min-h-screen bg-white p-4">
-            <button 
-              onClick={goToDashboard} 
-              className="mb-4 text-slate-500 flex items-center text-sm font-medium"
-            >
-              ← Anuluj i wróć
-            </button>
-            <InputForm 
-              onSubmit={handleGenerate} 
-              isProcessing={state.isProcessing} 
-              onSwitchToManual={handleStartCreateSimple}
-            />
+             <button onClick={closeModal} className="mb-4">← Wróć</button>
+             <InputForm 
+               onSubmit={handleGenerate} 
+               isProcessing={state.isProcessing} 
+               onSwitchToManual={handleStartCreateSimple}
+             />
           </div>
         )}
-        
-        {state.currentView === 'CREATE_SIMPLE' && (
-          <SimpleJobCard
-            job={state.selectedJob || undefined}
-            onClose={goToDashboard}
-            onSave={handleSaveSimpleJob}
-          />
+        {state.activeModal === 'CREATE_SIMPLE' && (
+           <SimpleJobCard job={state.selectedJob || undefined} onClose={closeModal} onSave={handleSaveSimpleJob} />
+        )}
+        {state.activeModal === 'VIEW_JOB' && (
+           <JobCard 
+             role={userRole}
+             job={state.selectedJob || undefined}
+             initialData={state.tempJobData || undefined}
+             initialImages={state.selectedImages}
+             onBack={closeModal}
+             onJobSaved={closeModal}
+             onArchive={async (id) => { /* logic same as desktop */ closeModal(); }}
+             onDelete={async (id) => { /* logic same as desktop */ closeModal(); }}
+           />
         )}
         
-        {state.currentView === 'VIEW_JOB' && (
-          <JobCard 
-            role={userRole}
-            job={state.selectedJob || undefined}
-            initialData={state.tempJobData || undefined}
-            initialImages={state.selectedImages}
-            onBack={goToDashboard}
-            onJobSaved={goToDashboard}
-            onArchive={async (id) => {
-              const job = state.selectedJob;
-              const jobType = job?.type === 'simple' ? 'simple' : 'ai';
-              try {
-                await jobsService.updateJob(id, { 
-                  status: JobStatus.ARCHIVED,
-                  completedAt: Date.now(),
-                  columnId: 'ARCHIVE' as const
-                }, jobType);
-                goToDashboard();
-              } catch (error) {
-                console.error('Failed to archive:', error);
-              }
-            }}
-            onDelete={async (id) => {
-              const job = state.selectedJob;
-              const jobType = job?.type === 'simple' ? 'simple' : 'ai';
-              try {
-                await jobsService.deleteJob(id, jobType);
-                goToDashboard();
-              } catch (error) {
-                console.error('Failed to delete:', error);
-              }
-            }}
-          />
-        )}
-        
-        {(state.currentView === 'DASHBOARD') && (
+        {state.activeModal === 'NONE' && (
           <MobileApp 
             role={userRole}
             onCreateNew={handleStartCreate}
@@ -265,190 +198,83 @@ const App: React.FC = () => {
     );
   }
 
-  // Desktop View
+  // --- DESKTOP VIEW (Sidebar Layout) ---
   return (
-    <div className="min-h-screen pb-10 transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
-      
-      {/* Top Bar */}
-      <div className="theme-header sticky top-0 z-50 px-2 sm:px-4 py-2 sm:py-3">
-        <div className="max-w-6xl mx-auto flex justify-between items-center gap-2">
-          <div className="flex items-center gap-2 sm:gap-3 cursor-pointer flex-shrink-0" onClick={goToDashboard}>
-            {appLogo ? (
-              <img src={appLogo} alt="Logo" className="h-8 sm:h-10 w-auto object-contain" />
-            ) : (
-              <div className="p-1.5 sm:p-2 shadow-lg" style={{ background: 'var(--accent-orange)', borderRadius: 'var(--radius-md)' }}>
-                <span className="text-sm sm:text-lg font-black text-white">M24</span>
+    <>
+      <Routes>
+        <Route element={<Layout onLogout={handleLogout} />}>
+          <Route path="/" element={
+            <Dashboard 
+              role={userRole} 
+              onSelectJob={handleSelectJob}
+              onCreateNew={handleStartCreate}
+              onCreateNewSimple={handleStartCreateSimple}
+              initialTab={state.returnToArchive ? 'ARCHIVED' : 'ACTIVE'}
+              refreshTrigger={dashboardRefreshTrigger}
+            />
+          } />
+          <Route path="/map" element={<MapPage onSelectJob={handleSelectJob} />} />
+          <Route path="/invoices" element={<InvoiceModule />} />
+          <Route path="/clients" element={<ClientModule />} />
+        </Route>
+      </Routes>
+
+      {/* GLOBAL MODALS (Overlay) */}
+      {state.activeModal !== 'NONE' && (
+        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="relative w-full max-w-7xl bg-white rounded-2xl shadow-2xl my-8">
+            <button 
+              onClick={closeModal}
+              className="absolute -top-12 right-0 text-white hover:text-gray-200 font-medium flex items-center gap-2"
+            >
+              Zamknij [ESC]
+            </button>
+
+            {state.activeModal === 'CREATE' && (
+              <div className="p-8">
+                <InputForm 
+                  onSubmit={handleGenerate} 
+                  isProcessing={state.isProcessing} 
+                  onSwitchToManual={handleStartCreateSimple}
+                />
               </div>
             )}
-            <div className="flex flex-col hidden sm:flex">
-              <span className="font-bold text-lg hidden md:inline tracking-tight leading-none" style={{ color: 'var(--text-primary)' }}>
-                Montaż Reklam 24
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-wider hidden md:block" style={{ color: 'var(--accent-orange)' }}>
-                CRM 5.0 PC + Mobile
-              </span>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* PC/Mobile Switcher */}
-            <div className="flex gap-1 p-1 rounded-lg" style={{ background: 'var(--bg-surface)' }}>
-              <button
-                onClick={() => {
-                  window.location.href = window.location.pathname + '?desktop=1';
-                }}
-                className="p-2 rounded-md transition-all flex items-center gap-1"
-                style={{ 
-                  background: !showMobileView ? 'var(--accent-primary)' : 'transparent',
-                  color: !showMobileView ? 'white' : 'var(--text-muted)'
-                }}
-                title="Wersja PC"
-              >
-                <Monitor className="w-4 h-4" />
-                <span className="text-xs font-bold hidden sm:inline">PC</span>
-              </button>
-              <button
-                onClick={() => {
-                  window.location.href = window.location.pathname + '?mobile=1';
-                }}
-                className="p-2 rounded-md transition-all flex items-center gap-1"
-                style={{ 
-                  background: showMobileView ? 'var(--accent-primary)' : 'transparent',
-                  color: showMobileView ? 'white' : 'var(--text-muted)'
-                }}
-                title="Wersja Mobile"
-              >
-                <Smartphone className="w-4 h-4" />
-                <span className="text-xs font-bold hidden sm:inline">Mobile</span>
-              </button>
-            </div>
-            
-            {/* Theme Switcher */}
-            <ThemeSwitcher />
-            
-            <div className="text-right hidden md:block">
-              <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Zalogowano jako</div>
-              <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-                {state.user.name}
-                <span 
-                  className="ml-2 text-[10px] px-2 py-0.5"
-                  style={{ 
-                    background: userRole === UserRole.ADMIN ? 'var(--accent-primary)' : 'var(--accent-orange)',
-                    color: 'var(--text-inverse)',
-                    borderRadius: 'var(--radius-sm)'
-                  }}
-                >
-                  {userRole === UserRole.ADMIN ? 'Admin' : 'Pracownik'}
-                </span>
-              </div>
-            </div>
-            <button 
-              onClick={handleLogout} 
-              className="p-2 sm:p-2.5 transition-colors"
-              style={{ 
-                background: 'var(--bg-surface)', 
-                color: 'var(--text-secondary)',
-                borderRadius: 'var(--radius-md)'
-              }}
-              title="Wyloguj"
-            >
-              <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
-            </button>
+
+            {state.activeModal === 'CREATE_SIMPLE' && (
+               <SimpleJobCard
+                 job={state.selectedJob || undefined}
+                 onClose={closeModal}
+                 onSave={handleSaveSimpleJob}
+               />
+            )}
+
+            {state.activeModal === 'VIEW_JOB' && (
+               <JobCard 
+                 role={userRole}
+                 job={state.selectedJob || undefined}
+                 initialData={state.tempJobData || undefined}
+                 initialImages={state.selectedImages}
+                 onBack={closeModal}
+                 onJobSaved={closeModal}
+                 onArchive={async (id) => {
+                    // Logic duplication - should be moved to service/hook
+                    const job = state.selectedJob;
+                    const jobType = job?.type === 'simple' ? 'simple' : 'ai';
+                    await jobsService.updateJob(id, { status: JobStatus.ARCHIVED, completedAt: Date.now(), columnId: 'ARCHIVE' as const }, jobType);
+                    closeModal();
+                 }}
+                 onDelete={async (id) => {
+                    const job = state.selectedJob;
+                    const jobType = job?.type === 'simple' ? 'simple' : 'ai';
+                    await jobsService.deleteJob(id, jobType);
+                    closeModal();
+                 }}
+               />
+            )}
           </div>
         </div>
-      </div>
-
-      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-        
-        {/* Error Banner */}
-        {state.error && (
-          <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-xl flex items-start gap-3 animate-shake">
-            <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <h3 className="text-sm font-bold text-red-800">Wystąpił błąd</h3>
-              <p className="text-sm text-red-700">{state.error}</p>
-            </div>
-            <button 
-              onClick={() => setState(prev => ({ ...prev, error: null }))}
-              className="ml-auto text-red-400 hover:text-red-600"
-            >
-              ×
-            </button>
-          </div>
-        )}
-
-        {/* Views */}
-        {state.currentView === 'DASHBOARD' && (
-          <Dashboard 
-            role={userRole} 
-            onSelectJob={handleSelectJob}
-            onCreateNew={handleStartCreate}
-            onCreateNewSimple={handleStartCreateSimple}
-            initialTab={state.returnToArchive ? 'ARCHIVED' : 'ACTIVE'}
-            refreshTrigger={dashboardRefreshTrigger}
-          />
-        )}
-
-        {state.currentView === 'CREATE' && (
-          <div className="animate-fade-in">
-            <button 
-              onClick={goToDashboard} 
-              className="mb-4 text-slate-500 hover:text-slate-800 flex items-center text-sm font-medium transition-colors"
-            >
-              ← Anuluj i wróć
-            </button>
-            <InputForm 
-              onSubmit={handleGenerate} 
-              isProcessing={state.isProcessing} 
-              onSwitchToManual={handleStartCreateSimple}
-            />
-          </div>
-        )}
-
-        {state.currentView === 'VIEW_JOB' && (
-          <div className="animate-fade-in">
-            <JobCard 
-              role={userRole}
-              job={state.selectedJob || undefined}
-              initialData={state.tempJobData || undefined}
-              initialImages={state.selectedImages}
-              onBack={goToDashboard}
-              onJobSaved={goToDashboard}
-              onArchive={async (id) => {
-                const job = state.selectedJob;
-                const jobType = job?.type === 'simple' ? 'simple' : 'ai';
-                try {
-                  await jobsService.updateJob(id, { 
-                    status: JobStatus.ARCHIVED,
-                    completedAt: Date.now(),
-                    columnId: 'ARCHIVE' as const
-                  }, jobType);
-                } catch (error) {
-                  console.error('Failed to archive:', error);
-                }
-              }}
-              onDelete={async (id) => {
-                const job = state.selectedJob;
-                const jobType = job?.type === 'simple' ? 'simple' : 'ai';
-                try {
-                  await jobsService.deleteJob(id, jobType);
-                } catch (error) {
-                  console.error('Failed to delete:', error);
-                }
-              }}
-            />
-          </div>
-        )}
-
-        {state.currentView === 'CREATE_SIMPLE' && (
-          <SimpleJobCard
-            job={state.selectedJob || undefined}
-            onClose={goToDashboard}
-            onSave={handleSaveSimpleJob}
-          />
-        )}
-      </div>
-    </div>
+      )}
+    </>
   );
 };
 

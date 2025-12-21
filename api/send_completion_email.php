@@ -60,6 +60,7 @@ $jobTitle = $input['job_title'];
 $toEmail = $input['to_email'];
 $completionImage = isset($input['completion_image']) ? $input['completion_image'] : null;
 $completionNotes = isset($input['completion_notes']) ? $input['completion_notes'] : '';
+$jobType = isset($input['job_type']) ? $input['job_type'] : 'ai'; // Domyślnie AI
 
 // Walidacja email
 if (!filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
@@ -123,21 +124,16 @@ if ($completionImage && strpos($completionImage, 'data:image') === 0) {
 $headersStr = implode("\r\n", $headers);
 $result = @mail($toEmail, $subject, $body, $headersStr);
 
-if ($result) {
+    if ($result) {
     // Zapisz info do bazy (opcjonalnie)
     try {
         $pdo = getDB();
         
-        // Sprawdź czy to jobs_ai czy jobs_simple
-        $stmt = $pdo->prepare("SELECT id FROM jobs_ai WHERE id = ?");
-        $stmt->execute(array($jobId));
-        $isAiJob = $stmt->fetch();
-        
-        $table = $isAiJob ? 'jobs_ai' : 'jobs_simple';
+        $table = ($jobType === 'simple') ? 'jobs_simple' : 'jobs_ai';
         
         // Aktualizuj rekord
         $stmt = $pdo->prepare("
-            UPDATE $table 
+            UPDATE $table
             SET review_request_sent_at = NOW(),
                 review_request_email = ?
             WHERE id = ?

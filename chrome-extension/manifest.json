@@ -8,12 +8,21 @@
   "permissions": [
     "activeTab",
     "storage",
-    "scripting"
+    "scripting",
+    "identity"
   ],
+  
+  "oauth2": {
+    "client_id": "253192054120-6rrtfhutapuuanfth8d9tt7p7t9450vo.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/gmail.readonly"
+    ]
+  },
   
   "host_permissions": [
     "https://mail.google.com/*",
     "https://montazreklam24.pl/*",
+    "http://localhost:8080/*",
     "https://generativelanguage.googleapis.com/*"
   ],
   

@@ -151,6 +151,82 @@ function handleChangePassword() {
     jsonResponse(array('success' => true, 'message' => 'Hasło zmienione'));
 }
 
+// =========================================================================
+// FUNKCJE POMOCNICZE AUTORYZACJI
+// =========================================================================
 
+/**
+ * Sprawdź autoryzację (Token sesji lub API Secret)
+ */
+function requireAuth() {
+    $token = getAuthToken();
+    
+    // 1. Sprawdź Secret Token (dla Extension)
+    if (defined('CRM_API_SECRET') && $token === CRM_API_SECRET) {
+        return array(
+            'id' => 1, // Zawsze Admin (lub pierwszy user)
+            'role' => 'admin',
+            'name' => 'API Extension',
+            'email' => 'extension@crm'
+        );
+    }
+    
+    // 2. Sprawdź sesję użytkownika
+    if (!$token) {
+        // Jeśli DEV_MODE to pozwól bez logowania (tylko na localhost)
+        if (defined('DEV_MODE') && DEV_MODE === true) {
+             return array(
+                'id' => 1,
+                'role' => 'admin',
+                'name' => 'Dev Admin',
+                'email' => 'admin@dev'
+            );
+        }
+        jsonResponse(array('error' => 'Unauthorized'), 401);
+    }
+    
+    $pdo = getDB();
+    
+    // Pobierz sesję
+    $stmt = $pdo->prepare('
+        SELECT s.*, u.role, u.name, u.email 
+        FROM sessions s 
+        JOIN users u ON s.user_id = u.id 
+        WHERE s.token = ? AND s.expires_at > NOW()
+    ');
+    $stmt->execute(array($token));
+    $session = $stmt->fetch();
+    
+    if (!$session) {
+        jsonResponse(array('error' => 'Unauthorized or session expired'), 401);
+    }
+    
+    return $session;
+}
 
+/**
+ * Pobierz token z nagłówka
+ */
+function getAuthToken() {
+    $headers = getallheaders();
+    $authHeader = isset($headers['Authorization']) ? $headers['Authorization'] : '';
+    
+    if (preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
+        return $matches[1];
+    }
+    
+    return null;
+}
 
+// Polyfill dla getallheaders() na nginx/fpm (czasem brakuje)
+if (!function_exists('getallheaders')) {
+    function getallheaders() {
+        $headers = [];
+        foreach ($_SERVER as $name => $value) {
+            if (substr($name, 0, 5) == 'HTTP_') {
+                $headers[str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($name, 5)))))] = $value;
+            }
+        }
+        return $headers;
+    }
+}

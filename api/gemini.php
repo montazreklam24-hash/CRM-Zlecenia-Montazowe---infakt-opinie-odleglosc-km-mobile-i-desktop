@@ -170,43 +170,32 @@ function callGeminiAPI($text, $images = array()) {
     
     // Buduj prompt
     $prompt = "
-Zadanie: Jesteś ekspertem od analizy zleceń montażowych.
-Przeanalizuj dostarczony tekst oraz załączone obrazy/pliki PDF.
+Zadanie: Jesteś ekspertem od logistyki i analizy zleceń montażowych.
+Twoim absolutnym priorytetem jest znalezienie DOKŁADNEGO ADRESU MONTAŻU, aby nawigacja GPS doprowadziła kierowcę prosto do celu.
 
-Twoim celem jest stworzenie precyzyjnej karty zlecenia w formacie JSON.
+WYTYCZNE SZCZEGÓŁOWE:
 
-WYTYCZNE DLA PDF I OBRAZÓW:
-- Dokładnie czytaj treść załączonych plików PDF. Często zawierają one specyfikację techniczną, której nie ma w mailu.
-- Jeśli widzisz rysunek techniczny, opisz wymiary i materiały w polu 'scopeWorkImages'.
+1. ADRES (KRYTYCZNE!):
+- Musisz wydobyć PEŁNY adres: Ulica, Numer domu/lokalu, Miasto.
+- INTELIGENTNE WYSZUKIWANIE: Jeśli w mailu jest nazwa obiektu (np. "CH Promenada", "Galeria Mokotów", "Szpital Bródnowski"), UŻYJ SWOJEJ WIEDZY, aby wpisać dokładny adres tego miejsca w Warszawie (np. dla Promenady wpisz: "ul. Ostrobramska 75C, Warszawa"). Nie pytaj - wpisz najbardziej prawdopodobny adres.
+- Jeśli jest kilka adresów, wybierz ten, gdzie ma być wykonana usługa.
 
-WYTYCZNE DANYCH:
-- Telefon: Szukaj dokładnie w całym tekście, również w stopkach i podpisach. OBOWIĄZKOWE!
-- Email: Znajdź adres email klienta jeśli jest dostępny.
-- NIP: Znajdź numer NIP firmy jeśli jest dostępny (10 cyfr).
-- Adres: Główny adres montażu. Baza to ul. Poprawna 39R, Warszawa - licz dystans od bazy.
-- Tytuł zlecenia (suggestedTitle): Generuj TYLKO gdy użytkownik NIE podał tytułu. Format: \"[Ulica] [Numer] [Miasto] [Telefon] [Klient]\" (np. \"Zajęcza 9 Warszawa 123456789 Jan Kowalski\")
+2. OSOBA KONTAKTOWA I TELEFON:
+- Znajdź numer telefonu do osoby, która będzie na miejscu lub koordynuje montaż. Szukaj w stopkach!
 
-WYMAGANY FORMAT ODPOWIEDZI (JSON):
+3. STRESZCZENIE (scopeWorkText) - BARDZO WAŻNE:
+- Nie kopiuj maila! Napisz zwięzłe, żołnierskie streszczenie w punktach.
+- Co konkretnie trzeba zrobić? (np. "1. Demontaż starego szyldu. 2. Montaż kasetonu 3x1m. 3. Wyklejenie witryny").
+- Wypisz wymiary i materiały, jeśli są podane.
+
+FORMAT (JSON):
 {
-    \"suggestedTitle\": \"Ulica Numer Miasto Telefon Nazwa_Klienta (TYLKO gdy brak tytułu od użytkownika!)\",
-    \"clientName\": \"Imię i nazwisko lub nazwa firmy\",
-    \"email\": \"email@klienta.pl\",
-    \"nip\": \"1234567890\",
-    \"companyName\": \"Nazwa firmy (opcjonalnie)\",
-    \"contactPerson\": \"Osoba kontaktowa\",
-    \"phoneNumber\": \"Numer telefonu\",
-    \"address\": \"Główny adres montażu\",
-    \"locations\": [
-        {
-            \"fullAddress\": \"Pełny adres do nawigacji\",
-            \"shortLabel\": \"Ulica Numer, Miasto\",
-            \"distance\": \"15 km\"
-        }
-    ],
-    \"scopeWorkText\": \"Szczegółowy opis zlecenia\",
-    \"scopeWorkImages\": \"Opis techniczny z analizy obrazów\",
+    "suggestedTitle": "Tytuł zlecenia",
+    "address": "Ulica Numer, Miasto (Nazwa Obiektu)",
+    "scopeWorkText": "1. ...\n2. ...",
+    ...
     \"payment\": {
-        \"type\": \"CASH|TRANSFER|UNKNOWN\",
+        \"type\": \"UNKNOWN\",
         \"netAmount\": null,
         \"grossAmount\": null
     }

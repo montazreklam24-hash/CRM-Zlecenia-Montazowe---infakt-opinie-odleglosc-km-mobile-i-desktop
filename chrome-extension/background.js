@@ -5,10 +5,11 @@
 
 // Domyślne ustawienia
 const DEFAULT_SETTINGS = {
-  crmUrl: 'https://montazreklam24.pl/crm',
+  crmUrl: 'http://localhost:8080',
   crmToken: '',
   geminiApiKey: '',
-  autoAnalyze: true
+  autoAnalyze: true,
+  importAttachments: false // Domyślnie WYŁĄCZONE (aby uniknąć problemów z OAuth)
 };
 
 // =========================================================================
@@ -197,6 +198,48 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
 }
 
 // =========================================================================
+// UPLOAD PLIKÓW (Multipart)
+// =========================================================================
+
+async function uploadFileToCRM(fileObj) {
+    const settings = await getSettings();
+    if (!settings.crmUrl || !settings.crmToken) {
+        throw new Error('Brak konfiguracji CRM');
+    }
+
+    const url = settings.crmUrl.replace(/\/$/, '') + '/api/upload.php';
+    
+    // Konwertuj Base64 na Blob
+    const res = await fetch(fileObj.data);
+    const blob = await res.blob();
+    
+    const formData = new FormData();
+    formData.append('file', blob, fileObj.name);
+    
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Authorization': 'Bearer ' + settings.crmToken
+            // Content-Type NIE MOŻE być ustawiony ręcznie przy FormData!
+        },
+        body: formData
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Upload failed: ${response.status} ${text}`);
+    }
+
+    const result = await response.json();
+    if (!result.success || !result.url) {
+        throw new Error(result.error || 'Unknown upload error');
+    }
+
+    return result.url;
+}
+
+
+// =========================================================================
 // POBIERANIE ZAŁĄCZNIKÓW (OAuth2)
 // =========================================================================
 
@@ -231,6 +274,11 @@ async function importAttachments(messageId) {
     
     // Jeśli import się nie udał (np. błąd API Google), rzuć błąd
     if (result.error) {
+        // Jeśli to błąd autoryzacji/konta, wyczyść token, żeby wymusić ponowne logowanie
+        if (result.error.includes('400') || result.error.includes('401') || result.error.includes('403')) {
+            console.warn('[CRM BG] Auth error detected. Clearing cached token to force re-login next time.');
+            chrome.identity.removeCachedAuthToken({ token: googleToken }, () => {});
+        }
         throw new Error("Import załączników: " + result.error);
     }
 
@@ -242,28 +290,87 @@ async function importAttachments(messageId) {
   }
 }
 
+// =========================================================================
+// POBIERANIE Message ID z Thread ID (naprawa błędu 400)
+// =========================================================================
+async function getRealMessageId(threadIdOrMessageId) {
+  // Jeśli ID wygląda na poprawne messageId (krótkie hex), zwróć je
+  if (!threadIdOrMessageId || (threadIdOrMessageId.length < 20 && !threadIdOrMessageId.startsWith('FM'))) {
+      return threadIdOrMessageId;
+  }
+
+  // Jeśli to długie ID (Thread ID lub Legacy), pytamy API o listę wiadomości w wątku
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadIdOrMessageId}?format=minimal`,
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    );
+    
+    if (!response.ok) return threadIdOrMessageId; // Fallback
+    
+    const data = await response.json();
+    if (data.messages && data.messages.length > 0) {
+        // Zwróć ID ostatniej wiadomości w wątku
+        const lastMsg = data.messages[data.messages.length - 1];
+        console.log('[CRM BG] Resolved Thread ID', threadIdOrMessageId, 'to Message ID', lastMsg.id);
+        return lastMsg.id;
+    }
+  } catch (e) {
+    console.error('[CRM BG] Error resolving thread ID:', e);
+  }
+  
+  return threadIdOrMessageId;
+}
+
 async function createJobInCRM(jobData) {
   try {
-    // 1. Pobierz załączniki (jeśli mamy messageId)
+    const settings = await getSettings();
+    let finalMessageId = jobData.gmailMessageId;
     let projectImages = [];
     let attachmentWarning = null;
-    
-    // Ważne: messageId musi być przekazane z content.js (pobrane z URL)
-    if (jobData.gmailMessageId) {
-      try {
-        projectImages = await importAttachments(jobData.gmailMessageId);
-      } catch (importError) {
-        // Jeśli import się nie udał (np. brak włączonego Gmail API), 
-        // kontynuujemy BEZ załączników ale zapisujemy ostrzeżenie
-        console.warn('[CRM BG] Import załączników nie powiódł się, kontynuuję bez nich:', importError.message);
-        attachmentWarning = "Załączniki nie zostały zaimportowane: " + importError.message;
-        // NIE blokujemy tworzenia zlecenia!
-      }
-    } else {
-        console.warn('[CRM BG] Brak messageId, pomijam załączniki');
+
+    // 1. POBIERZ ZAŁĄCZNIKI Z GMAILA (JEŚLI WŁĄCZONE)
+    if (settings.importAttachments) {
+        if (finalMessageId) {
+            finalMessageId = await getRealMessageId(finalMessageId);
+        }
+
+        if (finalMessageId) {
+          try {
+            projectImages = await importAttachments(finalMessageId);
+          } catch (importError) {
+            console.warn('[CRM BG] Import załączników nie powiódł się, kontynuuję bez nich:', importError.message);
+            attachmentWarning = "Załączniki Gmail nie zostały pobrane: " + importError.message;
+          }
+        } else {
+            console.warn('[CRM BG] Brak messageId, pomijam załączniki Gmail');
+        }
     }
 
-    // 2. Wyślij do CRM
+    // 2. DODAJ RĘCZNE ZAŁĄCZNIKI (MANUAL UPLOAD)
+    // TERAZ: Uploadujemy pliki NAJPIERW, i wysyłamy tylko URL-e
+    if (jobData.manualAttachments && Array.isArray(jobData.manualAttachments)) {
+        console.log('[CRM BG] Uploading manual attachments:', jobData.manualAttachments.length);
+        
+        const uploadPromises = jobData.manualAttachments
+            .filter(file => file.data && file.data.startsWith('data:image'))
+            .map(file => uploadFileToCRM(file)
+                .catch(err => {
+                    console.error('Failed to upload file:', file.name, err);
+                    attachmentWarning = (attachmentWarning ? attachmentWarning + "\n" : "") + 
+                                      `Nie udało się wgrać ${file.name}: ${err.message}`;
+                    return null;
+                })
+            );
+            
+        const uploadedUrls = await Promise.all(uploadPromises);
+        const validUrls = uploadedUrls.filter(url => url !== null);
+        
+        projectImages = [...projectImages, ...validUrls];
+    }
+
+    // 3. WYŚLIJ DO CRM
     const result = await apiRequest('jobs', 'POST', {
       jobTitle: jobData.title,
       phoneNumber: jobData.phone,
@@ -271,11 +378,11 @@ async function createJobInCRM(jobData) {
       address: jobData.fullAddress,
       scopeWorkText: jobData.description,
       
-      // Metadane Gmail
-      gmailMessageId: jobData.gmailMessageId || null,
+      // Metadane Gmail - wysyłamy poprawne ID
+      gmailMessageId: finalMessageId || null,
       
-      // Załączniki (ścieżki)
-      projectImages: projectImages, // Backend musi to obsłużyć!
+      // Załączniki (teraz tylko URL-e lub ścieżki, nie base64!)
+      projectImages: projectImages, 
       
       columnId: 'PREPARE'
     });
@@ -283,7 +390,7 @@ async function createJobInCRM(jobData) {
     return { 
       success: true, 
       job: result.job,
-      warning: attachmentWarning  // Może być null jeśli wszystko OK
+      warning: attachmentWarning 
     };
     
   } catch (error) {

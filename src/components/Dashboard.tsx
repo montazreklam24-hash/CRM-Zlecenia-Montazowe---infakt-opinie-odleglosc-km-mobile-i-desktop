@@ -1624,77 +1624,56 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     
     // Same column - just reorder
     if (sourceColumn === targetColumn) {
-      console.log('🟣 ENTERING REORDER BLOCK');
       const sourceJobs = jobs
         .filter(j => (j.columnId || 'PREPARE') === sourceColumn)
         .sort((a, b) => (a.order || 0) - (b.order || 0));
       
-      const currentIndex = sourceJobs.findIndex(j => j.id === draggedId);
+      // Build array of IDs
+      const jobIds = sourceJobs.map(j => j.id);
+      const currentIndex = jobIds.indexOf(draggedId);
       
-      console.log('🔵 REORDER DEBUG:', {
-        sourceJobs: sourceJobs.map(j => ({ id: j.id, title: j.data.jobTitle?.substring(0, 15), order: j.order })),
-        currentIndex,
-        newOrder,
-        insertBeforeJobId
-      });
+      if (currentIndex === -1) return; // Should not happen
+
+      // Remove from old position
+      jobIds.splice(currentIndex, 1);
       
-      if (currentIndex === -1) {
-        console.log('❌ currentIndex is -1, aborting');
-        return;
+      // Determine insert index
+      let insertIndex = jobIds.length; // Default: end
+      if (insertBeforeJobId) {
+        insertIndex = jobIds.indexOf(insertBeforeJobId);
+        if (insertIndex === -1) insertIndex = jobIds.length;
       }
       
-      // If dropping on same position, do nothing
-      if (currentIndex === newOrder) {
-        console.log('❌ Same position, aborting');
-        return;
-      }
+      // Insert at new position
+      jobIds.splice(insertIndex, 0, draggedId);
       
-      // Reorder array - remove dragged item and insert at new position
-      const reordered = sourceJobs.filter(j => j.id !== draggedId);
-      const draggedJob = sourceJobs[currentIndex];
-      
-      // Calculate insert position
-      let insertAt = newOrder;
-      if (newOrder > currentIndex) {
-        insertAt = newOrder - 1; // Adjust because we removed one item before this position
-      }
-      
-      console.log('🔵 Insert at:', insertAt);
-      
-      reordered.splice(insertAt, 0, draggedJob);
-      
-      console.log('🔵 After reorder:', reordered.map(j => ({ id: j.id, title: j.data.jobTitle?.substring(0, 15) })));
-      
-      // Update orders
+      // Create new jobs array with updated orders
       const orderMap = new Map<string, number>();
-      reordered.forEach((job, idx) => orderMap.set(job.id, idx));
+      jobIds.forEach((id, idx) => orderMap.set(id, idx));
       
-      setJobs(prev => {
-        const updated = prev.map(job => 
-          orderMap.has(job.id) ? { ...job, order: orderMap.get(job.id)! } : job
-        );
-        console.log('🔵 NEW STATE:', updated.filter(j => (j.columnId || 'PREPARE') === sourceColumn).sort((a,b) => (a.order||0)-(b.order||0)).map(j => ({ title: j.data.jobTitle?.substring(0,15), order: j.order })));
-        return updated;
-      });
+      setJobs(prev => prev.map(job => 
+        orderMap.has(job.id) ? { ...job, order: orderMap.get(job.id)! } : job
+      ));
       
+      // Send update to backend
       const draggedJobReordered = jobs.find(j => j.id === draggedId);
       const jobType = draggedJobReordered?.type || 'ai';
-      await jobsService.updateJobPosition(draggedId, targetColumn, orderMap.get(draggedId) || 0, jobType);
-      console.log('✅ Reorder complete');
+      // We need to send the exact new index
+      await jobsService.updateJobPosition(draggedId, targetColumn, insertIndex, jobType);
+      
     } else {
       // Moving to different column
-      // Update all orders in target column to make room
+      // ... (reszta bez zmian)
       const updatedJobs = jobs.map(job => {
         if (job.id === draggedId) {
-          // Move the dragged job to new column
           return { ...job, columnId: targetColumn, order: newOrder };
         }
+        // Shift jobs in target column
         if ((job.columnId || 'PREPARE') === targetColumn) {
-          // Shift jobs at or after insertion point
-          const currentOrder = job.order || 0;
-          if (currentOrder >= newOrder) {
-            return { ...job, order: currentOrder + 1 };
-          }
+           const currentOrder = job.order || 0;
+           if (currentOrder >= newOrder) {
+             return { ...job, order: currentOrder + 1 };
+           }
         }
         return job;
       });

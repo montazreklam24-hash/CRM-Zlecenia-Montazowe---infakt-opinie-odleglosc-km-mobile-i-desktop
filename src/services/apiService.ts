@@ -533,7 +533,10 @@ export const jobsService = {
       return;
     }
     
-    const endpoint = jobType === 'simple' ? `/jobs-simple/${id}` : `/jobs/${id}`;
+    const { realId, type: parsedType } = parseJobId(id);
+    const type = jobType || parsedType;
+    
+    const endpoint = type === 'simple' ? `/jobs-simple/${realId}` : `/jobs/${realId}`;
     await apiRequest(endpoint, { method: 'DELETE' });
   },
   

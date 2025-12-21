@@ -310,6 +310,11 @@
       <input type="checkbox" id="autoAnalyze" checked>
       <label for="autoAnalyze">Automatycznie analizuj po kliknięciu CRM</label>
     </div>
+
+    <div class="checkbox-group">
+      <input type="checkbox" id="importAttachments">
+      <label for="importAttachments">Pobieraj załączniki (wymaga logowania)</label>
+    </div>
     
     <button class="btn btn-primary" id="saveBtn">
       💾 Zapisz ustawienia
@@ -324,10 +329,10 @@
         <span class="quick-action-icon">📋</span>
         <span class="quick-action-label">Otwórz CRM</span>
       </a>
-      <a href="https://mail.google.com" target="_blank" class="quick-action">
-        <span class="quick-action-icon">📧</span>
-        <span class="quick-action-label">Otwórz Gmail</span>
-      </a>
+      <div class="quick-action" id="injectPanel" style="border-color: #f97316; color: #ea580c;">
+        <span class="quick-action-icon">💉</span>
+        <span class="quick-action-label">Wymuś Panel</span>
+      </div>
     </div>
   </div>
   

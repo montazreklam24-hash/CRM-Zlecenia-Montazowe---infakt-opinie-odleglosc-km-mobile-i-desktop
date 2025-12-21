@@ -102,9 +102,19 @@ switch ($endpoint) {
         require_once __DIR__ . '/settings.php';
         handleSettings($method);
         break;
+
+    case 'import_gmail':
+        require_once __DIR__ . '/import_gmail.php';
+        // Skrypt import_gmail.php wykonuje się od razu, nie ma funkcji handle...
+        break;
+
+    case 'check_missing':
+        require_once __DIR__ . '/check_missing_files.php';
+        break;
         
     case '':
     case 'status':
+    case 'ping':
         // Health check
         jsonResponse(array(
             'status' => 'ok',

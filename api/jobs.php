@@ -94,6 +94,12 @@ function createJob() {
         $pdo = getDB();
         
         $input = getJsonInput();
+        
+        // DEBUG LOGGING
+        $logDir = __DIR__ . '/logs';
+        if (!is_dir($logDir)) mkdir($logDir, 0777, true);
+        file_put_contents($logDir . '/debug_jobs.log', date('Y-m-d H:i:s') . " CREATE JOB INPUT: " . print_r($input, true) . "\n", FILE_APPEND);
+        
         $data = isset($input['data']) ? $input['data'] : $input;
         
         // Tytuł
@@ -109,14 +115,41 @@ function createJob() {
         
         // Generuj friendly ID (używamy funkcji z config.php)
         $friendlyId = generateFriendlyId('ai');
-        
+
+        // SPRAWDZANIE DUPLIKATÓW (v2.1)
+        // 1. Sprawdź po Gmail Message ID (jeśli podano)
+        $gmailMessageId = isset($data['gmailMessageId']) ? $data['gmailMessageId'] : null;
+        $gmailThreadId = isset($data['gmailThreadId']) ? $data['gmailThreadId'] : null;
+
+        if ($gmailMessageId) {
+            $stmt = $pdo->prepare('SELECT id, friendly_id FROM jobs_ai WHERE gmail_message_id = ?');
+            $stmt->execute([$gmailMessageId]);
+            $existingJob = $stmt->fetch();
+            
+            if ($existingJob) {
+                // Zwracamy istniejące zlecenie zamiast tworzyć nowe
+                $stmt = $pdo->prepare('SELECT * FROM jobs_ai WHERE id = ?');
+                $stmt->execute([$existingJob['id']]);
+                $job = $stmt->fetch();
+                
+                jsonResponse(array(
+                    'success' => true, 
+                    'job' => mapJobToFrontend($job),
+                    'isDuplicate' => true,
+                    'message' => 'Zlecenie z tego maila już istnieje.'
+                ), 200);
+                return;
+            }
+        }
+
         // INSERT
         $stmt = $pdo->prepare('
             INSERT INTO jobs_ai (
                 friendly_id, title, client_name, phone, email, nip,
                 address, coordinates_lat, coordinates_lng,
-                description, notes, status, column_id, column_order, created_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                description, notes, status, column_id, column_order, created_by,
+                gmail_message_id, gmail_thread_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ');
         
         $phone = null;
@@ -153,7 +186,9 @@ function createJob() {
                 'NEW',
                 isset($input['columnId']) ? $input['columnId'] : 'PREPARE',
                 0,
-                $user['id']
+                $user['id'],
+                $gmailMessageId,
+                $gmailThreadId
             ));
         } catch (PDOException $e) {
             logError("SQL Error in createJob: " . $e->getMessage());
