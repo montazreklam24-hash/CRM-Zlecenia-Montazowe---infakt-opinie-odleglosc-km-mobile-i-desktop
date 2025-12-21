@@ -125,6 +125,7 @@ const COMPANY_EMAILS = [
   'korpalski@',
   '@montazreklam24.pl',
   '@montazreklam24.com',
+  '@newoffice.pl',
   'kontakt@montazreklam24.pl',
   'biuro@montazreklam24.pl',
   'info@montazreklam24.pl'
@@ -145,7 +146,9 @@ function extractPhoneFromText(text) {
     /888[\s\-]?201[\s\-]?250/g,
     /888201250/g,
     /\+48[\s\-]?888[\s\-]?201[\s\-]?250/g,
-    /0048[\s\-]?888[\s\-]?201[\s\-]?250/g
+    /0048[\s\-]?888[\s\-]?201[\s\-]?250/g,
+    /22[\s\-]?213[\s\-]?95[\s\-]?96/g,
+    /222139596/g
   ];
   
   // Sprawdź czy tekst zawiera tylko numer CRM
@@ -291,30 +294,32 @@ KRYTYCZNE INSTRUKCJE - EMAIL KONTAKTOWY:
 - korpalski@* (wszystkie warianty)
 - *@montazreklam24.pl (wszystkie maile z tej domeny)
 - *@montazreklam24.com (wszystkie maile z tej domeny)
+- *@newoffice.pl (wszystkie maile z tej domeny)
 - kontakt@montazreklam24.pl
 - biuro@montazreklam24.pl
 - info@montazreklam24.pl
 
 🚨 WAŻNE - JAK ROZPOZNAĆ EMAIL KLIENTA:
 1. Email klienta MUSI być z INNEGO adresu niż maile firmowe powyżej
-2. Czasami firma pisze PIERWSZY mail (wygląda jak zapytanie), ale to NIE jest email klienta!
-3. Email klienta to ZAWSZE odpowiedź z innego adresu niż maile firmowe
+2. Czasami firma pisze PIERWSZY mail (wygląda jak zapytanie) lub klient ODPOWIADA na nasz mail - to NIE jest email klienta!
+3. Email klienta to ZAWSZE odpowiedź z innego adresu niż maile firmowe LUB dane podane W TREŚCI maila.
 4. Szukaj emaila w:
    - Polu "Od:" (From) - jeśli to nie jest mail firmowy, to jest mail klienta
    - Podpisie maila (jeśli jest inny niż firmowy)
-   - Treści maila (jeśli klient podaje swój email)
+   - TREŚCI maila (klient często podaje swój email w treści, gdy piszemy z firmowego)
 
 ✅ JAK WYBRAĆ WŁAŚCIWY EMAIL:
 1. Sprawdź pole "Od:" (From) - jeśli NIE zawiera żadnego z maili firmowych, użyj tego
 2. Jeśli pole "Od:" zawiera mail firmowy:
-   - Szukaj w treści maila - klient może podać swój email w odpowiedzi
+   - SZUKAJ W TREŚCI MAILA - klient mógł podać swój email w odpowiedzi
    - Szukaj w podpisie - klient może podać swój email
    - Jeśli nie znajdziesz innego maila niż firmowy, ustaw email: null
 
 3. IGNORUJ:
    - Wszystkie maile zawierające "montazreklam24"
    - Wszystkie maile zawierające "korpalski"
-   - Wszystkie maile z domeny @montazreklam24.pl lub @montazreklam24.com
+   - Wszystkie maile zawierające "newoffice"
+   - Wszystkie maile z domen: @montazreklam24.pl, @montazreklam24.com, @newoffice.pl
    - Maile kontaktowe firmy (kontakt@, biuro@, info@)
 
 4. Jeśli znajdziesz TYLKO maile firmowe lub nie znajdziesz żadnego maila klienta:
@@ -334,10 +339,11 @@ KRYTYCZNE INSTRUKCJE - EMAIL KONTAKTOWY:
 KRYTYCZNE INSTRUKCJE - TELEFON KONTAKTOWY:
 ================================================================================
 
-⚠️ NUMER DO IGNOROWANIA:
-- NUMER 888 201 250 (lub 888201250, +48 888 201 250, itp.) TO JEST NUMER FIRMY CRM
-- NIGDY nie dodawaj tego numeru jako telefon kontaktowy klienta!
-- Jeśli znajdziesz tylko ten numer, ustaw phone: null
+⚠️ NUMERY DO IGNOROWANIA (TO SĄ NUMERY FIRMY):
+- 888 201 250 (lub 888201250, +48 888 201 250, itp.)
+- 22 213 95 96 (lub 222139596, +48 22 213 95 96, itp.)
+- NIGDY nie dodawaj tych numerów jako telefon kontaktowy klienta!
+- Jeśli znajdziesz tylko te numery, ustaw phone: null
 
 🔍 JAK SZUKAĆ TELEFONU - SZUKAJ WSZĘDZIE:
 1. PRZECZYTAJ CAŁĄ TREŚĆ MAILA od początku do końca - każdy wiersz, każdy znak
@@ -380,18 +386,18 @@ INNE ZAGRANICZNE:
 1. Jeśli jest wiele numerów, wybierz:
    - Numer komórkowy zamiast stacjonarnego (jeśli oba są)
    - Numer bezpośredni zamiast centrali (jeśli oba są)
-   - Numer klienta zamiast numeru firmy CRM (888 201 250)
+   - Numer klienta zamiast numeru firmy CRM (888 201 250 lub 22 213 95 96)
    - Numer w podpisie nadawcy (często główny kontakt)
    
 2. IGNORUJ:
    - Numery faksu (fax, faks)
    - Numery centrali jeśli jest bezpośredni
-   - Numer 888 201 250 (to numer CRM)
+   - Numery firmy: 888 201 250, 22 213 95 96
    - Numery w stopce reklamowej (jeśli nie są głównym kontaktem)
 
-3. Jeśli znajdziesz tylko numer 888 201 250 lub nie znajdziesz żadnego numeru klienta:
+3. Jeśli znajdziesz tylko numery firmy lub nie znajdziesz żadnego numeru klienta:
    - Ustaw phone: null
-   - NIE wpisuj "brak", "nie znaleziono", "888 201 250"
+   - NIE wpisuj "brak", "nie znaleziono", ani numerów firmy.
 
 📝 FORMATOWANIE WYNIKU:
 - Usuń wszystkie znaki niebędące cyframi
@@ -1268,6 +1274,7 @@ async function testGmailMessage(messageIdOrUrl) {
     
     // Wyciągnij Message ID z URL jeśli podano URL
     let messageId = messageIdOrUrl.trim();
+    let finalMessageId = null;
     
     if (messageId.includes('mail.google.com')) {
       try {
