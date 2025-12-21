@@ -66,7 +66,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
       {/* Logo */}
       {showLogo && (
         <div className="p-6 border-b border-gray-100 flex items-center justify-center">
-          <h1 className="text-xl font-bold text-blue-600 tracking-tight">
+          <h1 className="text-xl font-bold text-orange-600 tracking-tight">
             MONTAŻ<span className="text-gray-800">24</span>
           </h1>
         </div>
@@ -108,7 +108,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                           isActive
-                            ? 'bg-blue-50 text-blue-600 font-medium shadow-sm'
+                            ? 'bg-orange-50 text-orange-600 font-medium shadow-sm'
                             : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
                         }`
                       }
@@ -141,4 +141,3 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
 };
 
 export default Sidebar;
-

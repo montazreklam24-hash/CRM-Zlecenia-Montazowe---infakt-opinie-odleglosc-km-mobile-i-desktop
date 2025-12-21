@@ -28,13 +28,13 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Top Navigation Bar - Alpha Style */}
-      <header className="fixed top-0 left-0 right-0 h-16 bg-gradient-to-r from-blue-600 to-blue-700 z-50 flex items-center justify-between px-4 md:px-6 shadow-lg">
+      {/* Top Navigation Bar - Pomarańczowy */}
+      <header className="fixed top-0 left-0 right-0 h-16 bg-gradient-to-r from-orange-600 to-orange-700 z-50 flex items-center justify-between px-4 md:px-6 shadow-lg">
         {/* Left: Logo + Menu */}
         <div className="flex items-center gap-4">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 text-white hover:bg-blue-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className="p-2 text-white hover:bg-orange-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-orange-300"
             aria-label="Toggle menu"
           >
             {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
@@ -43,11 +43,11 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
           {/* Logo M24 */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
             <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-md">
-              <span className="text-blue-600 font-bold text-lg">M24</span>
+              <span className="text-orange-600 font-bold text-lg">M24</span>
             </div>
             <div className="hidden md:flex flex-col">
               <span className="text-white font-bold text-sm leading-tight">Montaż Reklam 24</span>
-              <span className="text-blue-100 text-xs">CRM 5.0 PC + MOBILE</span>
+              <span className="text-orange-100 text-xs">CRM 5.0 PC + MOBILE</span>
             </div>
           </div>
         </div>
@@ -55,13 +55,13 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
         {/* Right: View Toggles + User */}
         <div className="flex items-center gap-3">
           {/* PC/Mobile Toggle */}
-          <div className="hidden md:flex bg-blue-500 rounded-lg p-1">
+          <div className="hidden md:flex bg-orange-500 rounded-lg p-1">
             <button
               onClick={() => handleViewToggle('desktop')}
               className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
                 currentView === 'desktop'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-white hover:bg-blue-400'
+                  ? 'bg-white text-orange-600 shadow-sm'
+                  : 'text-white hover:bg-orange-400'
               }`}
             >
               PC
@@ -70,8 +70,8 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
               onClick={() => handleViewToggle('mobile')}
               className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
                 currentView === 'mobile'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-white hover:bg-blue-400'
+                  ? 'bg-white text-orange-600 shadow-sm'
+                  : 'text-white hover:bg-orange-400'
               }`}
             >
               Mobile
@@ -81,7 +81,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
           {/* Trello Classic Button */}
           <button
             onClick={() => window.open('https://trello.com', '_blank')}
-            className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-400 text-white text-xs font-semibold rounded-lg transition-colors"
+            className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-orange-500 hover:bg-orange-400 text-white text-xs font-semibold rounded-lg transition-colors"
           >
             Trello Classic
           </button>
@@ -90,7 +90,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
           <div className="relative">
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-400 text-white text-xs font-semibold rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 bg-orange-500 hover:bg-orange-400 text-white text-xs font-semibold rounded-lg transition-colors"
             >
               <span className="hidden md:inline">
                 ZALOGOWANO JAKO {user?.name || 'Administrator'} {user?.name || 'Admin'}
