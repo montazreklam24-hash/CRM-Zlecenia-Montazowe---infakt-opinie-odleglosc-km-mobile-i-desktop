@@ -165,6 +165,8 @@ const MobileMapView: React.FC<MobileMapViewProps> = ({ jobs, onBack, onOpenJob }
         .on('click', (e) => {
           L.DomEvent.stopPropagation(e);
           setSelectedJob(job);
+          // Centruj mapę na klikniętym zleceniu
+          map.panTo(e.latlng);
         });
       
       markers.push(marker);

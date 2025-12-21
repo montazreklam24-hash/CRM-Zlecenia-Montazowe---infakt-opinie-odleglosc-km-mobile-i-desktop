@@ -453,6 +453,11 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
               const pixel = projection.fromLatLngToContainerPixel(marker.getPosition());
               setPopupPos({ x: pixel.x, y: pixel.y });
               setHoveredJob(job);
+              
+              // Zawsze centrujemy mapę na markerze, żeby dymek był widoczny
+              if (googleMapRef.current) {
+                googleMapRef.current.panTo(marker.getPosition());
+              }
             }
           }
         };

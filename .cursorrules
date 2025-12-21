@@ -34,3 +34,9 @@
 - Gemini: model gemini-1.5-flash
 - Klucze w api/config.php
 
+## Mapy (Google & OSM)
+- ZAWSZE przy kliknięciu lub najechaniu (hover) na marker dymek/karta MUSI zostać wyśrodkowana na mapie.
+- W Google Maps używaj `googleMapRef.current.panTo(marker.getPosition())`.
+- W OSM używaj `autoPan: true` oraz `map.panTo(latlng)`.
+- To kluczowe dla UX na urządzeniach mobilnych i małych ekranach.
+
