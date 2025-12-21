@@ -26,10 +26,10 @@ function createFloatingButton() {
         right: '20px',
         width: '64px',
         height: '64px',
-        backgroundColor: '#2563eb',
+        backgroundColor: '#f97316',
         color: 'white',
         borderRadius: '50%',
-        boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+        boxShadow: '0 4px 15px rgba(249, 115, 22, 0.4)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -133,7 +133,7 @@ function renderSidebar(state) {
                     ✨ Analizuj Maila (AI)
                 </button>
                 
-                <hr class="crm-divider">
+                <hr class="crm-divider" style="margin: 4px 0;">
                 
                 <div class="crm-field">
                     <label>Tytuł</label>
@@ -170,7 +170,7 @@ function renderSidebar(state) {
                     <div id="crm-file-list" class="crm-file-list"></div>
                 </div>
                 
-                <button id="crm-send" class="crm-btn-success crm-full-width" style="margin-top:10px;">
+                <button id="crm-send" class="crm-btn-success crm-full-width" style="margin-top:6px;">
                     🚀 Wyślij do CRM
                 </button>
             </div>
@@ -308,6 +308,95 @@ function renderFileList() {
     });
 }
 
+/**
+ * Pobiera aktualny Message ID z Gmaila używając wielu strategii
+ * Zwraca prawdziwy Message ID (krótkie hex), nie Thread ID ani Legacy ID
+ */
+function getCurrentMessageId() {
+    console.log('[CRM Content] Getting message ID...');
+    
+    // Strategia 1: Sprawdź data-message-id w elementach wiadomości
+    // Gmail używa różnych formatów - szukamy prawdziwego Message ID (krótkie hex, 16-20 znaków)
+    const messageElements = document.querySelectorAll('div[data-message-id], tr[data-message-id]');
+    for (let i = messageElements.length - 1; i >= 0; i--) {
+        const id = messageElements[i].getAttribute('data-message-id');
+        if (id) {
+            // Prawdziwy Message ID to krótki hex (16-20 znaków), nie zaczyna się od FM ani msg-
+            if (id.length >= 16 && id.length <= 20 && !id.startsWith('FM') && !id.startsWith('msg-')) {
+                console.log('[CRM Content] Found Message ID from data-message-id:', id);
+                return id;
+            }
+        }
+    }
+    
+    // Strategia 2: Sprawdź URL hash - może zawierać Message ID
+    const hash = window.location.hash;
+    if (hash) {
+        const hashParts = hash.split('/');
+        for (let part of hashParts) {
+            const cleanId = part.split('?')[0].split('#')[0];
+            // Walidacja: krótki hex, nie Thread ID ani Legacy ID
+            if (cleanId && cleanId.length >= 16 && cleanId.length <= 20 && 
+                !cleanId.startsWith('FM') && !cleanId.startsWith('msg-') &&
+                /^[a-zA-Z0-9_-]+$/.test(cleanId)) {
+                console.log('[CRM Content] Found Message ID from URL hash:', cleanId);
+                return cleanId;
+            }
+        }
+    }
+    
+    // Strategia 3: Sprawdź atrybuty aria-label lub data-legacy-thread-id (może zawierać Message ID w innym formacie)
+    const threadElements = document.querySelectorAll('[data-legacy-thread-id], [aria-label*="message"]');
+    for (let elem of threadElements) {
+        const threadId = elem.getAttribute('data-legacy-thread-id');
+        if (threadId && threadId.length >= 16 && threadId.length <= 20 && 
+            !threadId.startsWith('FM') && !threadId.startsWith('msg-')) {
+            console.log('[CRM Content] Found Message ID from legacy-thread-id:', threadId);
+            return threadId;
+        }
+    }
+    
+    // Strategia 4: Sprawdź elementy z klasą zawierającą "message" - mogą mieć ID w atrybutach
+    const messageDivs = document.querySelectorAll('div[class*="message"], div[class*="Message"]');
+    for (let div of messageDivs) {
+        // Sprawdź wszystkie atrybuty data-*
+        for (let attr of div.attributes) {
+            if (attr.name.startsWith('data-') && attr.value) {
+                const value = attr.value.trim();
+                if (value.length >= 16 && value.length <= 20 && 
+                    !value.startsWith('FM') && !value.startsWith('msg-') &&
+                    /^[a-zA-Z0-9_-]+$/.test(value)) {
+                    console.log('[CRM Content] Found Message ID from data attribute:', value, 'attr:', attr.name);
+                    return value;
+                }
+            }
+        }
+    }
+    
+    // Strategia 5: Fallback - użyj ostatniego data-message-id nawet jeśli wygląda na Thread ID
+    // Background.js spróbuje go rozwiązać
+    if (messageElements.length > 0) {
+        const lastMsg = messageElements[messageElements.length - 1];
+        const fallbackId = lastMsg.getAttribute('data-message-id');
+        if (fallbackId) {
+            console.log('[CRM Content] Using fallback ID (will be resolved by background):', fallbackId);
+            return fallbackId;
+        }
+    }
+    
+    // Strategia 6: Ostatnia deska ratunku - URL hash bez walidacji
+    if (hash) {
+        const urlId = hash.split('/').pop().split('?')[0].split('#')[0];
+        if (urlId && urlId.length > 5) {
+            console.log('[CRM Content] Using ID from URL as last resort:', urlId);
+            return urlId.replace(/[^a-zA-Z0-9_-]/g, '');
+        }
+    }
+    
+    console.warn('[CRM Content] Could not find Message ID');
+    return null;
+}
+
 function setupFormHandlers(content) {
     // 1. ZACZYTAJ
     content.querySelector('#crm-read').onclick = async () => {
@@ -319,20 +408,8 @@ function setupFormHandlers(content) {
         try {
             const bodyText = document.body.innerText.substring(0, 15000); 
             
-            // Pobierz ID
-            let messageId = null;
-            const messageElements = document.querySelectorAll('div[data-message-id]');
-            if (messageElements.length > 0) {
-                const lastMsg = messageElements[messageElements.length - 1];
-                const id = lastMsg.getAttribute('data-message-id');
-                if (id && !id.startsWith('FM')) messageId = id;
-            }
-            if (!messageId) {
-                const urlParts = window.location.hash.split('/');
-                const potentialId = urlParts[urlParts.length - 1].split('?')[0];
-                if (potentialId.length > 5) messageId = potentialId;
-            }
-            
+            // Pobierz ID używając nowej funkcji
+            const messageId = getCurrentMessageId();
             lastMessageId = messageId;
             
             const response = await chrome.runtime.sendMessage({
@@ -376,20 +453,12 @@ function setupFormHandlers(content) {
         const address = document.getElementById('crm-input-address').value;
         const scope = document.getElementById('crm-input-scope').value;
         
-        // ID
-        let messageId = lastMessageId;
-        if (!messageId) {
-             const messageElements = document.querySelectorAll('div[data-message-id]');
-             if (messageElements.length > 0) {
-                 const id = messageElements[messageElements.length - 1].getAttribute('data-message-id');
-                 if (id && !id.startsWith('FM')) messageId = id;
-             }
-             if (!messageId) {
-                 const urlParts = window.location.hash.split('/');
-                 messageId = urlParts[urlParts.length - 1].split('?')[0];
-             }
+        // ID - użyj zapisanego lub pobierz ponownie
+        let messageId = lastMessageId || getCurrentMessageId();
+        // Oczyść ID z nieprawidłowych znaków (zachowaj tylko alfanumeryczne, _, -)
+        if (messageId) {
+            messageId = messageId.replace(/[^a-zA-Z0-9_\-]/g, '');
         }
-        if (messageId) messageId = messageId.replace(/[^a-zA-Z0-9_\-]/g, '');
 
         try {
             const res = await chrome.runtime.sendMessage({
