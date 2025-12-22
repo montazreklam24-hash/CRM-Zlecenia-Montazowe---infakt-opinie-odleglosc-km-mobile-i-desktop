@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PaymentStatus, Invoice } from '../types';
-import { Plus, Trash2, FileText, Send, Download, ExternalLink, Loader2, CheckCircle2, AlertCircle, X } from 'lucide-react';
+import { Plus, Trash2, FileText, Send, Download, ExternalLink, Loader2, CheckCircle2, AlertCircle, X, Receipt } from 'lucide-react';
 import invoiceService, { InvoiceItemData } from '../services/invoiceService';
 
 interface InvoiceModuleProps {
@@ -50,7 +50,7 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
   const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [showBilling, setShowBilling] = useState(false);
+  const [showBilling, setShowBilling] = useState(true); // Domyślnie widoczne
   // Inicjalizuj billing - zawsze używaj głównych danych jako fallback
   const getInitialBilling = () => {
     if (initialBilling && initialBilling.name && initialBilling.name.length > 0) {
@@ -109,34 +109,34 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
                 aNo = streetMatch[3] || '';
               }
 
-              const updatedBilling = {
-                ...billing,
-                name,
-                street: st,
-                buildingNo: bNo,
-                apartmentNo: aNo,
-                city,
-                postCode
-              };
-              
-              setBilling(prev => ({
-                ...prev,
-                ...updatedBilling
-              }));
-              
-              if (onClientDataChange) {
-                onClientDataChange({
-                  companyName: name,
-                  nip: nipStr,
-                  email: billing.email,
-                  phone: phone,
+              setBilling(prev => {
+                const updated = {
+                  ...prev,
+                  name,
                   street: st,
-                  city,
-                  postCode,
                   buildingNo: bNo,
-                  apartmentNo: aNo
-                });
-              }
+                  apartmentNo: aNo,
+                  city,
+                  postCode
+                };
+                
+                // Powiadom rodzica o zmianie
+                if (onClientDataChange) {
+                  onClientDataChange({
+                    companyName: name,
+                    nip: nipStr,
+                    email: prev.email,
+                    phone: phone,
+                    street: st,
+                    city,
+                    postCode,
+                    buildingNo: bNo,
+                    apartmentNo: aNo
+                  });
+                }
+                
+                return updated;
+              });
             }
           } catch (e) {
             console.error('Auto-GUS failed:', e);
@@ -427,23 +427,27 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
           <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200 animate-in fade-in slide-in-from-top-4 duration-300">
             <div className="flex justify-between items-center mb-4">
               <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest">Nowy dokument</h4>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => setShowBilling(!showBilling)}
-                  className={`text-[10px] font-bold px-2 py-1 rounded border transition-colors ${
-                    showBilling ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50'
-                  }`}
-                >
-                  {showBilling ? 'Ukryj dane nabywcy' : 'Edytuj dane nabywcy'}
-                </button>
-                <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+              <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            {showBilling && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6 p-4 bg-white rounded-xl border border-blue-100 shadow-sm">
+            {/* Sekcja danych nabywcy - ZAWSZE WIDOCZNA */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  <Receipt className="w-4 h-4 text-blue-500" /> DANE NABYWCY DO FAKTURY
+                </h5>
+                <button 
+                  onClick={() => setShowBilling(!showBilling)}
+                  className="text-[10px] font-bold px-2 py-1 rounded border transition-colors bg-white text-blue-600 border-blue-200 hover:bg-blue-50"
+                >
+                  {showBilling ? '▼ Zwiń' : '▶ Rozwiń'}
+                </button>
+              </div>
+              
+              {showBilling && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-white rounded-xl border border-blue-100 shadow-sm">
                 <div className="md:col-span-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Nazwa Firmy / Nabywca</label>
                   <input 
@@ -577,9 +581,13 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
                   />
                 </div>
               </div>
-            )}
-            
-            <div className="space-y-3 mb-6">
+              )}
+            </div>
+
+            {/* Sekcja pozycji faktury */}
+            <div className="mb-6">
+              <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">POZYCJE FAKTURY</h5>
+              <div className="space-y-3">
               {items.map((item, idx) => (
                 <div key={idx} className="flex flex-wrap sm:flex-nowrap gap-2 items-start">
                   <div className="flex-1 min-w-[200px]">
@@ -636,6 +644,7 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
               >
                 <Plus className="w-3 h-3" /> Dodaj pozycję
               </button>
+            </div>
             </div>
 
             <div className="flex flex-col sm:flex-row justify-between items-center sm:items-end border-t border-slate-200 pt-4 mb-6 gap-4">
