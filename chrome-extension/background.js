@@ -275,16 +275,33 @@ function extractPhoneFromText(text) {
 
 function extractNipFromText(text) {
   if (!text) return null;
-  const nipRegex = /(?:NIP|VAT)[\s:.-]*((?:PL)?\s*\d{3}[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2})|(\d{3}-\d{3}-\d{2}-\d{2})|(\d{3}-\d{2}-\d{2}-\d{3})/gi;
-  const matches = [...text.matchAll(nipRegex)];
-  for (const match of matches) {
-      const cleaned = match[0].toUpperCase().replace(/[^0-9]/g, '');
+  
+  // Szukaj ciągów cyfr które mogą być NIP-em (różne formaty)
+  // 1. Formaty z myślnikami: 123-456-78-90, 123-45-67-890
+  const dashRegex = /\b\d{3}[-\s]\d{2,3}[-\s]\d{2}[-\s]\d{2,3}\b/g;
+  const dashMatches = text.match(dashRegex) || [];
+  
+  for (const match of dashMatches) {
+      const cleaned = match.replace(/[^0-9]/g, '');
       if (cleaned.length === 10 && isValidNip(cleaned)) return formatNip(cleaned);
   }
-  const digitMatches = text.match(/\b\d{10}\b/g) || [];
+  
+  // 2. Szukaj 10 cyfr pod rząd (może być z przedrostkiem NIP)
+  const digitRegex = /\b\d{10}\b/g;
+  const digitMatches = text.match(digitRegex) || [];
+  
   for (const digits of digitMatches) {
       if (isValidNip(digits)) return formatNip(digits);
   }
+  
+  // 3. Ostateczność: szukaj czegokolwiek po słowie NIP
+  const nipPrefixRegex = /(?:NIP|VAT)[\s:.-]*([0-9\-\s]{10,15})/gi;
+  const prefixMatches = [...text.matchAll(nipPrefixRegex)];
+  for (const match of prefixMatches) {
+      const cleaned = match[1].replace(/[^0-9]/g, '');
+      if (cleaned.length === 10 && isValidNip(cleaned)) return formatNip(cleaned);
+  }
+  
   return null;
 }
 
@@ -311,9 +328,10 @@ async function analyzeEmail(emailData) {
       if (threadContent) contextBody = emailData.body + "\n\n=== PEŁNA HISTORIA ===\n" + threadContent;
   }
   
-  const fromEmail = emailData.fromEmail || emailData.from || null;
-  const parts = [{ text: `Jesteś asystentem CRM. Wyciągnij dane klienta z maila i historii wątku.
+  const parts = [{ text: `Jesteś asystentem CRM. Wyciągnij dane klienta WYŁĄCZNIE na podstawie poniższego maila i historii wątku.
 - Telefon, Email klienta (IGNORUJ FIRMOWE), Firma, NIP, Imię, Adres montażu, Zakres prac, Tytuł.
+- KRYTYCZNE: Używaj TYLKO danych tekstowych z maila. NIE zmyślaj NIP-u ani telefonu, jeśli go nie ma.
+- KRYTYCZNE: Jeśli w stopce jest podany NIP (np. NIP 526-10-16-043), przepisz go DOKŁADNIE tak jak jest. NIE używaj swojej wiedzy o firmach do podstawiania innych numerów.
 - Używaj "oklejanie witryn" zamiast "montaż witryn".
 
 Mail:
@@ -342,8 +360,30 @@ Odpowiedz TYLKO JSON: { "phone": "...", "email": "...", "companyName": "...", "n
     const resData = await response.json();
     const parsed = JSON.parse(resData.candidates[0].content.parts[0].text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
     
-    if (!parsed.phone || parsed.phone === 'null') parsed.phone = extractPhoneFromText(contextBody);
-    if (!parsed.nip || parsed.nip === 'null') parsed.nip = extractNipFromText(contextBody);
+    // Walidacja NIP i Telefonu (AI lubi zmyślać na podstawie nazwy firmy)
+    const bodyDigitsOnly = contextBody.replace(/[^0-9]/g, '');
+    
+    if (parsed.nip && parsed.nip !== 'null') {
+        const nipDigits = parsed.nip.replace(/[^0-9]/g, '');
+        // Jeśli NIP-u od AI nie ma w tekście maila, spróbuj regex
+        if (!bodyDigitsOnly.includes(nipDigits)) {
+            const realNip = extractNipFromText(contextBody);
+            if (realNip) parsed.nip = realNip;
+        }
+    } else {
+        parsed.nip = extractNipFromText(contextBody);
+    }
+
+    if (parsed.phone && parsed.phone !== 'null') {
+        const phoneDigits = parsed.phone.replace(/[^0-9]/g, '');
+        // Jeśli telefonu od AI nie ma w tekście maila (min. 7 cyfr), spróbuj regex
+        if (phoneDigits.length >= 7 && !bodyDigitsOnly.includes(phoneDigits)) {
+            const realPhone = extractPhoneFromText(contextBody);
+            if (realPhone) parsed.phone = realPhone;
+        }
+    } else {
+        parsed.phone = extractPhoneFromText(contextBody);
+    }
     if (parsed.email && isCompanyEmail(parsed.email)) parsed.email = null;
     if (!parsed.email || parsed.email === 'null') {
         const foundEmails = contextBody.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/gi) || [];
