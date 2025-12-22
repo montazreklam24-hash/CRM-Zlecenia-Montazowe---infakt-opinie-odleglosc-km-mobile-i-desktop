@@ -73,31 +73,34 @@ function googleApiGetRaw(string $url, string $token): array {
 }
 
 // UPROSZCZONA WERSJA - Zawsze zbiera WSZYSTKIE załączniki (z deduplikacją)
-// $seenFilenames to zbiór już zebranych nazw plików, żeby uniknąć duplikatów z różnych wiadomości w wątku
-function collectAttachmentsFromPart(array $part, string $messageId, array &$out, array &$seenFilenames): void {
+// $seenFiles to zbiór już zebranych plików (klucz: nazwa+rozmiar), żeby uniknąć duplikatów z różnych wiadomości w wątku
+function collectAttachmentsFromPart(array $part, string $messageId, array &$out, array &$seenFiles): void {
   $mimeType = $part['mimeType'] ?? '';
   $filename = $part['filename'] ?? '';
   $body = $part['body'] ?? [];
   $attachmentId = $body['attachmentId'] ?? null;
+  $fileSize = $body['size'] ?? 0; // Rozmiar pliku z Gmail API
   $inlineData = $body['data'] ?? null;
 
   // Załącznik z ID (typowy przypadek)
   if ($attachmentId) {
     $isInlineImage = (strpos($mimeType, 'image/') === 0);
     if ($filename || $isInlineImage) {
-      // DEDUPLIKACJA: Sprawdź czy już mamy plik o tej nazwie
-      $filenameKey = strtolower($filename ?: 'inline_' . substr($attachmentId, 0, 16));
-      if (isset($seenFilenames[$filenameKey])) {
-        debugImport("SKIPPING DUPLICATE: $filename (already collected from another message)");
+      // DEDUPLIKACJA: Sprawdź czy już mamy plik o tej nazwie I rozmiarze
+      // Klucz = nazwa (lowercase) + rozmiar - dzięki temu różne wersje pliku (inny rozmiar) zostaną pobrane
+      $fileKey = strtolower($filename ?: 'inline_' . substr($attachmentId, 0, 16)) . '_' . $fileSize;
+      if (isset($seenFiles[$fileKey])) {
+        debugImport("SKIPPING DUPLICATE: $filename ({$fileSize} bytes) - already collected from another message");
       } else {
-        debugImport("Collecting: $filename (mime: $mimeType)");
-        $seenFilenames[$filenameKey] = true;
+        debugImport("Collecting: $filename (mime: $mimeType, size: {$fileSize} bytes)");
+        $seenFiles[$fileKey] = true;
         $out[] = [
           'messageId' => $messageId,
           'attachmentId' => (string)$attachmentId,
           'filename' => $filename,
           'mimeType' => $mimeType,
-          'isInline' => $isInlineImage
+          'isInline' => $isInlineImage,
+          'size' => $fileSize
         ];
       }
     }
@@ -106,16 +109,18 @@ function collectAttachmentsFromPart(array $part, string $messageId, array &$out,
   // Inline obraz bez ID (rzadko)
   if (!$attachmentId && $inlineData && strpos($mimeType, 'image/') === 0) {
     $inlineFilename = $filename ?: ('inline_' . substr(md5($inlineData), 0, 8) . '.png');
-    $filenameKey = strtolower($inlineFilename);
-    if (!isset($seenFilenames[$filenameKey])) {
-      $seenFilenames[$filenameKey] = true;
+    $inlineSize = strlen($inlineData); // Rozmiar danych base64
+    $fileKey = strtolower($inlineFilename) . '_' . $inlineSize;
+    if (!isset($seenFiles[$fileKey])) {
+      $seenFiles[$fileKey] = true;
       $out[] = [
         'messageId' => $messageId,
         'attachmentId' => null,
         'filename' => $inlineFilename,
         'mimeType' => $mimeType,
         'isInline' => true,
-        'inlineData' => $inlineData
+        'inlineData' => $inlineData,
+        'size' => $inlineSize
       ];
     }
   }
@@ -128,12 +133,12 @@ function collectAttachmentsFromPart(array $part, string $messageId, array &$out,
   }
 }
 
-function collectAttachmentsFromMessage(array $message, array &$out, array &$seenFilenames): void {
+function collectAttachmentsFromMessage(array $message, array &$out, array &$seenFiles): void {
   $messageId = $message['id'] ?? '';
   if (!$messageId) return;
   $payload = $message['payload'] ?? null;
   if (!$payload || !is_array($payload)) return;
-  collectAttachmentsFromPart($payload, $messageId, $out, $seenFilenames);
+  collectAttachmentsFromPart($payload, $messageId, $out, $seenFiles);
 }
 
 try {
@@ -164,12 +169,12 @@ try {
   
   debugImport("Thread fetched. Messages count: " . count($threadRes['json']['messages'] ?? []));
   
-  // KROK 3: Zbierz załączniki ze WSZYSTKICH wiadomości w wątku (z deduplikacją)
-  $seenFilenames = []; // Śledzenie już zebranych plików - zapobiega duplikatom z różnych wiadomości
+  // KROK 3: Zbierz załączniki ze WSZYSTKICH wiadomości w wątku (z deduplikacją po nazwie+rozmiarze)
+  $seenFiles = []; // Śledzenie już zebranych plików (klucz: nazwa_rozmiar) - zapobiega duplikatom z różnych wiadomości
   foreach ($threadRes['json']['messages'] as $msg) {
       if (is_array($msg)) {
           debugImport("Scanning message: " . ($msg['id'] ?? 'unknown'));
-          collectAttachmentsFromMessage($msg, $attachmentsMeta, $seenFilenames);
+          collectAttachmentsFromMessage($msg, $attachmentsMeta, $seenFiles);
       }
   }
 
