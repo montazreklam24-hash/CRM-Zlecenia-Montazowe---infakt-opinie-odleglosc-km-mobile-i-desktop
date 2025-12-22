@@ -827,7 +827,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
       )}
 
       {/* Nav Bar */}
-      <div className="flex justify-between items-center mb-4 sticky top-16 z-30 py-3 bg-slate-100/90 backdrop-blur-sm border-b border-slate-200/50">
+      <div className="flex justify-between items-center mb-4 sticky top-0 z-30 py-3 bg-slate-100/90 backdrop-blur-sm border-b border-slate-200/50">
         <button onClick={onBack} className="flex items-center text-slate-700 font-bold bg-white px-4 py-2.5 rounded-xl shadow-sm hover:shadow border border-slate-200 transition-all">
           <ArrowLeft className="w-4 h-4 mr-2" /> Wróć
         </button>

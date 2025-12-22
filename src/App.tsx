@@ -221,7 +221,7 @@ const App: React.FC = () => {
 
       {/* GLOBAL MODALS (Overlay) */}
       {state.activeModal !== 'NONE' && (
-        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto">
           <div className="relative w-full max-w-7xl bg-white rounded-2xl shadow-2xl my-8">
             <button 
               onClick={closeModal}

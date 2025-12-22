@@ -133,7 +133,13 @@ function handleCreateProforma() {
         // Zapisz w bazie (opcjonalnie)
         $jobId = isset($input['jobId']) ? $input['jobId'] : null;
         if ($jobId) {
-            saveInvoiceToDb($jobId, $invoice, 'proforma', $clientId);
+            saveInvoiceToDb($jobId, array(
+                'id' => $invoice['id'],
+                'number' => $invoice['number'],
+                'total_net' => isset($invoice['net_price']) ? $invoice['net_price'] / 100 : 0,
+                'total_gross' => isset($invoice['gross_price']) ? $invoice['gross_price'] / 100 : 0,
+                'share_link' => $shareLink
+            ), 'proforma', $clientId);
         }
         
         jsonResponse(array(
@@ -242,7 +248,14 @@ function handleCreateInvoice() {
         // Zapisz w bazie
         $jobId = isset($input['jobId']) ? $input['jobId'] : null;
         if ($jobId) {
-            saveInvoiceToDb($jobId, $invoice, 'vat', $clientId);
+            saveInvoiceToDb($jobId, array(
+                'id' => $invoice['id'],
+                'number' => $invoice['number'],
+                'total_net' => isset($invoice['net_price']) ? $invoice['net_price'] / 100 : 0,
+                'total_gross' => isset($invoice['gross_price']) ? $invoice['gross_price'] / 100 : 0,
+                'share_link' => $shareLink,
+                'status' => $markPaid ? 'paid' : 'pending'
+            ), 'vat', $clientId);
         }
         
         jsonResponse(array(
@@ -394,8 +407,11 @@ function saveInvoiceToDb($jobId, $invoiceData, $type, $clientId) {
         ");
         
         $stmt = $pdo->prepare("
-            INSERT INTO invoices (job_id, infakt_id, infakt_number, type, client_id, created_at)
-            VALUES (?, ?, ?, ?, ?, NOW())
+            INSERT INTO invoices (
+                job_id, infakt_id, infakt_number, type, client_id, 
+                total_net, total_gross, status, share_link, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
         
         $stmt->execute(array(
@@ -403,7 +419,11 @@ function saveInvoiceToDb($jobId, $invoiceData, $type, $clientId) {
             $invoiceData['id'],
             isset($invoiceData['number']) ? $invoiceData['number'] : null,
             $type,
-            $clientId
+            $clientId,
+            isset($invoiceData['total_net']) ? $invoiceData['total_net'] : 0,
+            isset($invoiceData['total_gross']) ? $invoiceData['total_gross'] : 0,
+            isset($invoiceData['status']) ? $invoiceData['status'] : 'pending',
+            isset($invoiceData['share_link']) ? $invoiceData['share_link'] : null
         ));
         
         return $pdo->lastInsertId();
@@ -474,7 +494,26 @@ function handleGetJobInvoices($jobId) {
         $stmt->execute(array($jobId));
         $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        jsonResponse(array('success' => true, 'invoices' => $invoices));
+        $mapped = array();
+        foreach ($invoices as $inv) {
+            $mapped[] = array(
+                'id' => intval($inv['id']),
+                'jobId' => $inv['job_id'],
+                'infaktId' => intval($inv['infakt_id']),
+                'infakt_number' => $inv['infakt_number'], // keep both for safety
+                'infaktNumber' => $inv['infakt_number'],
+                'type' => $inv['type'],
+                'clientId' => intval($inv['client_id']),
+                'totalNet' => floatval($inv['total_net']),
+                'totalGross' => floatval($inv['total_gross']),
+                'status' => $inv['status'],
+                'share_link' => $inv['share_link'],
+                'shareLink' => $inv['share_link'],
+                'created_at' => $inv['created_at']
+            );
+        }
+        
+        jsonResponse(array('success' => true, 'invoices' => $mapped));
     } catch (Exception $e) {
         // Tabela może nie istnieć - zwróć pustą listę
         jsonResponse(array('success' => true, 'invoices' => array()));

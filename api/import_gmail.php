@@ -25,6 +25,7 @@ function debugImport($msg) {
 $input = json_decode(file_get_contents('php://input'), true);
 $id = $input['messageId'] ?? $input['id'] ?? null;
 $token = $input['token'] ?? null;
+$selectedIds = $input['selectedIds'] ?? null; // Lista ID załączników do pobrania
 
 if (!$id || !$token) {
   http_response_code(400);
@@ -67,7 +68,7 @@ function googleApiGetRaw(string $url, string $token): array {
   return ['ok' => ($httpCode >= 200 && $httpCode < 300), 'code' => $httpCode, 'error' => null, 'json' => $json];
 }
 
-function collectAttachmentsFromPart(array $part, string $messageId, array &$out): void {
+function collectAttachmentsFromPart(array $part, string $messageId, array &$out, $selectedIds = null): void {
   $mimeType = $part['mimeType'] ?? '';
   $filename = $part['filename'] ?? '';
   $body = $part['body'] ?? [];
@@ -78,42 +79,53 @@ function collectAttachmentsFromPart(array $part, string $messageId, array &$out)
   debugImport("Part: Mime=$mimeType, File=$filename, AttId=" . ($attachmentId ? 'YES' : 'NO') . ", Data=" . ($inlineData ? 'YES' : 'NO'));
 
   if ($attachmentId) {
-    $isInlineImage = (strpos($mimeType, 'image/') === 0);
-    if ($filename || $isInlineImage) {
-      $out[] = [
-        'messageId' => $messageId,
-        'attachmentId' => $attachmentId,
-        'filename' => $filename,
-        'mimeType' => $mimeType,
-        'isInline' => $isInlineImage
-      ];
+    // Jeśli podano wybrane ID, sprawdź czy ten załącznik jest na liście
+    if ($selectedIds !== null && !in_array($attachmentId, $selectedIds)) {
+        debugImport("Skipping attachment $attachmentId (not selected)");
+    } else {
+        $isInlineImage = (strpos($mimeType, 'image/') === 0);
+        if ($filename || $isInlineImage) {
+          $out[] = [
+            'messageId' => $messageId,
+            'attachmentId' => $attachmentId,
+            'filename' => $filename,
+            'mimeType' => $mimeType,
+            'isInline' => $isInlineImage
+          ];
+        }
     }
   }
 
   if (!$attachmentId && $inlineData && strpos($mimeType, 'image/') === 0) {
-    $out[] = [
-      'messageId' => $messageId,
-      'attachmentId' => null,
-      'filename' => $filename ?: ('inline_' . substr(md5($inlineData), 0, 8) . '.png'),
-      'mimeType' => $mimeType,
-      'isInline' => true,
-      'inlineData' => $inlineData
-    ];
+    // Dla inline data (bez ID), na razie pozwalamy jeśli nie ma wyboru lub jeśli to logo? 
+    // W sumie user chce wybierać WSZYSTKO co jest załącznikiem.
+    // Jeśli selectedIds jest podane, a ten inline nie ma ID, to go pomijamy?
+    // Zwykle inline mają attachmentId w Gmail API.
+    if ($selectedIds === null) {
+        $out[] = [
+          'messageId' => $messageId,
+          'attachmentId' => null,
+          'filename' => $filename ?: ('inline_' . substr(md5($inlineData), 0, 8) . '.png'),
+          'mimeType' => $mimeType,
+          'isInline' => true,
+          'inlineData' => $inlineData
+        ];
+    }
   }
 
   if (!empty($part['parts']) && is_array($part['parts'])) {
     foreach ($part['parts'] as $sub) {
-      if (is_array($sub)) collectAttachmentsFromPart($sub, $messageId, $out);
+      if (is_array($sub)) collectAttachmentsFromPart($sub, $messageId, $out, $selectedIds);
     }
   }
 }
 
-function collectAttachmentsFromMessage(array $message, array &$out): void {
+function collectAttachmentsFromMessage(array $message, array &$out, $selectedIds = null): void {
   $messageId = $message['id'] ?? '';
   if (!$messageId) return;
   $payload = $message['payload'] ?? null;
   if (!$payload || !is_array($payload)) return;
-  collectAttachmentsFromPart($payload, $messageId, $out);
+  collectAttachmentsFromPart($payload, $messageId, $out, $selectedIds);
 }
 
 try {
@@ -135,7 +147,7 @@ try {
       
       debugImport("Resolved directly as Thread");
       foreach ($threadRes['json']['messages'] as $msg) {
-          if (is_array($msg)) collectAttachmentsFromMessage($msg, $attachmentsMeta);
+          if (is_array($msg)) collectAttachmentsFromMessage($msg, $attachmentsMeta, $selectedIds);
       }
   } else {
       // Mamy wiadomość, pobieramy threadId
@@ -150,16 +162,16 @@ try {
           if ($threadRes['ok'] && !empty($threadRes['json']['messages'])) {
               debugImport("Fetched full thread with " . count($threadRes['json']['messages']) . " messages");
               foreach ($threadRes['json']['messages'] as $msg) {
-                  if (is_array($msg)) collectAttachmentsFromMessage($msg, $attachmentsMeta);
+                  if (is_array($msg)) collectAttachmentsFromMessage($msg, $attachmentsMeta, $selectedIds);
               }
           } else {
               // Fallback: tylko ta wiadomość
               debugImport("Failed to fetch thread, using single message");
-              collectAttachmentsFromMessage($msgRes['json'], $attachmentsMeta);
+              collectAttachmentsFromMessage($msgRes['json'], $attachmentsMeta, $selectedIds);
           }
       } else {
           // Brak threadId, tylko ta wiadomość
-          collectAttachmentsFromMessage($msgRes['json'], $attachmentsMeta);
+          collectAttachmentsFromMessage($msgRes['json'], $attachmentsMeta, $selectedIds);
       }
   }
 

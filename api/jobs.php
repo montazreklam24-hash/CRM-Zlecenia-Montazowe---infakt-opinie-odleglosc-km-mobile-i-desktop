@@ -117,6 +117,44 @@ function createJob() {
         // Generuj friendly ID
         $friendlyId = generateFriendlyId();
 
+        // ZNAJDŹ LUB UTWÓRZ KLIENTA
+        $clientId = null;
+        $nip = isset($data['nip']) ? preg_replace('/[^0-9]/', '', $data['nip']) : null;
+        $email = isset($data['email']) ? trim($data['email']) : null;
+        
+        if ($nip && strlen($nip) === 10) {
+            $stmt = $pdo->prepare('SELECT id FROM clients WHERE nip = ?');
+            $stmt->execute([$nip]);
+            $client = $stmt->fetch();
+            if ($client) $clientId = $client['id'];
+        }
+        
+        if (!$clientId && $email) {
+            $stmt = $pdo->prepare('SELECT id FROM clients WHERE email = ?');
+            $stmt->execute([$email]);
+            $client = $stmt->fetch();
+            if ($client) $clientId = $client['id'];
+        }
+
+        // Jeśli nadal brak clientId, a mamy dane - utwórz klienta
+        if (!$clientId && (isset($data['clientName']) || isset($data['companyName']))) {
+            try {
+                $cName = isset($data['clientName']) ? $data['clientName'] : $data['companyName'];
+                $stmt = $pdo->prepare('INSERT INTO clients (company_name, email, phone, nip, created_by) VALUES (?, ?, ?, ?, ?)');
+                $stmt->execute([
+                    $cName,
+                    $email,
+                    isset($data['phoneNumber']) ? $data['phoneNumber'] : (isset($data['phone']) ? $data['phone'] : null),
+                    $nip,
+                    $user['id']
+                ]);
+                $clientId = $pdo->lastInsertId();
+            } catch (Exception $e) {
+                // Ignoruj błąd tworzenia klienta, nie przerywaj tworzenia zlecenia
+                error_log("Failed to auto-create client: " . $e->getMessage());
+            }
+        }
+
         // SPRAWDZANIE DUPLIKATÓW
         $gmailMessageId = isset($data['gmailMessageId']) ? $data['gmailMessageId'] : null;
         $gmailThreadId = isset($data['gmailThreadId']) ? $data['gmailThreadId'] : null;
@@ -145,11 +183,11 @@ function createJob() {
         // INSERT
         $stmt = $pdo->prepare('
             INSERT INTO jobs_ai (
-                friendly_id, title, client_name, phone, email, nip,
+                friendly_id, title, client_id, client_name, phone, email, nip,
                 address, coordinates_lat, coordinates_lng,
                 description, notes, status, column_id, column_order, created_by,
                 gmail_message_id, gmail_thread_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ');
         
         $phone = null;
@@ -173,6 +211,7 @@ function createJob() {
         $stmt->execute(array(
             $friendlyId,
             $title,
+            $clientId,
             isset($data['clientName']) ? $data['clientName'] : null,
             $phone,
             isset($data['email']) ? $data['email'] : null,
