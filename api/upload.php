@@ -8,11 +8,26 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/images.php'; // For generateThumbnail
 
+// DEBUG: Loguj każdy request
+function debugUpload($msg) {
+    $logDir = __DIR__ . '/logs';
+    if (!is_dir($logDir)) mkdir($logDir, 0777, true);
+    file_put_contents($logDir . '/upload_debug.log', date('Y-m-d H:i:s') . " | " . $msg . "\n", FILE_APPEND);
+}
+
+debugUpload("=== NEW UPLOAD REQUEST ===");
+debugUpload("Method: " . $_SERVER['REQUEST_METHOD']);
+debugUpload("Content-Type: " . ($_SERVER['CONTENT_TYPE'] ?? 'NONE'));
+debugUpload("Content-Length: " . ($_SERVER['CONTENT_LENGTH'] ?? 'NONE'));
+debugUpload("FILES keys: " . json_encode(array_keys($_FILES)));
+debugUpload("POST keys: " . json_encode(array_keys($_POST)));
+
 // Obsługa CORS
 handleCORS();
 
 // Wymagana autoryzacja
 $user = requireAuth();
+debugUpload("Auth OK, user: " . ($user['email'] ?? 'unknown'));
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonResponse(array('error' => 'Method not allowed'), 405);
@@ -20,8 +35,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 // Sprawdź czy przesłano plik
 if (!isset($_FILES['file'])) {
+    debugUpload("ERROR: No file in FILES array. Full FILES: " . json_encode($_FILES));
+    debugUpload("Full POST: " . json_encode($_POST));
     jsonResponse(array('error' => 'No file uploaded'), 400);
 }
+
+debugUpload("File received: " . $_FILES['file']['name'] . " (size: " . $_FILES['file']['size'] . ", error: " . $_FILES['file']['error'] . ")");
 
 $file = $_FILES['file'];
 
