@@ -128,7 +128,7 @@ function collectAttachmentsFromPart(array $part, string $messageId, array &$out,
   // Rekurencja do pod-części
   if (!empty($part['parts']) && is_array($part['parts'])) {
     foreach ($part['parts'] as $sub) {
-      if (is_array($sub)) collectAttachmentsFromPart($sub, $messageId, $out, $seenFilenames);
+      if (is_array($sub)) collectAttachmentsFromPart($sub, $messageId, $out, $seenFiles);
     }
   }
 }
