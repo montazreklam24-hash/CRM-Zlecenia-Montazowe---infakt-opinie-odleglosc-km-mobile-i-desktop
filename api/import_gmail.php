@@ -27,6 +27,12 @@ $id = $input['messageId'] ?? $input['id'] ?? null;
 $token = $input['token'] ?? null;
 $selectedIds = $input['selectedIds'] ?? null; // Lista ID załączników do pobrania
 
+// Log input parameters (without token)
+debugImport("INPUT params: ID=$id, SelectedIds count=" . ($selectedIds ? count($selectedIds) : 'NULL'));
+if ($selectedIds) {
+    debugImport("Selected IDs sample: " . substr(json_encode(array_slice($selectedIds, 0, 3)), 0, 200));
+}
+
 if (!$id || !$token) {
   http_response_code(400);
   echo json_encode(['success' => false, 'error' => 'Missing messageId/id or token']);
@@ -75,8 +81,10 @@ function collectAttachmentsFromPart(array $part, string $messageId, array &$out,
   $attachmentId = $body['attachmentId'] ?? null;
   $inlineData = $body['data'] ?? null;
   
-  // DEBUG: Log structure
-  debugImport("Part: Mime=$mimeType, File=$filename, AttId=" . ($attachmentId ? 'YES' : 'NO') . ", Data=" . ($inlineData ? 'YES' : 'NO'));
+  // DEBUG: Log structure only if interesting
+  if ($attachmentId || $inlineData) {
+      debugImport("Part: Mime=$mimeType, File=$filename, AttId=" . ($attachmentId ? 'YES' : 'NO') . ", Data=" . ($inlineData ? 'YES' : 'NO'));
+  }
 
   if ($attachmentId) {
     // Jeśli podano wybrane ID, sprawdź czy ten załącznik jest na liście
@@ -85,6 +93,7 @@ function collectAttachmentsFromPart(array $part, string $messageId, array &$out,
     } else {
         $isInlineImage = (strpos($mimeType, 'image/') === 0);
         if ($filename || $isInlineImage) {
+          debugImport("Collecting attachment: $filename ($attachmentId)");
           $out[] = [
             'messageId' => $messageId,
             'attachmentId' => $attachmentId,
@@ -178,8 +187,10 @@ try {
   debugImport("Found " . count($attachmentsMeta) . " attachment(s) in meta");
 
   if (count($attachmentsMeta) === 0) {
-      debugImport("WARNING: No attachments found. Dumping message structure:");
-      debugImport(json_encode($msgRes['json'], JSON_PRETTY_PRINT));
+      debugImport("WARNING: No attachments found. Dumping message structure (SAMPLE):");
+      // Dump only part of json to avoid huge logs
+      $jsonStr = json_encode($msgRes['json'], JSON_PRETTY_PRINT);
+      debugImport(substr($jsonStr, 0, 2000) . "...");
   }
 
   // 3) Pobierz pliki
