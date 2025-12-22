@@ -133,6 +133,8 @@ function handleCreateProforma() {
         // Zapisz w bazie (opcjonalnie)
         $jobId = isset($input['jobId']) ? $input['jobId'] : null;
         if ($jobId) {
+            $pdo = getDB();
+            createInvoicesTable($pdo);
             saveInvoiceToDb($jobId, array(
                 'id' => $invoice['id'],
                 'number' => $invoice['number'],
@@ -248,6 +250,8 @@ function handleCreateInvoice() {
         // Zapisz w bazie
         $jobId = isset($input['jobId']) ? $input['jobId'] : null;
         if ($jobId) {
+            $pdo = getDB();
+            createInvoicesTable($pdo);
             saveInvoiceToDb($jobId, array(
                 'id' => $invoice['id'],
                 'number' => $invoice['number'],
@@ -386,25 +390,12 @@ function handleMarkAsPaid() {
  * Zapisz fakturę do lokalnej bazy danych
  */
 function saveInvoiceToDb($jobId, $invoiceData, $type, $clientId) {
+    $logFile = __DIR__ . '/logs/invoice_debug.log';
+    $msg = date('Y-m-d H:i:s') . " Attempting to save invoice: job=$jobId, infakt_id=" . $invoiceData['id'] . "\n";
+    file_put_contents($logFile, $msg, FILE_APPEND);
+
     try {
         $pdo = getDB();
-        
-        // Sprawdź czy tabela istnieje, jeśli nie - utwórz
-        $pdo->exec("
-            CREATE TABLE IF NOT EXISTS invoices (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                job_id VARCHAR(50),
-                infakt_id INT,
-                infakt_number VARCHAR(50),
-                type ENUM('proforma', 'vat') DEFAULT 'proforma',
-                client_id INT,
-                total_net DECIMAL(10,2),
-                total_gross DECIMAL(10,2),
-                status ENUM('pending', 'paid', 'cancelled') DEFAULT 'pending',
-                share_link VARCHAR(255),
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        ");
         
         $stmt = $pdo->prepare("
             INSERT INTO invoices (
@@ -414,21 +405,28 @@ function saveInvoiceToDb($jobId, $invoiceData, $type, $clientId) {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
         
-        $stmt->execute(array(
-            $jobId,
-            $invoiceData['id'],
+        $res = $stmt->execute(array(
+            (string)$jobId,
+            (int)$invoiceData['id'],
             isset($invoiceData['number']) ? $invoiceData['number'] : null,
             $type,
-            $clientId,
-            isset($invoiceData['total_net']) ? $invoiceData['total_net'] : 0,
-            isset($invoiceData['total_gross']) ? $invoiceData['total_gross'] : 0,
+            (int)$clientId,
+            isset($invoiceData['total_net']) ? (float)$invoiceData['total_net'] : 0,
+            isset($invoiceData['total_gross']) ? (float)$invoiceData['total_gross'] : 0,
             isset($invoiceData['status']) ? $invoiceData['status'] : 'pending',
             isset($invoiceData['share_link']) ? $invoiceData['share_link'] : null
         ));
         
+        if (!$res) {
+            $err = $stmt->errorInfo();
+            file_put_contents($logFile, "DB ERROR: " . json_encode($err) . "\n", FILE_APPEND);
+        } else {
+            file_put_contents($logFile, "SUCCESS: ID=" . $pdo->lastInsertId() . "\n", FILE_APPEND);
+        }
+        
         return $pdo->lastInsertId();
     } catch (Exception $e) {
-        error_log('Save invoice to DB error: ' . $e->getMessage());
+        file_put_contents($logFile, "EXCEPTION: " . $e->getMessage() . "\n", FILE_APPEND);
         return null;
     }
 }
@@ -477,7 +475,6 @@ function handleCheckStatus($invoiceId) {
 }
 
 /**
- * GET /api/invoices/job/{jobId}
  * Pobierz faktury dla zlecenia
  */
 function handleGetJobInvoices($jobId) {
@@ -485,6 +482,9 @@ function handleGetJobInvoices($jobId) {
     
     try {
         $pdo = getDB();
+        
+        // Upewnij się że tabela istnieje
+        createInvoicesTable($pdo);
         
         $stmt = $pdo->prepare("
             SELECT * FROM invoices 
@@ -500,24 +500,43 @@ function handleGetJobInvoices($jobId) {
                 'id' => intval($inv['id']),
                 'jobId' => $inv['job_id'],
                 'infaktId' => intval($inv['infakt_id']),
-                'infakt_number' => $inv['infakt_number'], // keep both for safety
                 'infaktNumber' => $inv['infakt_number'],
                 'type' => $inv['type'],
                 'clientId' => intval($inv['client_id']),
                 'totalNet' => floatval($inv['total_net']),
                 'totalGross' => floatval($inv['total_gross']),
                 'status' => $inv['status'],
-                'share_link' => $inv['share_link'],
                 'shareLink' => $inv['share_link'],
-                'created_at' => $inv['created_at']
+                'createdAt' => $inv['created_at']
             );
         }
         
         jsonResponse(array('success' => true, 'invoices' => $mapped));
     } catch (Exception $e) {
-        // Tabela może nie istnieć - zwróć pustą listę
+        error_log('Get job invoices error: ' . $e->getMessage());
         jsonResponse(array('success' => true, 'invoices' => array()));
     }
+}
+
+/**
+ * Helper do tworzenia tabeli invoices
+ */
+function createInvoicesTable($pdo) {
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS invoices (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            job_id VARCHAR(50),
+            infakt_id INT,
+            infakt_number VARCHAR(50),
+            type ENUM('proforma', 'vat') DEFAULT 'proforma',
+            client_id INT,
+            total_net DECIMAL(10,2),
+            total_gross DECIMAL(10,2),
+            status ENUM('pending', 'paid', 'cancelled') DEFAULT 'pending',
+            share_link VARCHAR(255),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
 }
 
 // =============================================================================
@@ -534,6 +553,9 @@ function handleGetAllInvoices() {
     try {
         $pdo = getDB();
         
+        // Upewnij się że tabela istnieje
+        createInvoicesTable($pdo);
+        
         // Pobierz parametry filtrowania (opcjonalnie)
         $type = isset($_GET['type']) ? $_GET['type'] : null;
         $status = isset($_GET['status']) ? $_GET['status'] : null;
@@ -546,7 +568,7 @@ function handleGetAllInvoices() {
         ";
         $params = array();
         
-        if ($type) {
+        if ($type && $type !== 'all') {
             $query .= " AND i.type = ?";
             $params[] = $type;
         }
@@ -556,18 +578,20 @@ function handleGetAllInvoices() {
             $params[] = $status;
         }
         
-        $query .= " ORDER BY i.created_at DESC";
+        $query .= " ORDER BY i.created_at DESC LIMIT 100";
         
         $stmt = $pdo->prepare($query);
         $stmt->execute($params);
         $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        error_log("[invoices] Found " . count($invoices) . " invoices in DB");
         
         $mapped = array();
         foreach ($invoices as $inv) {
             $mapped[] = array(
                 'id' => intval($inv['id']),
                 'jobId' => $inv['job_id'],
-                'jobTitle' => $inv['job_title'],
+                'jobTitle' => $inv['job_title'] ? $inv['job_title'] : 'Zlecenie #' . $inv['job_id'],
                 'jobFriendlyId' => $inv['job_friendly_id'],
                 'infaktId' => intval($inv['infakt_id']),
                 'infaktNumber' => $inv['infakt_number'],
@@ -583,6 +607,7 @@ function handleGetAllInvoices() {
         
         jsonResponse(array('success' => true, 'invoices' => $mapped));
     } catch (Exception $e) {
+        error_log('[invoices] Error in handleGetAllInvoices: ' . $e->getMessage());
         jsonResponse(array('success' => true, 'invoices' => array(), 'error' => $e->getMessage()));
     }
 }

@@ -110,6 +110,54 @@ switch ($endpoint) {
     case '':
     case 'status':
     case 'ping':
+        // Uruchom migrację tabeli faktur przy okazji statusu
+        try {
+            $pdo = getDB();
+            
+            // Sprawdź czy tabela istnieje
+            $tableExists = $pdo->query("SHOW TABLES LIKE 'invoices'")->rowCount() > 0;
+            
+            if (!$tableExists) {
+                $pdo->exec("CREATE TABLE invoices (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    job_id VARCHAR(50),
+                    infakt_id INT,
+                    infakt_number VARCHAR(50),
+                    type ENUM('proforma', 'vat') DEFAULT 'proforma',
+                    client_id INT,
+                    total_net DECIMAL(10,2),
+                    total_gross DECIMAL(10,2),
+                    status ENUM('pending', 'paid', 'cancelled') DEFAULT 'pending',
+                    share_link VARCHAR(255),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            } else {
+                // Tabela istnieje - sprawdź czy ma wszystkie kolumny
+                $columns = $pdo->query("SHOW COLUMNS FROM invoices")->fetchAll(PDO::FETCH_COLUMN);
+                
+                if (!in_array('total_net', $columns)) {
+                    $pdo->exec("ALTER TABLE invoices ADD COLUMN total_net DECIMAL(10,2) DEFAULT 0");
+                }
+                if (!in_array('total_gross', $columns)) {
+                    $pdo->exec("ALTER TABLE invoices ADD COLUMN total_gross DECIMAL(10,2) DEFAULT 0");
+                }
+                if (!in_array('share_link', $columns)) {
+                    $pdo->exec("ALTER TABLE invoices ADD COLUMN share_link VARCHAR(255)");
+                }
+                if (!in_array('status', $columns)) {
+                    $pdo->exec("ALTER TABLE invoices ADD COLUMN status ENUM('pending', 'paid', 'cancelled') DEFAULT 'pending'");
+                }
+                
+                // Napraw kolumnę type - zmień z VARCHAR na ENUM
+                $pdo->exec("ALTER TABLE invoices MODIFY COLUMN type VARCHAR(20) DEFAULT 'proforma'");
+                
+                // Usuń foreign key constraint jeśli istnieje
+                try {
+                    $pdo->exec("ALTER TABLE invoices DROP FOREIGN KEY invoices_ibfk_1");
+                } catch (Exception $e) {}
+            }
+        } catch (Exception $e) {}
+
         // Health check
         jsonResponse(array(
             'status' => 'ok',
