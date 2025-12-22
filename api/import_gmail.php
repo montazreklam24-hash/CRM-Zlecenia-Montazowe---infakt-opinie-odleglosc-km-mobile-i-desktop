@@ -28,9 +28,10 @@ $token = $input['token'] ?? null;
 $selectedIds = $input['selectedIds'] ?? null; // Lista ID załączników do pobrania
 
 // Log input parameters (without token)
+debugImport("=== NEW REQUEST ===");
 debugImport("INPUT params: ID=$id, SelectedIds count=" . ($selectedIds ? count($selectedIds) : 'NULL'));
 if ($selectedIds) {
-    debugImport("Selected IDs sample: " . substr(json_encode(array_slice($selectedIds, 0, 3)), 0, 200));
+    debugImport("Selected IDs (ALL): " . json_encode($selectedIds));
 }
 
 if (!$id || !$token) {
@@ -87,13 +88,35 @@ function collectAttachmentsFromPart(array $part, string $messageId, array &$out,
   }
 
   if ($attachmentId) {
+    // WAŻNE: loguj każdy znaleziony załącznik
+    debugImport("Found attachment in message $messageId: ID='$attachmentId', File='$filename'");
+    
     // Jeśli podano wybrane ID, sprawdź czy ten załącznik jest na liście
-    if ($selectedIds !== null && !in_array($attachmentId, $selectedIds)) {
-        debugImport("Skipping attachment $attachmentId (not selected)");
+    // Używamy strict comparison (true) dla pewności
+    if ($selectedIds !== null) {
+        $isSelected = in_array($attachmentId, $selectedIds, true);
+        debugImport("  -> Checking if '$attachmentId' in selectedIds: " . ($isSelected ? 'YES' : 'NO'));
+        
+        if (!$isSelected) {
+            debugImport("  -> SKIPPING (not in selection)");
+        } else {
+            $isInlineImage = (strpos($mimeType, 'image/') === 0);
+            if ($filename || $isInlineImage) {
+              debugImport("  -> COLLECTING attachment: $filename");
+              $out[] = [
+                'messageId' => $messageId,
+                'attachmentId' => $attachmentId,
+                'filename' => $filename,
+                'mimeType' => $mimeType,
+                'isInline' => $isInlineImage
+              ];
+            }
+        }
     } else {
+        // Brak filtra - zbierz wszystko
         $isInlineImage = (strpos($mimeType, 'image/') === 0);
         if ($filename || $isInlineImage) {
-          debugImport("Collecting attachment: $filename ($attachmentId)");
+          debugImport("  -> COLLECTING (no filter): $filename");
           $out[] = [
             'messageId' => $messageId,
             'attachmentId' => $attachmentId,

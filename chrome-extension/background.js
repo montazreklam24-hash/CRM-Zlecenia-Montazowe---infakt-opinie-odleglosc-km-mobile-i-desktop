@@ -431,21 +431,62 @@ async function getGmailAttachments(messageId) {
 }
 
 async function importAttachments(attachmentsToImport) {
-  if (!Array.isArray(attachmentsToImport)) return [];
+  if (!Array.isArray(attachmentsToImport)) {
+    await logDebug('warn', 'import', 'attachmentsToImport is not an array', attachmentsToImport);
+    return [];
+  }
+  
+  await logDebug('info', 'import', 'Starting import of attachments', { 
+    count: attachmentsToImport.length,
+    attachments: attachmentsToImport.map(a => ({ id: a.id?.substring(0, 20), messageId: a.messageId?.substring(0, 20), name: a.name }))
+  });
+  
   try {
     const googleToken = await getAuthToken();
     const resultPaths = [];
+    
+    // Grupuj załączniki po messageId
     const byMessage = {};
     for (const att of attachmentsToImport) {
+        if (!att.messageId || !att.id) {
+            await logDebug('warn', 'import', 'Attachment missing messageId or id', att);
+            continue;
+        }
         if (!byMessage[att.messageId]) byMessage[att.messageId] = [];
         byMessage[att.messageId].push(att.id);
     }
+    
+    await logDebug('info', 'import', 'Grouped by message', { 
+        messageCount: Object.keys(byMessage).length,
+        groups: Object.entries(byMessage).map(([msgId, ids]) => ({ msgId: msgId.substring(0, 20), attCount: ids.length }))
+    });
+    
     for (const [msgId, attIds] of Object.entries(byMessage)) {
-        const result = await apiRequest('import_gmail.php', 'POST', { messageId: msgId, token: googleToken, selectedIds: attIds });
-        if (result.success && result.attachments) resultPaths.push(...result.attachments.map(att => att.path));
+        await logDebug('info', 'import', `Sending request for message ${msgId}`, { selectedIds: attIds });
+        
+        const result = await apiRequest('import_gmail.php', 'POST', { 
+            messageId: msgId, 
+            token: googleToken, 
+            selectedIds: attIds 
+        });
+        
+        await logDebug('info', 'import', `Response for message ${msgId}`, { 
+            success: result.success, 
+            attachmentsCount: result.attachments?.length,
+            error: result.error
+        });
+        
+        if (result.success && result.attachments) {
+            resultPaths.push(...result.attachments.map(att => att.path));
+        }
     }
+    
+    await logDebug('info', 'import', 'Import complete', { totalPaths: resultPaths.length, paths: resultPaths });
     return resultPaths;
-  } catch (error) { throw error; }
+  } catch (error) { 
+    await logDebug('error', 'import', 'Import failed', { error: error.message });
+    throw error; 
+  }
 }
 
 async function getRealMessageId(idOrThreadId) {
@@ -469,10 +510,30 @@ async function createJobInCRM(jobData) {
     let projectImages = [];
     let attachmentWarning = null;
 
+    await logDebug('info', 'createJob', 'Starting job creation', {
+        title: jobData.title,
+        gmailMessageId: jobData.gmailMessageId,
+        selectedAttachmentsCount: jobData.selectedAttachments?.length || 0,
+        manualAttachmentsCount: jobData.manualAttachments?.length || 0,
+        importAttachmentsEnabled: settings.importAttachments
+    });
+
     if (settings.importAttachments && jobData.selectedAttachments?.length > 0) {
+        await logDebug('info', 'createJob', 'Will import Gmail attachments', {
+            count: jobData.selectedAttachments.length,
+            details: jobData.selectedAttachments
+        });
         try {
             projectImages = await importAttachments(jobData.selectedAttachments);
-        } catch (e) { attachmentWarning = "Błąd importu: " + e.message; }
+            await logDebug('info', 'createJob', 'Gmail attachments imported', { paths: projectImages });
+        } catch (e) { 
+            attachmentWarning = "Błąd importu: " + e.message;
+            await logDebug('error', 'createJob', 'Gmail attachments import failed', { error: e.message });
+        }
+    } else {
+        await logDebug('info', 'createJob', 'Skipping Gmail attachments import', {
+            reason: !settings.importAttachments ? 'disabled in settings' : 'no attachments selected'
+        });
     }
 
     if (jobData.manualAttachments && Array.isArray(jobData.manualAttachments)) {

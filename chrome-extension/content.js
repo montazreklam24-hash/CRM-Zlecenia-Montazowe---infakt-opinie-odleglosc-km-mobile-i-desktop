@@ -888,17 +888,6 @@ function setupFormHandlers(content) {
             messageId = messageId.replace(/[^a-zA-Z0-9_\-]/g, '');
         }
         
-        // Loguj przed wysłaniem
-            console.log('[CRM Content] Creating job with:', {
-            messageId: messageId,
-            messageIdLength: messageId?.length,
-            manualAttachments: uploadedFiles.length,
-            selectedGmailAttachments: selectedAttachmentIds.length,
-            title: title.substring(0, 50),
-            phone: phone,
-            email: email
-        });
-
         // Znajdź pełne obiekty załączników na podstawie wybranych ID
         const selectedAttachmentsFull = gmailAttachments
             .filter(att => selectedAttachmentIds.includes(att.id))
@@ -909,6 +898,15 @@ function setupFormHandlers(content) {
                 mimeType: att.mimeType,
                 size: att.size
             }));
+
+        // Szczegółowe logowanie przed wysłaniem
+        console.log('[CRM Content] === CREATING JOB ===');
+        console.log('[CRM Content] Title:', title);
+        console.log('[CRM Content] Gmail Message ID:', messageId);
+        console.log('[CRM Content] Manual attachments count:', uploadedFiles.length);
+        console.log('[CRM Content] Selected Gmail attachment IDs:', selectedAttachmentIds);
+        console.log('[CRM Content] Full attachment objects being sent:', selectedAttachmentsFull);
+        console.log('[CRM Content] gmailAttachments available:', gmailAttachments.map(a => ({ id: a.id?.substring(0, 30), messageId: a.messageId, name: a.name })));
 
         try {
             const res = await chrome.runtime.sendMessage({
