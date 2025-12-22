@@ -88,21 +88,33 @@ function collectAttachmentsFromPart(array $part, string $messageId, array &$out,
   }
 
   if ($attachmentId) {
-    // WAŻNE: loguj każdy znaleziony załącznik
-    debugImport("Found attachment in message $messageId: ID='$attachmentId', File='$filename'");
+    $attachmentId = (string)$attachmentId;
+    debugImport("Checking attachment: " . substr($attachmentId, 0, 40) . "... (len: " . strlen($attachmentId) . ")");
     
-    // Jeśli podano wybrane ID, sprawdź czy ten załącznik jest na liście
-    // Używamy strict comparison (true) dla pewności
     if ($selectedIds !== null) {
-        $isSelected = in_array($attachmentId, $selectedIds, true);
-        debugImport("  -> Checking if '$attachmentId' in selectedIds: " . ($isSelected ? 'YES' : 'NO'));
+        $isSelected = false;
+        foreach ($selectedIds as $sId) {
+            $sId = trim((string)$sId);
+            // Porównujemy surowe ID oraz zdekodowane base64url (na wypadek różnic w kodowaniu)
+            if ($sId === $attachmentId || 
+                strtr($sId, '-_', '+/') === strtr($attachmentId, '-_', '+/') ||
+                trim($sId, '=') === trim($attachmentId, '=')) {
+                $isSelected = true;
+                break;
+            }
+        }
         
         if (!$isSelected) {
-            debugImport("  -> SKIPPING (not in selection)");
+            debugImport("  -> NOT in selection. Filter IDs: " . count($selectedIds));
+            // Logujemy pierwsze ID z filtra dla porównania
+            if (count($selectedIds) > 0) {
+                $firstFilterId = (string)$selectedIds[0];
+                debugImport("  -> First filter ID: " . substr($firstFilterId, 0, 40) . "... (len: " . strlen($firstFilterId) . ")");
+            }
         } else {
             $isInlineImage = (strpos($mimeType, 'image/') === 0);
             if ($filename || $isInlineImage) {
-              debugImport("  -> COLLECTING attachment: $filename");
+              debugImport("  -> MATCH! Collecting: $filename");
               $out[] = [
                 'messageId' => $messageId,
                 'attachmentId' => $attachmentId,
@@ -116,7 +128,7 @@ function collectAttachmentsFromPart(array $part, string $messageId, array &$out,
         // Brak filtra - zbierz wszystko
         $isInlineImage = (strpos($mimeType, 'image/') === 0);
         if ($filename || $isInlineImage) {
-          debugImport("  -> COLLECTING (no filter): $filename");
+          debugImport("  -> NO FILTER. Collecting: $filename");
           $out[] = [
             'messageId' => $messageId,
             'attachmentId' => $attachmentId,
@@ -164,50 +176,30 @@ try {
   debugImport("=== START IMPORT (ID: $id) ===");
   $attachmentsMeta = [];
 
-  // 1) Pobierz WIADOMOŚĆ, aby uzyskać threadId
+  // 1) Pobierz DOKŁADNIE tę wiadomość (nie wątek), 
+  // bo attachmentId są unikalne dla konkretnego messageId
   $msgUrl = "https://www.googleapis.com/gmail/v1/users/me/messages/{$id}?format=full";
   $msgRes = googleApiGetRaw($msgUrl, $token);
   
-  if (!$msgRes['ok']) {
-      // Spróbuj jako wątek (fallback)
+  if ($msgRes['ok']) {
+      debugImport("Fetched message $id correctly.");
+      collectAttachmentsFromMessage($msgRes['json'], $attachmentsMeta, $selectedIds);
+  } else {
+      debugImport("Failed to fetch message $id. HTTP code: " . $msgRes['code']);
+      // Fallback do wątku tylko jeśli nie udało się pobrać wiadomości
       $threadUrl = "https://www.googleapis.com/gmail/v1/users/me/threads/{$id}?format=full";
       $threadRes = googleApiGetRaw($threadUrl, $token);
-      
-      if (!$threadRes['ok']) {
-          throw new Exception("Nie udało się pobrać wiadomości ani wątku. msgHTTP={$msgRes['code']}");
-      }
-      
-      debugImport("Resolved directly as Thread");
-      foreach ($threadRes['json']['messages'] as $msg) {
-          if (is_array($msg)) collectAttachmentsFromMessage($msg, $attachmentsMeta, $selectedIds);
-      }
-  } else {
-      // Mamy wiadomość, pobieramy threadId
-      $threadId = $msgRes['json']['threadId'] ?? null;
-      debugImport("Resolved as Message, Thread ID: " . ($threadId ?? 'NULL'));
-      
-      if ($threadId) {
-          // Pobierz CAŁY wątek
-          $threadUrl = "https://www.googleapis.com/gmail/v1/users/me/threads/{$threadId}?format=full";
-          $threadRes = googleApiGetRaw($threadUrl, $token);
-          
-          if ($threadRes['ok'] && !empty($threadRes['json']['messages'])) {
-              debugImport("Fetched full thread with " . count($threadRes['json']['messages']) . " messages");
-              foreach ($threadRes['json']['messages'] as $msg) {
-                  if (is_array($msg)) collectAttachmentsFromMessage($msg, $attachmentsMeta, $selectedIds);
-              }
-          } else {
-              // Fallback: tylko ta wiadomość
-              debugImport("Failed to fetch thread, using single message");
-              collectAttachmentsFromMessage($msgRes['json'], $attachmentsMeta, $selectedIds);
+      if ($threadRes['ok']) {
+          debugImport("Resolved as Thread fallback.");
+          foreach ($threadRes['json']['messages'] as $msg) {
+              if (is_array($msg)) collectAttachmentsFromMessage($msg, $attachmentsMeta, $selectedIds);
           }
       } else {
-          // Brak threadId, tylko ta wiadomość
-          collectAttachmentsFromMessage($msgRes['json'], $attachmentsMeta, $selectedIds);
+          throw new Exception("Nie udało się pobrać wiadomości ani wątku.");
       }
   }
 
-  debugImport("Found " . count($attachmentsMeta) . " attachment(s) in meta");
+  debugImport("Found " . count($attachmentsMeta) . " matching attachment(s)");
 
   if (count($attachmentsMeta) === 0) {
       debugImport("WARNING: No attachments found. Dumping message structure (SAMPLE):");
