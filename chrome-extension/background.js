@@ -369,29 +369,20 @@ Odpowiedz TYLKO JSON: { "phone": "...", "email": "...", "companyName": "...", "n
     const resData = await response.json();
     const parsed = JSON.parse(resData.candidates[0].content.parts[0].text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
     
-    // Walidacja NIP i Telefonu (AI lubi zmyślać na podstawie nazwy firmy)
-    const bodyDigitsOnly = contextBody.replace(/[^0-9]/g, '');
+    // KRYTYCZNA ZMIANA: Priorytet dla danych wyciągniętych REGEXEM z tekstu
+    // AI (Gemini) ma tendencję do "zmyślania" danych na podstawie nazw firm z bazy wiedzy Google.
+    // Dlatego zawsze najpierw ufamy temu, co fizycznie jest napisane w mailu.
     
-    if (parsed.nip && parsed.nip !== 'null') {
-        const nipDigits = parsed.nip.replace(/[^0-9]/g, '');
-        // Jeśli NIP-u od AI nie ma w tekście maila, spróbuj regex
-        if (!bodyDigitsOnly.includes(nipDigits)) {
-            const realNip = extractNipFromText(contextBody);
-            if (realNip) parsed.nip = realNip;
-        }
-    } else {
-        parsed.nip = extractNipFromText(contextBody);
+    const realNip = extractNipFromText(contextBody);
+    if (realNip) {
+        parsed.nip = realNip;
+        await logDebug('info', 'analyze', 'NIP overwritten by regex match', { nip: realNip });
     }
 
-    if (parsed.phone && parsed.phone !== 'null') {
-        const phoneDigits = parsed.phone.replace(/[^0-9]/g, '');
-        // Jeśli telefonu od AI nie ma w tekście maila (min. 7 cyfr), spróbuj regex
-        if (phoneDigits.length >= 7 && !bodyDigitsOnly.includes(phoneDigits)) {
-            const realPhone = extractPhoneFromText(contextBody);
-            if (realPhone) parsed.phone = realPhone;
-        }
-    } else {
-        parsed.phone = extractPhoneFromText(contextBody);
+    const realPhone = extractPhoneFromText(contextBody);
+    if (realPhone) {
+        parsed.phone = realPhone;
+        await logDebug('info', 'analyze', 'Phone overwritten by regex match', { phone: realPhone });
     }
     if (parsed.email && isCompanyEmail(parsed.email)) parsed.email = null;
     if (!parsed.email || parsed.email === 'null') {
