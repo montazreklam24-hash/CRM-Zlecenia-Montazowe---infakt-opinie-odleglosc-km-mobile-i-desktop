@@ -62,7 +62,7 @@ async function clearDebugLogs() {
 // KOMUNIKACJA Z CONTENT SCRIPT
 // =========================================================================
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   console.log('[CRM BG] Message:', request.action);
   
   switch (request.action) {
@@ -95,16 +95,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return true;
       
     case 'clearDebugLogs':
-      clearDebugLogs().then(() => sendResponse({ success: true }));
+      clearDebugLogs().then(function() { sendResponse({ success: true }); });
       return true;
       
     case 'testGmailMessage':
       testGmailMessage(request.messageId)
-        .then(result => {
+        .then(function(result) {
           console.log('[CRM BG] testGmailMessage result:', result);
           sendResponse(result || { success: false, error: 'Brak odpowiedzi z funkcji' });
         })
-        .catch(error => {
+        .catch(function(error) {
           console.error('[CRM BG] testGmailMessage error:', error);
           sendResponse({ success: false, error: error.message || 'Nieznany błąd' });
         });
@@ -122,6 +122,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       getAttachmentData(request.messageId, request.attachmentId).then(sendResponse);
       return true;
   }
+  return false;
 });
 
 // =========================================================================
@@ -929,6 +930,16 @@ async function getAttachmentData(messageId, attachmentId) {
     return { success: false, error: e.message };
   }
 }
+
+/**
+ * Pobiera listę załączników dla danej wiadomości bezpośrednio z Gmail API
+ */
+async function getGmailAttachments(messageId) {
+  if (!messageId) {
+    await logDebug('warn', 'getAttachments', 'No messageId provided');
+    return { success: false, error: 'Brak Message ID' };
+  }
+  
   await logDebug('info', 'getAttachments', 'Fetching attachments list', { messageId });
   
   try {
@@ -957,7 +968,10 @@ async function getAttachmentData(messageId, attachmentId) {
             name: part.filename,
             mimeType: part.mimeType,
             size: part.body.size,
-            isInline: !!part.headers?.find(h => h.name === 'Content-ID' || (h.name === 'Content-Disposition' && h.value.includes('inline')))
+            isInline: !!part.headers?.find(h => {
+              const name = h.name.toLowerCase();
+              return name === 'content-id' || (name === 'content-disposition' && h.value.toLowerCase().includes('inline'));
+            })
           });
         }
         if (part.parts) findAttachments(part.parts);
@@ -1068,19 +1082,25 @@ async function getRealMessageId(threadIdOrMessageId) {
   await logDebug('info', 'messageId', 'Resolving message ID', { 
     inputId: threadIdOrMessageId, 
     inputLength: threadIdOrMessageId?.length,
-    looksLikeThreadId: threadIdOrMessageId?.length >= 20 || threadIdOrMessageId?.startsWith('FM')
+    isThreadId: threadIdOrMessageId?.length >= 20 || threadIdOrMessageId?.includes(':') || threadIdOrMessageId?.startsWith('FM')
   });
   
-  // Jeśli ID wygląda na poprawne messageId (krótkie hex), zwróć je
-  if (!threadIdOrMessageId || (threadIdOrMessageId.length < 20 && !threadIdOrMessageId.startsWith('FM'))) {
-      await logDebug('info', 'messageId', 'ID looks like valid Message ID, using as-is');
+  // Jeśli ID wygląda na poprawne messageId (16 znaków hex), zwróć je
+  if (threadIdOrMessageId && /^[a-f0-9]{16}$/.test(threadIdOrMessageId)) {
+      await logDebug('info', 'messageId', 'ID is valid Hex Message ID, using as-is');
       return threadIdOrMessageId;
   }
 
-  // Jeśli to długie ID (Thread ID lub Legacy), pytamy API o listę wiadomości w wątku
+  // Jeśli ID wygląda na dłuższą formę (Thread ID), pytamy API o listę wiadomości w wątku
   try {
     const token = await getAuthToken();
-    const url = `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadIdOrMessageId}?format=minimal`;
+    // Jeśli ID zawiera prefiks typu "thread-f:", użyj tylko części po dwukropku lub wyczyść
+    let cleanId = threadIdOrMessageId;
+    if (cleanId.includes(':')) {
+        cleanId = cleanId.split(':').pop();
+    }
+    
+    const url = `https://gmail.googleapis.com/gmail/v1/users/me/threads/${cleanId}?format=minimal`;
     await logDebug('info', 'messageId', 'Fetching thread data from Gmail API', { url });
     
     const response = await fetch(url, { 

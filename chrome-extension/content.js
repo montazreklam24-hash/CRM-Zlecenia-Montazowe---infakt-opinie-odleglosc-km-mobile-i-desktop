@@ -517,31 +517,28 @@ function openAttachmentsModal() {
 function getCurrentMessageId() {
     console.log('[CRM Content] Getting message ID...');
     
-    // Strategia 1: DOM (Najpewniejsza dla API - szukamy Hex ID)
-    // Szukamy elementów wiadomości
-    const messageElements = document.querySelectorAll('div[data-message-id]');
-    
-    // Strategia 1b: Sprawdź data-legacy-message-id (często zawiera Hex ID gdy data-message-id jest wewnętrzne)
+    // Strategia 1: DOM
     const legacyElements = document.querySelectorAll('div[data-legacy-message-id]');
     if (legacyElements.length > 0) {
         for (let i = legacyElements.length - 1; i >= 0; i--) {
             const id = legacyElements[i].getAttribute('data-legacy-message-id');
-             if (id && !id.startsWith('FM') && !id.includes('#') && id.length >= 10) {
-                 console.log('[CRM Content] Found valid Hex ID from data-legacy-message-id:', id);
-                 return id;
-            }
+             if (id && id.length >= 10) return id;
         }
     }
 
+    const legacyThreadElements = document.querySelectorAll('div[data-legacy-thread-id]');
+    if (legacyThreadElements.length > 0) {
+        for (let i = legacyThreadElements.length - 1; i >= 0; i--) {
+            const id = legacyThreadElements[i].getAttribute('data-legacy-thread-id');
+             if (id && id.length >= 10) return id;
+        }
+    }
+
+    const messageElements = document.querySelectorAll('div[data-message-id]');
     if (messageElements.length > 0) {
-        // Sprawdzamy od ostatniego elementu (najnowsza wiadomość w wątku)
         for (let i = messageElements.length - 1; i >= 0; i--) {
             const id = messageElements[i].getAttribute('data-message-id');
-            // Szukamy ID, które NIE zaczyna się od "FM" i nie ma "#" (czysty hex)
-            if (id && !id.startsWith('FM') && !id.includes('#') && id.length >= 10) {
-                 console.log('[CRM Content] Found valid Hex ID from DOM:', id);
-                 return id;
-            }
+            if (id && id.length >= 10) return id;
         }
     }
 
@@ -600,14 +597,20 @@ async function getEmailImages() {
         for (const img of imgElements) {
             try {
                 const src = img.src;
-                // Pomiń obrazy systemowe Gmaila (ikony, avatary)
-                if (src.includes('googleusercontent.com') && !src.includes('attachment')) {
+                // Pomiń obrazy systemowe Gmaila i te bez http/data (bezpieczniejszy fetch)
+                if ((src.includes('googleusercontent.com') && !src.includes('attachment')) || 
+                    (!src.startsWith('http') && !src.startsWith('data:'))) {
                     continue;
                 }
                 
-                // Spróbuj pobrać obraz jako base64
-                const response = await fetch(src);
-                if (response.ok) {
+                // Spróbuj pobrać obraz jako base64 z timeoutem
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+                const response = await fetch(src, { signal: controller.signal }).catch(() => null);
+                clearTimeout(timeoutId);
+
+                if (response && response.ok) {
                     const blob = await response.blob();
                     if (blob.type.startsWith('image/')) {
                         const base64 = await new Promise((resolve) => {
@@ -714,45 +717,65 @@ function setupFormHandlers(content) {
             // POBIERZ LISTĘ ZAŁĄCZNIKÓW DO WYBORU
             if (messageId) {
                 console.log('[CRM Content] Fetching attachments list for:', messageId);
-                const attRes = await chrome.runtime.sendMessage({
-                    action: 'getGmailAttachments',
-                    messageId: messageId
-                });
-                
-                if (attRes.success && attRes.attachments) {
-                    // 1. USUWANIE DUPLIKATÓW I FILTROWANIE ŚMIECI
-                    const seen = new Set();
-                    const blacklist = ['logo', 'montazreklam', 'newoffice', 'footer', 'stopka', 'sygnatura', 'facebook', 'instagram', 'linkedin'];
-                    
-                    gmailAttachments = attRes.attachments.filter(att => {
-                        // Unikalność (nazwa + rozmiar)
-                        const key = `${att.name}-${att.size}`;
-                        if (seen.has(key)) return false;
-                        seen.add(key);
-
-                        const nameLower = att.name.toLowerCase();
-                        
-                        // Ignoruj znane wzorce śmieciowych grafik z Gmaila (image001.png itd.)
-                        if (/^image\d{3}\.(png|jpg|jpeg|gif)$/i.test(nameLower)) return false;
-                        
-                        // Ignoruj czarną listę słów
-                        const isBlacklisted = blacklist.some(word => nameLower.includes(word));
-                        if (isBlacklisted) return false;
-
-                        return true;
+                try {
+                    const attRes = await chrome.runtime.sendMessage({
+                        action: 'getGmailAttachments',
+                        messageId: messageId
                     });
-
-                    // Domyślnie zaznacz te które NIE są inline (prawdziwe załączniki)
-                    selectedAttachmentIds = gmailAttachments
-                        .filter(a => !a.isInline) 
-                        .map(a => a.id);
-                        
-                    updateAttachmentsButton();
                     
-                    // Automatycznie otwórz okno wyboru jeśli są załączniki
-                    if (gmailAttachments.length > 0) {
-                        openAttachmentsModal();
+                    console.log('[CRM Content] Attachments response:', attRes);
+                    
+                    if (attRes && attRes.success && attRes.attachments) {
+                        // 1. USUWANIE DUPLIKATÓW I FILTROWANIE ŚMIECI
+                        const seen = new Set();
+                        // Bardziej precyzyjna czarna lista - tylko jeśli to mały plik obrazu
+                        const blacklist = ['logo', 'montazreklam', 'newoffice', 'footer', 'stopka', 'sygnatura', 'facebook', 'instagram', 'linkedin'];
+                        
+                        gmailAttachments = attRes.attachments.filter(att => {
+                            if (!att.name) return false;
+                            
+                            // Unikalność (nazwa + rozmiar)
+                            const key = `${att.name}-${att.size}`;
+                            if (seen.has(key)) return false;
+                            seen.add(key);
+                            return true;
+                        });
+
+                        console.log('[CRM Content] Final attachments list:', gmailAttachments);
+
+                        // INTELIGENTNE ZAZNACZANIE (Zamiast usuwania, po prostu odznaczamy śmieci)
+                        const blacklist = ['logo', 'montazreklam', 'newoffice', 'footer', 'stopka', 'sygnatura', 'facebook', 'instagram', 'linkedin'];
+                        
+                        selectedAttachmentIds = gmailAttachments
+                            .filter(att => {
+                                // Prawdziwe załączniki (nie inline) zaznaczamy zawsze
+                                if (!att.isInline) return true;
+
+                                const nameLower = att.name.toLowerCase();
+                                const isImage = /\.(png|jpg|jpeg|gif)$/i.test(nameLower);
+                                
+                                // Odznacz małe grafiki systemowe i te z czarnej listy
+                                if (isImage && att.size < 40000) {
+                                    if (/^image\d{3}\.(png|jpg|jpeg|gif)$/i.test(nameLower)) return false;
+                                    if (blacklist.some(word => nameLower.includes(word))) return false;
+                                }
+
+                                return true;
+                            })
+                            .map(a => a.id);
+                            
+                        updateAttachmentsButton();
+                        
+                        // ZAWSZE otwieraj okno jeśli są jakiekolwiek załączniki
+                        if (gmailAttachments.length > 0) {
+                            console.log('[CRM Content] Opening attachments modal...');
+                            openAttachmentsModal();
+                        }
+                    } else if (attRes && !attRes.success) {
+                        console.error('[CRM Content] Failed to fetch attachments:', attRes.error);
                     }
+                } catch (err) {
+                    console.error('[CRM Content] Error sending getGmailAttachments message:', err);
                 }
             }
             
