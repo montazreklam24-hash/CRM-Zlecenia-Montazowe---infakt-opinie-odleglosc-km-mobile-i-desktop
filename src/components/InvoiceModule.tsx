@@ -138,16 +138,18 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
 
   // Pobierz faktury jeśli nie są przekazane w propsach
   useEffect(() => {
-    if (jobId && (!initialInvoices || initialInvoices.length === 0)) {
+    if (jobId && initialInvoices.length === 0) {
+      console.log('[InvoiceModule] Pobieram faktury dla jobId:', jobId);
       invoiceService.getJobInvoices(jobId).then(res => {
+        console.log('[InvoiceModule] Otrzymane faktury:', res);
         if (res.success && res.invoices) {
           setInvoices(res.invoices);
         }
       }).catch(err => {
-        console.error('Failed to fetch invoices:', err);
+        console.error('[InvoiceModule] Failed to fetch invoices:', err);
       });
     }
-  }, [jobId, initialInvoices]);
+  }, [jobId]);
 
   // Sync billing if it changes from props
   useEffect(() => {
