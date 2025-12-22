@@ -497,6 +497,84 @@ function mapJobToFrontend($job) {
     
     $jobId = $job['id'];
     
+    // Pobierz faktury dla tego zlecenia
+    $invoices = array();
+    try {
+        $pdo = getDB();
+        // Sprawdź czy tabela istnieje
+        $tableExists = false;
+        try {
+            $pdo->query("SELECT 1 FROM invoices LIMIT 1");
+            $tableExists = true;
+        } catch (Exception $e) {
+            // Tabela nie istnieje, utwórz ją
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS invoices (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    job_id VARCHAR(50),
+                    infakt_id INT,
+                    infakt_number VARCHAR(50),
+                    type ENUM('proforma', 'vat') DEFAULT 'proforma',
+                    client_id INT,
+                    total_net DECIMAL(10,2),
+                    total_gross DECIMAL(10,2),
+                    status ENUM('pending', 'paid', 'cancelled') DEFAULT 'pending',
+                    share_link VARCHAR(255),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+            $tableExists = true;
+        }
+        
+        if ($tableExists) {
+            $stmt = $pdo->prepare("
+                SELECT * FROM invoices 
+                WHERE job_id = ? 
+                ORDER BY created_at DESC
+            ");
+            $stmt->execute(array($jobId));
+            $invoicesRaw = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            foreach ($invoicesRaw as $inv) {
+                // Mapuj typ: 'vat' -> 'invoice' dla zgodności z typem Invoice
+                $invoiceType = ($inv['type'] === 'vat') ? 'invoice' : $inv['type'];
+                
+                $invoices[] = array(
+                    'id' => intval($inv['id']),
+                    'jobId' => $inv['job_id'],
+                    'clientId' => intval($inv['client_id']),
+                    'type' => $invoiceType,
+                    'number' => $inv['infakt_number'] ? $inv['infakt_number'] : '',
+                    'infaktId' => intval($inv['infakt_id']),
+                    'infaktNumber' => $inv['infakt_number'],
+                    'infakt_number' => $inv['infakt_number'], // snake_case dla kompatybilności z InvoiceModule
+                    'infaktLink' => $inv['share_link'],
+                    'share_link' => $inv['share_link'], // snake_case dla kompatybilności
+                    'totalNet' => floatval($inv['total_net']),
+                    'totalVat' => floatval($inv['total_gross']) - floatval($inv['total_net']),
+                    'totalGross' => floatval($inv['total_gross']),
+                    'paymentMethod' => 'transfer',
+                    'paymentStatus' => $inv['status'] === 'paid' ? 'paid' : ($inv['status'] === 'cancelled' ? 'overdue' : 'pending'),
+                    'status' => $inv['status'], // snake_case dla kompatybilności z InvoiceModule
+                    'paidAmount' => $inv['status'] === 'paid' ? floatval($inv['total_gross']) : 0,
+                    'paidDate' => $inv['status'] === 'paid' ? $inv['created_at'] : null,
+                    'dueDate' => null,
+                    'issueDate' => $inv['created_at'],
+                    'sellDate' => $inv['created_at'],
+                    'description' => null,
+                    'notes' => null,
+                    'sentAt' => null,
+                    'sentTo' => null,
+                    'createdAt' => strtotime($inv['created_at']) * 1000,
+                    'created_at' => $inv['created_at'], // snake_case dla kompatybilności z InvoiceModule
+                    'items' => array()
+                );
+            }
+        }
+    } catch (Exception $e) {
+        error_log('Error fetching invoices in mapJobToFrontend: ' . $e->getMessage());
+    }
+    
     return array(
         'id' => strval($jobId), // Czyste ID
         'original_id' => strval($jobId),
@@ -540,7 +618,9 @@ function mapJobToFrontend($job) {
         'completedAt' => !empty($job['completed_at']) ? strtotime($job['completed_at']) * 1000 : null,
         'completionNotes' => isset($job['completion_notes']) ? $job['completion_notes'] : null,
         'reviewRequestSentAt' => !empty($job['review_request_sent_at']) ? strtotime($job['review_request_sent_at']) * 1000 : null,
-        'reviewRequestEmail' => isset($job['review_request_email']) ? $job['review_request_email'] : null
+        'reviewRequestEmail' => isset($job['review_request_email']) ? $job['review_request_email'] : null,
+        // Pobieramy faktury
+        'invoices' => $invoices
     );
 }
 

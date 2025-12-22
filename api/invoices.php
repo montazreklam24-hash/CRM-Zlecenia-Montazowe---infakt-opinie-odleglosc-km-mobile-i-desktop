@@ -496,18 +496,24 @@ function handleGetJobInvoices($jobId) {
         
         $mapped = array();
         foreach ($invoices as $inv) {
+            // Mapuj typ: 'vat' -> 'invoice' dla zgodności z typem Invoice
+            $invoiceType = ($inv['type'] === 'vat') ? 'invoice' : $inv['type'];
+            
             $mapped[] = array(
                 'id' => intval($inv['id']),
                 'jobId' => $inv['job_id'],
                 'infaktId' => intval($inv['infakt_id']),
                 'infaktNumber' => $inv['infakt_number'],
-                'type' => $inv['type'],
+                'infakt_number' => $inv['infakt_number'], // snake_case dla kompatybilności z InvoiceModule
+                'type' => $invoiceType,
                 'clientId' => intval($inv['client_id']),
                 'totalNet' => floatval($inv['total_net']),
                 'totalGross' => floatval($inv['total_gross']),
                 'status' => $inv['status'],
                 'shareLink' => $inv['share_link'],
-                'createdAt' => $inv['created_at']
+                'share_link' => $inv['share_link'], // snake_case dla kompatybilności
+                'createdAt' => $inv['created_at'],
+                'created_at' => $inv['created_at'] // snake_case dla kompatybilności z InvoiceModule
             );
         }
         

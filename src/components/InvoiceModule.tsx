@@ -51,16 +51,35 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showBilling, setShowBilling] = useState(false);
-  const [billing, setBilling] = useState(initialBilling || {
-    name: clientName || '',
-    nip: nip || '',
-    street: '',
-    buildingNo: '',
-    apartmentNo: '',
-    postCode: '',
-    city: '',
-    email: clientEmail || ''
-  });
+  // Inicjalizuj billing - zawsze używaj głównych danych jako fallback
+  const getInitialBilling = () => {
+    if (initialBilling && initialBilling.name && initialBilling.name.length > 0) {
+      // Jeśli billing ma dane, użyj ich, ale uzupełnij puste pola z głównych danych
+      return {
+        name: initialBilling.name || clientName || '',
+        nip: initialBilling.nip || nip || '',
+        street: initialBilling.street || '',
+        buildingNo: initialBilling.buildingNo || '',
+        apartmentNo: initialBilling.apartmentNo || '',
+        postCode: initialBilling.postCode || '',
+        city: initialBilling.city || '',
+        email: initialBilling.email || clientEmail || ''
+      };
+    }
+    // Jeśli billing jest pusty, użyj głównych danych zlecenia
+    return {
+      name: clientName || '',
+      nip: nip || '',
+      street: '',
+      buildingNo: '',
+      apartmentNo: '',
+      postCode: '',
+      city: '',
+      email: clientEmail || ''
+    };
+  };
+
+  const [billing, setBilling] = useState(getInitialBilling());
   const lastAutoNip = useRef<string | null>(null);
 
   // Automatyczny GUS po wpisaniu NIP w module fakturowania
@@ -151,12 +170,34 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
     }
   }, [jobId]);
 
-  // Sync billing if it changes from props
+  // Sync billing if it changes from props - ale tylko jeśli ma sensowne dane
   useEffect(() => {
-    if (initialBilling) {
-      setBilling(initialBilling);
+    if (initialBilling && (initialBilling.name || initialBilling.nip)) {
+      // Uzupełnij puste pola z głównych danych
+      setBilling(prev => ({
+        name: initialBilling.name || prev.name || clientName || '',
+        nip: initialBilling.nip || prev.nip || nip || '',
+        street: initialBilling.street || prev.street || '',
+        buildingNo: initialBilling.buildingNo || prev.buildingNo || '',
+        apartmentNo: initialBilling.apartmentNo || prev.apartmentNo || '',
+        postCode: initialBilling.postCode || prev.postCode || '',
+        city: initialBilling.city || prev.city || '',
+        email: initialBilling.email || prev.email || clientEmail || ''
+      }));
+    } else if (!initialBilling || (!initialBilling.name && !initialBilling.nip)) {
+      // Jeśli billing jest pusty, użyj głównych danych
+      setBilling({
+        name: clientName || '',
+        nip: nip || '',
+        street: '',
+        buildingNo: '',
+        apartmentNo: '',
+        postCode: '',
+        city: '',
+        email: clientEmail || ''
+      });
     }
-  }, [initialBilling]);
+  }, [initialBilling, clientName, clientEmail, nip]);
 
   const handleBillingChange = (field: string, value: string) => {
     const newBilling = { ...billing, [field]: value };
@@ -323,18 +364,18 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
             {invoices.map((inv: any) => (
               <div key={inv.id} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-white hover:border-blue-200 transition-all group shadow-sm">
                 <div className="flex items-center gap-4">
-                  <div className={`p-2 rounded-lg ${inv.type === 'proforma' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>
+                  <div className={`p-2 rounded-lg ${(inv.type === 'proforma') ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>
                     <FileText className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-slate-800">{inv.infakt_number || `#${inv.id}`}</p>
+                    <p className="text-sm font-bold text-slate-800">{inv.infaktNumber || inv.infakt_number || `#${inv.id}`}</p>
                     <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wide">
-                      {inv.type === 'proforma' ? 'Proforma' : 'Faktura VAT'} • {new Date(inv.created_at || Date.now()).toLocaleDateString()}
+                      {(inv.type === 'proforma') ? 'Proforma' : 'Faktura VAT'} • {new Date(inv.createdAt || inv.created_at || Date.now()).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {inv.status !== 'paid' && (
+                  {(inv.status !== 'paid' && inv.paymentStatus !== 'paid') && (
                     <button 
                       onClick={() => handleMarkPaid(inv.id)}
                       className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
@@ -352,9 +393,9 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
                   >
                     <Download className="w-5 h-5" />
                   </a>
-                  {inv.share_link && (
+                  {(inv.shareLink || inv.share_link) && (
                     <a 
-                      href={inv.share_link} 
+                      href={inv.shareLink || inv.share_link} 
                       target="_blank" 
                       rel="noreferrer"
                       className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
