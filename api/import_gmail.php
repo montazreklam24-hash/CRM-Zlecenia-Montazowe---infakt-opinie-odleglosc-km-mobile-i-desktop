@@ -124,28 +124,38 @@ function collectAttachmentsFromMessage(array $message, array &$out): void {
 }
 
 try {
-  debugImport("=== START IMPORT (ID: $id) - POBIERAMY WSZYSTKO ===");
+  debugImport("=== START IMPORT (ID: $id) - POBIERAMY CAŁY WĄTEK ===");
   $attachmentsMeta = [];
 
-  // Spróbuj najpierw jako pojedyncza wiadomość
-  $msgUrl = "https://www.googleapis.com/gmail/v1/users/me/messages/{$id}?format=full";
+  // KROK 1: Pobierz pojedynczą wiadomość żeby uzyskać threadId
+  $msgUrl = "https://www.googleapis.com/gmail/v1/users/me/messages/{$id}?format=minimal";
   $msgRes = googleApiGetRaw($msgUrl, $token);
   
-  if ($msgRes['ok']) {
-      debugImport("Fetched message $id correctly.");
-      collectAttachmentsFromMessage($msgRes['json'], $attachmentsMeta);
+  $threadId = null;
+  if ($msgRes['ok'] && !empty($msgRes['json']['threadId'])) {
+      $threadId = $msgRes['json']['threadId'];
+      debugImport("Got threadId: $threadId from message $id");
   } else {
-      debugImport("Failed to fetch message $id. HTTP code: " . $msgRes['code']);
-      // Fallback do wątku
-      $threadUrl = "https://www.googleapis.com/gmail/v1/users/me/threads/{$id}?format=full";
-      $threadRes = googleApiGetRaw($threadUrl, $token);
-      if ($threadRes['ok']) {
-          debugImport("Resolved as Thread - collecting from ALL messages.");
-          foreach ($threadRes['json']['messages'] as $msg) {
-              if (is_array($msg)) collectAttachmentsFromMessage($msg, $attachmentsMeta);
-          }
-      } else {
-          throw new Exception("Nie udało się pobrać wiadomości ani wątku.");
+      // Może $id to już threadId?
+      $threadId = $id;
+      debugImport("Using $id as threadId directly");
+  }
+  
+  // KROK 2: Pobierz CAŁY WĄTEK ze wszystkimi wiadomościami
+  $threadUrl = "https://www.googleapis.com/gmail/v1/users/me/threads/{$threadId}?format=full";
+  $threadRes = googleApiGetRaw($threadUrl, $token);
+  
+  if (!$threadRes['ok']) {
+      throw new Exception("Nie udało się pobrać wątku $threadId. HTTP: " . $threadRes['code']);
+  }
+  
+  debugImport("Thread fetched. Messages count: " . count($threadRes['json']['messages'] ?? []));
+  
+  // KROK 3: Zbierz załączniki ze WSZYSTKICH wiadomości w wątku
+  foreach ($threadRes['json']['messages'] as $msg) {
+      if (is_array($msg)) {
+          debugImport("Scanning message: " . ($msg['id'] ?? 'unknown'));
+          collectAttachmentsFromMessage($msg, $attachmentsMeta);
       }
   }
 
