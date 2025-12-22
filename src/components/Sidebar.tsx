@@ -19,6 +19,16 @@ interface NavSection {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex', showLogo = true }) => {
+  // Mapowanie polskich nazw sekcji na klucze
+  const getSectionKey = (title: string): string => {
+    const mapping: Record<string, string> = {
+      'Główne': 'main',
+      'Raporty': 'reports',
+      'Archiwum': 'archive'
+    };
+    return mapping[title] || title.toLowerCase().replace(/\s+/g, '-');
+  };
+
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     'main': true, // Domyślnie rozwinięte
     'reports': false,
@@ -81,7 +91,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
         {sections.map((section, sectionIndex) => {
-          const sectionKey = section.title.toLowerCase().replace(/\s+/g, '-');
+          const sectionKey = getSectionKey(section.title);
           const isExpanded = expandedSections[sectionKey] ?? false;
 
           return (
