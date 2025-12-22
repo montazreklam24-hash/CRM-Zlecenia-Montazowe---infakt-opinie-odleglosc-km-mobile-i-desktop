@@ -167,13 +167,25 @@ try {
       throw new Exception("Nie udało się pobrać wątku $threadId. HTTP: " . $threadRes['code']);
   }
   
-  debugImport("Thread fetched. Messages count: " . count($threadRes['json']['messages'] ?? []));
+  $messages = $threadRes['json']['messages'] ?? [];
+  debugImport("Thread fetched. Messages count: " . count($messages));
   
-  // KROK 3: Zbierz załączniki ze WSZYSTKICH wiadomości w wątku (z deduplikacją po nazwie+rozmiarze)
+  // KROK 3: Posortuj wiadomości od NAJNOWSZEJ do najstarszej
+  // Gmail API zwraca chronologicznie (stare→nowe), a my chcemy odwrotnie
+  // Dzięki temu najnowszy załącznik (np. zaakceptowany projekt) będzie okładką
+  usort($messages, function($a, $b) {
+      $dateA = isset($a['internalDate']) ? intval($a['internalDate']) : 0;
+      $dateB = isset($b['internalDate']) ? intval($b['internalDate']) : 0;
+      return $dateB - $dateA; // Malejąco (najnowsze najpierw)
+  });
+  debugImport("Messages sorted: newest first");
+  
+  // KROK 4: Zbierz załączniki ze WSZYSTKICH wiadomości w wątku (z deduplikacją po nazwie+rozmiarze)
   $seenFiles = []; // Śledzenie już zebranych plików (klucz: nazwa_rozmiar) - zapobiega duplikatom z różnych wiadomości
-  foreach ($threadRes['json']['messages'] as $msg) {
+  foreach ($messages as $msg) {
       if (is_array($msg)) {
-          debugImport("Scanning message: " . ($msg['id'] ?? 'unknown'));
+          $msgDate = isset($msg['internalDate']) ? date('Y-m-d H:i', intval($msg['internalDate'])/1000) : 'unknown';
+          debugImport("Scanning message: " . ($msg['id'] ?? 'unknown') . " (date: $msgDate)");
           collectAttachmentsFromMessage($msg, $attachmentsMeta, $seenFiles);
       }
   }

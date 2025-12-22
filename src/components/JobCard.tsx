@@ -62,10 +62,13 @@ interface AttachmentPreviewProps {
   setCoverImage: (index: number) => void;
   rotateProjectImage: (index: number) => void;
   removeProjectImage: (index: number) => void;
+  isSelected?: boolean;
+  onToggleSelect?: (index: number) => void;
 }
 
 const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({ 
-  url, idx, isEditing, isAdmin, onClick, setCoverImage, rotateProjectImage, removeProjectImage 
+  url, idx, isEditing, isAdmin, onClick, setCoverImage, rotateProjectImage, removeProjectImage,
+  isSelected, onToggleSelect
 }) => {
   const [imgError, setImgError] = useState(false);
   const extension = getFileExtension(url);
@@ -76,7 +79,9 @@ const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({
   const displayUrl = showThumbnail ? `${url}.jpg` : url;
 
   return (
-    <div className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 group bg-slate-50">
+    <div className={`relative aspect-square rounded-xl overflow-hidden border-2 group bg-slate-50 transition-all ${
+      isSelected ? 'border-red-500 ring-2 ring-red-200' : 'border-slate-200'
+    }`}>
       <div onClick={() => !isImg ? window.open(url, '_blank') : onClick(url)} className={`w-full h-full ${isImg ? 'cursor-zoom-in' : 'cursor-pointer'}`}>
         {(!isImg && !showThumbnail) || (showThumbnail && imgError) ? (
           <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 p-4 bg-slate-100">
@@ -101,6 +106,20 @@ const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({
           isEditing ? 'bg-black/10' : 'bg-black/40'
         }`}>
           <div className="flex justify-between pointer-events-auto">
+            {/* Checkbox do zbiorczego usuwania */}
+            {onToggleSelect && (
+              <button 
+                onClick={(e) => {e.stopPropagation(); onToggleSelect(idx)}} 
+                className={`p-1.5 rounded-lg shadow-md transition-all ${
+                  isSelected 
+                    ? 'bg-red-500 text-white' 
+                    : 'bg-white/90 text-slate-400 hover:text-red-500'
+                }`}
+                title="Zaznacz do usunięcia"
+              >
+                <CheckCircle2 className={`w-5 h-5 ${isSelected ? 'fill-current' : ''}`} />
+              </button>
+            )}
             <button 
               onClick={(e) => {e.stopPropagation(); setCoverImage(idx)}} 
               className={`p-2 rounded-lg shadow-md transition-transform active:scale-95 ${
@@ -116,7 +135,7 @@ const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({
                 <button 
                   onClick={(e) => {e.stopPropagation(); rotateProjectImage(idx)}} 
                   className="p-2 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600"
-                  title="Obróć o 90┬░"
+                  title="Obróć o 90°"
                 >
                   <RotateCw className="w-5 h-5" />
                 </button>
@@ -746,6 +765,10 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
   // Stan dla modalu potwierdzenia usunięcia zdjęcia
   const [deleteImageIndex, setDeleteImageIndex] = useState<number | null>(null);
   
+  // Stan dla zbiorczego usuwania zdjęć (checkboxy)
+  const [selectedForDeletion, setSelectedForDeletion] = useState<number[]>([]);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  
   const removeProjectImage = async (index: number) => {
     // Pokaż modal potwierdzenia zamiast window.confirm
     setDeleteImageIndex(index);
@@ -761,6 +784,38 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
         await jobsService.updateJob(job.id, { projectImages: newImages }); 
       } catch (err) {
         console.error('Błąd usuwania zdjęcia:', err);
+      }
+    }
+  };
+  
+  // Zbiorcze usuwanie zdjęć
+  const toggleImageSelection = (index: number) => {
+    setSelectedForDeletion(prev => 
+      prev.includes(index) 
+        ? prev.filter(i => i !== index) 
+        : [...prev, index]
+    );
+  };
+  
+  const selectAllImages = () => {
+    if (selectedForDeletion.length === projectImages.length) {
+      setSelectedForDeletion([]);
+    } else {
+      setSelectedForDeletion(projectImages.map((_, i) => i));
+    }
+  };
+  
+  const confirmDeleteSelectedImages = async () => {
+    if (selectedForDeletion.length === 0) return;
+    const newImages = projectImages.filter((_, i) => !selectedForDeletion.includes(i));
+    setProjectImages(newImages);
+    setSelectedForDeletion([]);
+    setShowBulkDeleteConfirm(false);
+    if (!isEditing && job) {
+      try { 
+        await jobsService.updateJob(job.id, { projectImages: newImages }); 
+      } catch (err) {
+        console.error('Błąd usuwania zdjęć:', err);
       }
     }
   };
@@ -892,6 +947,62 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
               >
                 <Trash2 className="w-4 h-4" />
                 Usuń
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.getElementById('modal-root') || document.body
+      )}
+
+      {/* Modal potwierdzenia ZBIORCZEGO usunięcia zdjęć */}
+      {showBulkDeleteConfirm && createPortal(
+        <div 
+          className="fixed inset-0 z-[99999] bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setShowBulkDeleteConfirm(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-slate-800 mb-2">
+              Usunąć {selectedForDeletion.length} zdjęć?
+            </h3>
+            <p className="text-slate-600 text-sm mb-4">
+              Czy na pewno chcesz usunąć zaznaczone zdjęcia z projektu? Tej operacji nie można cofnąć.
+            </p>
+            
+            {/* Miniatury zaznaczonych zdjęć */}
+            <div className="mb-4 flex flex-wrap gap-2 justify-center max-h-32 overflow-y-auto">
+              {selectedForDeletion.slice(0, 8).map(idx => (
+                projectImages[idx] && (
+                  <img 
+                    key={idx}
+                    src={projectImages[idx]} 
+                    alt={`Do usunięcia ${idx + 1}`} 
+                    className="w-14 h-14 object-cover rounded-lg border-2 border-red-200"
+                  />
+                )
+              ))}
+              {selectedForDeletion.length > 8 && (
+                <div className="w-14 h-14 bg-slate-100 rounded-lg border-2 border-slate-200 flex items-center justify-center text-slate-500 text-xs font-bold">
+                  +{selectedForDeletion.length - 8}
+                </div>
+              )}
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowBulkDeleteConfirm(false)}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
+              >
+                Anuluj
+              </button>
+              <button
+                onClick={confirmDeleteSelectedImages}
+                className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Usuń wszystkie
               </button>
             </div>
           </div>
@@ -1743,21 +1854,54 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
             )}
 
             {projectImages.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {projectImages.map((img, idx) => (
-                  <AttachmentPreview
-                    key={idx}
-                    url={img}
-                    idx={idx}
-                    isEditing={isEditing}
-                    isAdmin={isAdmin}
-                    onClick={setLightboxImage}
-                    setCoverImage={setCoverImage}
-                    rotateProjectImage={rotateProjectImage}
-                    removeProjectImage={removeProjectImage}
-                  />
-                ))}
-              </div>
+              <>
+                {/* Pasek zbiorczego usuwania */}
+                {(isEditing || isAdmin) && projectImages.length > 1 && (
+                  <div className="flex items-center justify-between mb-3 p-2 bg-slate-100 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={selectAllImages}
+                        className="text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center gap-1"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        {selectedForDeletion.length === projectImages.length ? 'Odznacz wszystko' : 'Zaznacz wszystko'}
+                      </button>
+                      {selectedForDeletion.length > 0 && (
+                        <span className="text-xs text-slate-500">
+                          ({selectedForDeletion.length} zaznaczonych)
+                        </span>
+                      )}
+                    </div>
+                    {selectedForDeletion.length > 0 && (
+                      <button
+                        onClick={() => setShowBulkDeleteConfirm(true)}
+                        className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg flex items-center gap-1 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Usuń zaznaczone ({selectedForDeletion.length})
+                      </button>
+                    )}
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {projectImages.map((img, idx) => (
+                    <AttachmentPreview
+                      key={idx}
+                      url={img}
+                      idx={idx}
+                      isEditing={isEditing}
+                      isAdmin={isAdmin}
+                      onClick={setLightboxImage}
+                      setCoverImage={setCoverImage}
+                      rotateProjectImage={rotateProjectImage}
+                      removeProjectImage={removeProjectImage}
+                      isSelected={selectedForDeletion.includes(idx)}
+                      onToggleSelect={toggleImageSelection}
+                    />
+                  ))}
+                </div>
+              </>
             ) : (
               <div className="text-center py-8 border-2 border-dashed border-slate-200 rounded-xl">
                 <p className="text-sm text-slate-400">Brak załączników.</p>
