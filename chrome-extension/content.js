@@ -893,7 +893,7 @@ function setupFormHandlers(content) {
             .filter(att => selectedAttachmentIds.includes(att.id))
             .map(att => ({
                 id: att.id,
-                messageId: att.messageId, // WAŻNE: To jest ID wiadomości z której pochodzi załącznik
+                messageId: att.messageId, // TO JEST KLUCZOWE: ID konkretnej wiadomości!
                 name: att.name,
                 mimeType: att.mimeType,
                 size: att.size

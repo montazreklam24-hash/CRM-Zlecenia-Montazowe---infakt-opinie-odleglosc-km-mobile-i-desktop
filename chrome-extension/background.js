@@ -431,62 +431,29 @@ async function getGmailAttachments(messageId) {
 }
 
 async function importAttachments(attachmentsToImport) {
-  if (!Array.isArray(attachmentsToImport)) {
-    await logDebug('warn', 'import', 'attachmentsToImport is not an array', attachmentsToImport);
-    return [];
-  }
-  
-  await logDebug('info', 'import', 'Starting import of attachments', { 
-    count: attachmentsToImport.length,
-    attachments: attachmentsToImport.map(a => ({ id: a.id?.substring(0, 20), messageId: a.messageId?.substring(0, 20), name: a.name }))
-  });
+  if (!Array.isArray(attachmentsToImport) || attachmentsToImport.length === 0) return [];
   
   try {
     const googleToken = await getAuthToken();
     const resultPaths = [];
     
-    // Grupuj załączniki po messageId
-    const byMessage = {};
+    // Ważne: każde wybrane ID załącznika musi być pobrane z WŁAŚCIWEGO messageId
     for (const att of attachmentsToImport) {
-        if (!att.messageId || !att.id) {
-            await logDebug('warn', 'import', 'Attachment missing messageId or id', att);
-            continue;
-        }
-        if (!byMessage[att.messageId]) byMessage[att.messageId] = [];
-        byMessage[att.messageId].push(att.id);
-    }
-    
-    await logDebug('info', 'import', 'Grouped by message', { 
-        messageCount: Object.keys(byMessage).length,
-        groups: Object.entries(byMessage).map(([msgId, ids]) => ({ msgId: msgId.substring(0, 20), attCount: ids.length }))
-    });
-    
-    for (const [msgId, attIds] of Object.entries(byMessage)) {
-        await logDebug('info', 'import', `Sending request for message ${msgId}`, { selectedIds: attIds });
+        if (!att.messageId || !att.id) continue;
         
+        // Wysyłamy prośbę o pobranie tego konkretnego załącznika z jego konkretnej wiadomości
         const result = await apiRequest('import_gmail.php', 'POST', { 
-            messageId: msgId, 
+            messageId: att.messageId, 
             token: googleToken, 
-            selectedIds: attIds 
-        });
-        
-        await logDebug('info', 'import', `Response for message ${msgId}`, { 
-            success: result.success, 
-            attachmentsCount: result.attachments?.length,
-            error: result.error
+            selectedIds: [att.id] // Tylko ten jeden ID dla tej wiadomości
         });
         
         if (result.success && result.attachments) {
-            resultPaths.push(...result.attachments.map(att => att.path));
+            resultPaths.push(...result.attachments.map(a => a.path));
         }
     }
-    
-    await logDebug('info', 'import', 'Import complete', { totalPaths: resultPaths.length, paths: resultPaths });
     return resultPaths;
-  } catch (error) { 
-    await logDebug('error', 'import', 'Import failed', { error: error.message });
-    throw error; 
-  }
+  } catch (error) { throw error; }
 }
 
 async function getRealMessageId(idOrThreadId) {
