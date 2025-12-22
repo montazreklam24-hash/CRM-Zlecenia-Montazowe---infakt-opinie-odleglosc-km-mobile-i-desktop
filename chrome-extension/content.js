@@ -133,6 +133,10 @@ function renderSidebar(state) {
     if (state === 'form') {
         content.innerHTML = `
             <div class="crm-form">
+                <div id="crm-confidence-warning" class="crm-warning-banner" style="display: none;">
+                    ⚠️ AI nie jest pewne tych danych. Sprawdź dokładnie!
+                </div>
+                
                 <div class="crm-top-buttons">
                     <button id="crm-read" class="crm-btn-primary crm-btn-half">
                         ✨ Analizuj Maila (AI)
@@ -786,12 +790,25 @@ function setupFormHandlers(content) {
             
             if (response.success && response.data) {
                 const d = response.data;
+                
+                // Pokaż ostrzeżenie jeśli confidence jest niskie
+                const warningBanner = document.getElementById('crm-confidence-warning');
+                if (warningBanner) {
+                    warningBanner.style.display = (d.confidence !== undefined && d.confidence < 0.7) ? 'block' : 'none';
+                }
+
                 document.getElementById('crm-input-title').value = d.suggestedTitle || '';
                 document.getElementById('crm-input-phone').value = d.phone || ''; 
                 document.getElementById('crm-input-email').value = d.email || '';
                 document.getElementById('crm-input-nip').value = d.nip || '';
                 document.getElementById('crm-input-address').value = d.address || '';
                 document.getElementById('crm-input-scope').value = d.scopeWorkText || d.scopeOfWork || '';
+
+                // Dodaj sugestie dla telefonu
+                renderSuggestions('crm-input-phone', d.phoneCandidates);
+                // Dodaj sugestie dla adresu
+                renderSuggestions('crm-input-address', d.addressCandidates);
+
             } else {
                 alert('Błąd AI: ' + (response.error || 'Brak danych'));
             }
@@ -944,4 +961,34 @@ function setupFormHandlers(content) {
             }
         }
     };
+}
+
+function renderSuggestions(inputId, candidates) {
+    const input = document.getElementById(inputId);
+    if (!input || !candidates || !Array.isArray(candidates) || candidates.length === 0) {
+        // Usuń istniejące sugestie jeśli są
+        const existing = input.parentElement.querySelector('.crm-suggestions');
+        if (existing) existing.remove();
+        return;
+    }
+
+    let suggestionsDiv = input.parentElement.querySelector('.crm-suggestions');
+    if (!suggestionsDiv) {
+        suggestionsDiv = document.createElement('div');
+        suggestionsDiv.className = 'crm-suggestions';
+        input.parentElement.appendChild(suggestionsDiv);
+    }
+
+    suggestionsDiv.innerHTML = '<div class="crm-suggestion-label">Inne wykryte:</div>';
+    
+    candidates.forEach(val => {
+        const chip = document.createElement('div');
+        chip.className = 'crm-suggestion-chip';
+        chip.innerText = val;
+        chip.onclick = () => {
+            input.value = val;
+            // Opcjonalnie: usuń chip po kliknięciu lub zaznacz jako wybrany
+        };
+        suggestionsDiv.appendChild(chip);
+    });
 }

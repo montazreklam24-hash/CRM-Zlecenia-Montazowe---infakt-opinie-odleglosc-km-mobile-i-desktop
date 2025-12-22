@@ -343,17 +343,18 @@ Jesteś inteligentnym asystentem CRM dla firmy "Montaż Reklam 24". Twoim zadani
 
 KRYTYCZNE ZASADY:
 1. TERMINOLOGIA: Jeśli zlecenie dotyczy witryn, szyb, okien – ZAWSZE używaj słowa "oklejanie" lub "oklejenie". NIGDY "montaż witryn".
-2. IDENTYFIKACJA KLIENTA: Musisz aktywnie szukać numeru telefonu klienta w całym wątku (również w stopkach).
+2. IDENTYFIKACJA KLIENTA: Musisz aktywnie szukać wszystkich numerów telefonu klienta w całym wątku (również w stopkach).
 3. IGNORUJ FIRMĘ: Nigdy nie zwracaj jako danych klienta telefonów firmowych (888 201 250, 22 213 95 96) ani maili firmowych (@montazreklam24.pl, @montazreklam24.com, @newoffice.pl, montazreklam24@gmail.com).
 4. ADRESY: 
-   - W polu "address" wpisz adres MONTAŻU (gdzie ekipa ma pojechać). 
+   - W polu "address" wpisz główny adres MONTAŻU (miejsce pracy). 
+   - W polu "addressCandidates" wypisz wszystkie inne adresy znalezione w mailu.
    - Jeśli w mailu jest inny adres rejestrowy/do faktury, wpisz go w pole "billingAddress".
-   - Jeśli jest tylko jeden adres, użyj go w obu miejscach.
 5. WĄTKI: Przeszukaj cały wątek, dane klienta często są w pierwszej wiadomości.
 
 ODPOWIEDZ TYLKO CZYSTYM JSONEM:
 {
-  "phone": "XXX XXX XXX lub null",
+  "phone": "główny numer (XXX XXX XXX) lub null",
+  "phoneCandidates": ["lista wszystkich innych znalezionych numerów telefonów"],
   "email": "email klienta lub null",
   "companyName": "nazwa firmy lub null",
   "nip": "NIP lub null",
@@ -367,6 +368,7 @@ ODPOWIEDZ TYLKO CZYSTYM JSONEM:
     "postCode": "kod XX-XXX",
     "district": "dzielnica lub null"
   },
+  "addressCandidates": ["lista wszystkich innych pełnych adresów znalezionych w tekście"],
   "billingAddress": {
     "street": "ulica",
     "buildingNo": "nr",
@@ -515,6 +517,18 @@ ${contextBody}
     }
     parsed.address = fullAddress;
 
+    // Przetwórz addressCandidates - upewnij się że to tablica stringów
+    if (parsed.addressCandidates && Array.isArray(parsed.addressCandidates)) {
+        parsed.addressCandidates = parsed.addressCandidates.map(addr => {
+            if (typeof addr === 'object' && addr !== null) {
+                return [addr.street ? addr.street + (addr.buildingNo ? ' ' + addr.buildingNo : '') : '', addr.postCode, addr.city].filter(Boolean).join(', ');
+            }
+            return addr;
+        }).filter(addr => addr && addr !== fullAddress);
+    } else {
+        parsed.addressCandidates = [];
+    }
+
     // Obsługa adresu do faktury (billingAddress)
     if (parsed.billingAddress && typeof parsed.billingAddress === 'object') {
         const ba = parsed.billingAddress;
@@ -529,7 +543,28 @@ ${contextBody}
                 parsed.scopeOfWork = billingNote;
             }
             await logDebug('info', 'analyze', 'Added billing address to scopeOfWork');
+            
+            // Dodaj też do kandydatów jeśli nie ma go tam jeszcze
+            if (!parsed.addressCandidates.includes(billingStr)) {
+                parsed.addressCandidates.push(billingStr);
+            }
         }
+    }
+
+    // Przetwórz phoneCandidates - usuń duplikaty i sformatuj
+    if (parsed.phoneCandidates && Array.isArray(parsed.phoneCandidates)) {
+        parsed.phoneCandidates = parsed.phoneCandidates
+            .map(p => {
+                if (typeof p !== 'string') return '';
+                const digits = p.replace(/\D/g, '');
+                if (digits.length === 9) return digits.match(/.{1,3}/g).join(' ');
+                return p;
+            })
+            .filter(p => p && p !== parsed.phone && !p.includes('888201250'));
+        // Unikalne
+        parsed.phoneCandidates = [...new Set(parsed.phoneCandidates)];
+    } else {
+        parsed.phoneCandidates = [];
     }
     
     // KRYTYCZNE: Popraw tytuł - zamień "montaż witryn" na "oklejanie witryn"
