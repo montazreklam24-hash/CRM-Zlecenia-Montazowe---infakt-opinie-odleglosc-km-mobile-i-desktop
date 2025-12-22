@@ -72,8 +72,9 @@ function googleApiGetRaw(string $url, string $token): array {
   return ['ok' => ($httpCode >= 200 && $httpCode < 300), 'code' => $httpCode, 'error' => null, 'json' => $json];
 }
 
-// UPROSZCZONA WERSJA - Zawsze zbiera WSZYSTKIE załączniki
-function collectAttachmentsFromPart(array $part, string $messageId, array &$out): void {
+// UPROSZCZONA WERSJA - Zawsze zbiera WSZYSTKIE załączniki (z deduplikacją)
+// $seenFilenames to zbiór już zebranych nazw plików, żeby uniknąć duplikatów z różnych wiadomości w wątku
+function collectAttachmentsFromPart(array $part, string $messageId, array &$out, array &$seenFilenames): void {
   $mimeType = $part['mimeType'] ?? '';
   $filename = $part['filename'] ?? '';
   $body = $part['body'] ?? [];
@@ -84,43 +85,55 @@ function collectAttachmentsFromPart(array $part, string $messageId, array &$out)
   if ($attachmentId) {
     $isInlineImage = (strpos($mimeType, 'image/') === 0);
     if ($filename || $isInlineImage) {
-      debugImport("Collecting: $filename (mime: $mimeType)");
-      $out[] = [
-        'messageId' => $messageId,
-        'attachmentId' => (string)$attachmentId,
-        'filename' => $filename,
-        'mimeType' => $mimeType,
-        'isInline' => $isInlineImage
-      ];
+      // DEDUPLIKACJA: Sprawdź czy już mamy plik o tej nazwie
+      $filenameKey = strtolower($filename ?: 'inline_' . substr($attachmentId, 0, 16));
+      if (isset($seenFilenames[$filenameKey])) {
+        debugImport("SKIPPING DUPLICATE: $filename (already collected from another message)");
+      } else {
+        debugImport("Collecting: $filename (mime: $mimeType)");
+        $seenFilenames[$filenameKey] = true;
+        $out[] = [
+          'messageId' => $messageId,
+          'attachmentId' => (string)$attachmentId,
+          'filename' => $filename,
+          'mimeType' => $mimeType,
+          'isInline' => $isInlineImage
+        ];
+      }
     }
   }
 
   // Inline obraz bez ID (rzadko)
   if (!$attachmentId && $inlineData && strpos($mimeType, 'image/') === 0) {
-    $out[] = [
-      'messageId' => $messageId,
-      'attachmentId' => null,
-      'filename' => $filename ?: ('inline_' . substr(md5($inlineData), 0, 8) . '.png'),
-      'mimeType' => $mimeType,
-      'isInline' => true,
-      'inlineData' => $inlineData
-    ];
+    $inlineFilename = $filename ?: ('inline_' . substr(md5($inlineData), 0, 8) . '.png');
+    $filenameKey = strtolower($inlineFilename);
+    if (!isset($seenFilenames[$filenameKey])) {
+      $seenFilenames[$filenameKey] = true;
+      $out[] = [
+        'messageId' => $messageId,
+        'attachmentId' => null,
+        'filename' => $inlineFilename,
+        'mimeType' => $mimeType,
+        'isInline' => true,
+        'inlineData' => $inlineData
+      ];
+    }
   }
 
   // Rekurencja do pod-części
   if (!empty($part['parts']) && is_array($part['parts'])) {
     foreach ($part['parts'] as $sub) {
-      if (is_array($sub)) collectAttachmentsFromPart($sub, $messageId, $out);
+      if (is_array($sub)) collectAttachmentsFromPart($sub, $messageId, $out, $seenFilenames);
     }
   }
 }
 
-function collectAttachmentsFromMessage(array $message, array &$out): void {
+function collectAttachmentsFromMessage(array $message, array &$out, array &$seenFilenames): void {
   $messageId = $message['id'] ?? '';
   if (!$messageId) return;
   $payload = $message['payload'] ?? null;
   if (!$payload || !is_array($payload)) return;
-  collectAttachmentsFromPart($payload, $messageId, $out);
+  collectAttachmentsFromPart($payload, $messageId, $out, $seenFilenames);
 }
 
 try {
@@ -151,11 +164,12 @@ try {
   
   debugImport("Thread fetched. Messages count: " . count($threadRes['json']['messages'] ?? []));
   
-  // KROK 3: Zbierz załączniki ze WSZYSTKICH wiadomości w wątku
+  // KROK 3: Zbierz załączniki ze WSZYSTKICH wiadomości w wątku (z deduplikacją)
+  $seenFilenames = []; // Śledzenie już zebranych plików - zapobiega duplikatom z różnych wiadomości
   foreach ($threadRes['json']['messages'] as $msg) {
       if (is_array($msg)) {
           debugImport("Scanning message: " . ($msg['id'] ?? 'unknown'));
-          collectAttachmentsFromMessage($msg, $attachmentsMeta);
+          collectAttachmentsFromMessage($msg, $attachmentsMeta, $seenFilenames);
       }
   }
 
