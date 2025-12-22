@@ -129,8 +129,109 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 // ANALIZA EMAILA PRZEZ GEMINI
 // =========================================================================
 
-// Lista maili firmowych do ignorowania
-const COMPANY_EMAILS = [
+// Funkcja pomocnicza do pobierania pełnej treści wątku
+async function getFullThreadContent(messageId) {
+    if (!messageId) return '';
+    try {
+        const token = await getAuthToken();
+        const realId = await getRealMessageId(messageId);
+        
+        // 1. Pobierz ID wątku
+        const msgUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${realId}?format=minimal`;
+        const msgResp = await fetch(msgUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!msgResp.ok) return '';
+        const msgData = await msgResp.json();
+        const threadId = msgData.threadId;
+        
+        if (!threadId) return '';
+
+        // 2. Pobierz cały wątek
+        const threadUrl = `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}?format=full`;
+        const threadResp = await fetch(threadUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!threadResp.ok) return '';
+        const threadData = await threadResp.json();
+        
+        let fullText = '';
+        const seenTexts = new Set(); // Żeby nie powielać treści
+
+        // Funkcja do wyciągania tekstu z payloadu
+        function extractText(parts) {
+            let text = '';
+            if (!parts) return '';
+            
+            // Jeśli to tablica
+            if (Array.isArray(parts)) {
+                for (const part of parts) {
+                    text += extractText(part);
+                }
+                return text;
+            }
+            
+            // Jeśli pojedynczy obiekt
+            if (parts.mimeType === 'text/plain' && parts.body && parts.body.data) {
+                try {
+                    const decoded = atob(parts.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+                    return decoded;
+                } catch (e) { return ''; }
+            }
+            
+            if (parts.parts) {
+                return extractText(parts.parts);
+            }
+            
+            return '';
+        }
+
+        if (threadData.messages) {
+            // Sortuj od najnowszych (chociaż Gmail zwykle daje chronologicznie)
+            // Ale my chcemy budować kontekst, więc chronologicznie jest ok.
+            for (const msg of threadData.messages) {
+                const text = extractText(msg.payload);
+                if (text && text.length > 20) { // Ignoruj bardzo krótkie
+                    // Proste czyszczenie cytatów
+                    const cleanText = text.replace(/^>.*$/gm, '').trim(); 
+                    if (!seenTexts.has(cleanText)) {
+                        fullText += `\n\n--- WIADOMOŚĆ Z DNIA ${new Date(parseInt(msg.internalDate)).toLocaleString()} ---\n${cleanText}`;
+                        seenTexts.add(cleanText);
+                    }
+                }
+            }
+        }
+        
+        return fullText;
+    } catch (e) {
+        console.error('Error fetching thread content:', e);
+        return '';
+    }
+}
+
+async function analyzeEmail(emailData) {
+  await logDebug('info', 'analyze', 'Starting email analysis', { 
+    hasImages: emailData.images?.length > 0,
+    imagesCount: emailData.images?.length || 0,
+    messageId: emailData.messageId
+  });
+  
+  const settings = await getSettings();
+  
+  if (!settings.geminiApiKey) {
+    return { success: false, error: 'Brak klucza API Gemini' };
+  }
+
+  // POBIERZ PEŁNĄ HISTORIĘ WĄTKU
+  let contextBody = emailData.body;
+  if (emailData.messageId) {
+      const threadContent = await getFullThreadContent(emailData.messageId);
+      if (threadContent) {
+          await logDebug('info', 'analyze', 'Fetched full thread content', { length: threadContent.length });
+          // Łączymy: Treść z widoku (priorytet) + Historia wątku
+          contextBody = emailData.body + "\n\n=== PEŁNA HISTORIA KORESPONDENCJI (DO ANALIZY) ===\n" + threadContent;
+      }
+  }
+  
+  // Sprawdź email nadawcy
+  const fromEmail = emailData.fromEmail || emailData.from || null;
+
   'montazreklam24@gmail.com',
   'montazreklam24@',
   'a.korpalski@',
@@ -748,7 +849,7 @@ Jeśli nie znalazłeś danego pola, ustaw null.
     
     // Fallback: jeśli Gemini nie znalazło telefonu, spróbuj wyciągnąć z tekstu
     if (!parsed.phone || parsed.phone === 'null' || parsed.phone === null) {
-      const phoneMatch = extractPhoneFromText(emailData.body);
+      const phoneMatch = extractPhoneFromText(contextBody); // Szukaj w całym kontekście
       if (phoneMatch) {
         parsed.phone = phoneMatch;
         console.log('[CRM BG] Phone extracted via fallback:', phoneMatch);
@@ -801,7 +902,7 @@ Jeśli nie znalazłeś danego pola, ustaw null.
     if (!parsed.email || parsed.email === 'null' || parsed.email === null) {
       // Szukaj emaili w treści (prosty regex)
       const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/gi;
-      const foundEmails = emailData.body.match(emailRegex) || [];
+      const foundEmails = contextBody.match(emailRegex) || []; // Szukaj w całym kontekście
       const clientEmail = foundEmails.find(email => {
         const emailLower = email.toLowerCase().trim();
         return !isCompanyEmail(emailLower);
@@ -824,7 +925,7 @@ Jeśli nie znalazłeś danego pola, ustaw null.
     
     // Fallback dla NIP
     if (!parsed.nip || parsed.nip === 'null' || parsed.nip === null) {
-        const nipMatch = extractNipFromText(emailData.body);
+        const nipMatch = extractNipFromText(contextBody); // Szukaj w całym kontekście
         if (nipMatch) {
             parsed.nip = nipMatch;
             await logDebug('info', 'analyze', 'NIP extracted via fallback regex', { nip: parsed.nip });
@@ -1073,84 +1174,58 @@ async function getGmailAttachments(messageId) {
   }
 }
 
-async function importAttachments(messageId, selectedIds = null) {
-  await logDebug('info', 'import', 'Starting attachment import', { 
-    messageId, 
-    messageIdLength: messageId?.length,
-    selectedCount: selectedIds ? selectedIds.length : 'ALL'
+async function importAttachments(attachmentsToImport) {
+  // Support both old (messageId, ids) and new (list of objects) signatures
+  // But here we implement the new one: list of {id, messageId}
+  
+  if (!Array.isArray(attachmentsToImport)) {
+      // Fallback for old calls if any
+      return []; 
+  }
+
+  await logDebug('info', 'import', 'Starting attachment import (multi-message)', { 
+    count: attachmentsToImport.length 
   });
   
   try {
     const googleToken = await getAuthToken();
-    await logDebug('info', 'import', 'Sending import request to API', { 
-      messageId, 
-      hasToken: !!googleToken,
-      selectedIds 
-    });
+    const resultPaths = [];
+
+    // Group by messageId to optimize calls? Or just fetch one by one?
+    // Let's fetch one by one for simplicity first, or group if API allows.
+    // The PHP script takes messageId + selectedIds. 
+    // We can group by messageId and call API for each message.
     
-    const result = await apiRequest('import_gmail.php', 'POST', {
-      messageId: messageId,
-      token: googleToken,
-      selectedIds: selectedIds // Przekaż listę wybranych ID do API
-    });
-    
-    await logDebug('info', 'import', 'Import API response received', { 
-      success: result.success, 
-      attachmentsCount: result.attachments?.length || 0,
-      error: result.error || null
-    });
-    
-    if (result.success && result.attachments) {
-      // Zwróć WSZYSTKIE załączniki - nie tylko obrazy, ale też PDF-y i inne pliki
-      const paths = result.attachments.map(att => att.path);
-      const fileTypes = result.attachments.map(att => ({
-        path: att.path,
-        mimeType: att.mimeType,
-        originalName: att.originalName
-      }));
-      
-      await logDebug('info', 'import', 'Import successful - ALL attachments', { 
-        attachmentsCount: paths.length, 
-        paths,
-        fileTypes: fileTypes.map(f => `${f.originalName} (${f.mimeType})`)
-      });
-      
-      // Loguj szczegóły każdego pliku
-      result.attachments.forEach((att, idx) => {
-        logDebug('info', 'import', `Attachment ${idx + 1}: ${att.originalName}`, {
-          path: att.path,
-          mimeType: att.mimeType,
-          isImage: att.mimeType?.startsWith('image/'),
-          isPdf: att.mimeType === 'application/pdf'
-        });
-      });
-      
-      return paths; // Zwróć wszystkie ścieżki - obrazy, PDF-y, wszystko
-    }
-    
-    // Jeśli import się nie udał (np. błąd API Google), rzuć błąd
-    if (result.error) {
-        await logDebug('warn', 'import', 'Import failed with error', { error: result.error });
-        
-        // Jeśli to błąd autoryzacji/konta, wyczyść token, żeby wymusić ponowne logowanie
-        if (result.error.includes('400') || result.error.includes('401') || result.error.includes('403')) {
-            await logDebug('warn', 'oauth', 'Auth error detected, clearing cached token', { error: result.error });
-            chrome.identity.removeCachedAuthToken({ token: googleToken }, () => {
-              logDebug('info', 'oauth', 'Cached token cleared');
-            });
-        }
-        throw new Error("Import załączników: " + result.error);
+    const byMessage = {};
+    for (const att of attachmentsToImport) {
+        if (!byMessage[att.messageId]) byMessage[att.messageId] = [];
+        byMessage[att.messageId].push(att.id);
     }
 
-    await logDebug('warn', 'import', 'Import completed but no attachments found');
-    return [];
+    for (const [msgId, attIds] of Object.entries(byMessage)) {
+        await logDebug('info', 'import', `Importing from message ${msgId}`, { ids: attIds });
+        
+        const result = await apiRequest('import_gmail.php', 'POST', {
+            messageId: msgId,
+            token: googleToken,
+            selectedIds: attIds
+        });
+        
+        if (result.success && result.attachments) {
+             const paths = result.attachments.map(att => att.path);
+             resultPaths.push(...paths);
+        } else {
+             await logDebug('warn', 'import', `Failed to import from ${msgId}`, { error: result.error });
+        }
+    }
+    
+    return resultPaths;
+
   } catch (error) {
     await logDebug('error', 'import', 'Attachment import error', { 
       message: error.message, 
-      stack: error.stack,
-      messageId 
+      stack: error.stack 
     });
-    // Przekaż błąd wyżej, żeby zatrzymać tworzenie zlecenia
     throw error;
   }
 }
@@ -1236,53 +1311,31 @@ async function createJobInCRM(jobData) {
       importAttachments: settings.importAttachments,
       hasMessageId: !!finalMessageId,
       messageId: finalMessageId,
-      selectedIds: jobData.selectedAttachmentIds 
+      selectedAttachmentsCount: jobData.selectedAttachments?.length
     });
     
     if (settings.importAttachments) {
-        if (finalMessageId) {
-            finalMessageId = await getRealMessageId(finalMessageId);
-        }
-
-        if (finalMessageId) {
-          try {
-            await logDebug('info', 'createJob', 'Calling importAttachments', { 
-                messageId: finalMessageId,
-                selectedIds: jobData.selectedAttachmentIds 
-            });
-            const importedFiles = await importAttachments(finalMessageId, jobData.selectedAttachmentIds);
-            
-            await logDebug('info', 'createJob', 'Import completed', { 
-              importedFilesCount: importedFiles?.length || 0,
-              importedFiles: importedFiles,
-              isArray: Array.isArray(importedFiles)
-            });
-            
-            // Dodaj WSZYSTKIE załączniki - obrazy, PDF-y, wszystko
-            if (Array.isArray(importedFiles) && importedFiles.length > 0) {
-              projectImages = importedFiles;
-              await logDebug('info', 'createJob', 'Gmail attachments added to projectImages', { 
-                count: projectImages.length,
-                files: projectImages
-              });
-            } else {
-              await logDebug('warn', 'createJob', 'importAttachments returned empty array or invalid data', { 
-                importedFiles: importedFiles,
-                type: typeof importedFiles
-              });
+        // Nowa logika: jeśli mamy przekazaną listę obiektów selectedAttachments, używamy jej
+        if (jobData.selectedAttachments && jobData.selectedAttachments.length > 0) {
+            try {
+                const importedFiles = await importAttachments(jobData.selectedAttachments);
+                
+                await logDebug('info', 'createJob', 'Import completed (new method)', { 
+                    count: importedFiles.length 
+                });
+                
+                if (importedFiles.length > 0) {
+                    projectImages = importedFiles;
+                }
+            } catch (e) {
+                attachmentWarning = "Błąd importu załączników: " + e.message;
             }
-          } catch (importError) {
-            await logDebug('error', 'createJob', 'Import załączników nie powiódł się', { 
-              error: importError.message,
-              stack: importError.stack,
-              name: importError.name
-            });
-            attachmentWarning = "Załączniki Gmail nie zostały pobrane: " + importError.message;
-          }
-        } else {
-            await logDebug('warn', 'createJob', 'Brak messageId po resolucji, pomijam załączniki Gmail', {
-              originalMessageId: jobData.gmailMessageId
-            });
+        } 
+        // Stara logika (fallback): jeśli mamy tylko ID wiadomości i listę ID
+        else if (finalMessageId) {
+             // ... code for fallback if needed, but we rely on selectedAttachments now ...
+             // Skip fallback to avoid confusion, assumption is selectedAttachments is always sent now
+             await logDebug('info', 'createJob', 'No selectedAttachments array provided, skipping import');
         }
     } else {
         await logDebug('info', 'createJob', 'Import attachments disabled in settings');

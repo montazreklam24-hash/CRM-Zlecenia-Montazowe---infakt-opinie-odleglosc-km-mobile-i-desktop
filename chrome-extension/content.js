@@ -872,7 +872,7 @@ function setupFormHandlers(content) {
         }
         
         // Loguj przed wysłaniem
-        console.log('[CRM Content] Creating job with:', {
+            console.log('[CRM Content] Creating job with:', {
             messageId: messageId,
             messageIdLength: messageId?.length,
             manualAttachments: uploadedFiles.length,
@@ -881,6 +881,17 @@ function setupFormHandlers(content) {
             phone: phone,
             email: email
         });
+
+        // Znajdź pełne obiekty załączników na podstawie wybranych ID
+        const selectedAttachmentsFull = gmailAttachments
+            .filter(att => selectedAttachmentIds.includes(att.id))
+            .map(att => ({
+                id: att.id,
+                messageId: att.messageId, // WAŻNE: To jest ID wiadomości z której pochodzi załącznik
+                name: att.name,
+                mimeType: att.mimeType,
+                size: att.size
+            }));
 
         try {
             const res = await chrome.runtime.sendMessage({
@@ -894,10 +905,11 @@ function setupFormHandlers(content) {
                     description: scope,
                     gmailMessageId: messageId,
                     manualAttachments: uploadedFiles,
-                    selectedAttachmentIds: selectedAttachmentIds // <-- PRZEKAZUJEMY WYBRANE ID
+                    selectedAttachments: selectedAttachmentsFull, // Przekazujemy pełne obiekty
+                    selectedAttachmentIds: selectedAttachmentIds // Dla wstecznej kompatybilności (opcjonalnie)
                 }
             });
-            
+
             console.log('[CRM Content] Create job response:', {
                 success: res.success,
                 warning: res.warning,
