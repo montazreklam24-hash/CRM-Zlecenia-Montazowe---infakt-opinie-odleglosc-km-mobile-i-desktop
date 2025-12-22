@@ -744,8 +744,6 @@ function setupFormHandlers(content) {
                         console.log('[CRM Content] Final attachments list:', gmailAttachments);
 
                         // INTELIGENTNE ZAZNACZANIE (Zamiast usuwania, po prostu odznaczamy śmieci)
-                        const blacklist = ['logo', 'montazreklam', 'newoffice', 'footer', 'stopka', 'sygnatura', 'facebook', 'instagram', 'linkedin'];
-                        
                         selectedAttachmentIds = gmailAttachments
                             .filter(att => {
                                 // Prawdziwe załączniki (nie inline) zaznaczamy zawsze
