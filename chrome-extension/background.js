@@ -433,27 +433,40 @@ async function getGmailAttachments(messageId) {
 async function importAttachments(attachmentsToImport) {
   if (!Array.isArray(attachmentsToImport) || attachmentsToImport.length === 0) return [];
   
-  try {
-    const googleToken = await getAuthToken();
-    const resultPaths = [];
-    
-    // Ważne: każde wybrane ID załącznika musi być pobrane z WŁAŚCIWEGO messageId
-    for (const att of attachmentsToImport) {
-        if (!att.messageId || !att.id) continue;
-        
-        // Wysyłamy prośbę o pobranie tego konkretnego załącznika z jego konkretnej wiadomości
-        const result = await apiRequest('import_gmail.php', 'POST', { 
-            messageId: att.messageId, 
-            token: googleToken, 
-            selectedIds: [att.id] // Tylko ten jeden ID dla tej wiadomości
-        });
-        
-        if (result.success && result.attachments) {
-            resultPaths.push(...result.attachments.map(a => a.path));
-        }
+  await logDebug('info', 'import', 'Starting direct import via Browser', { count: attachmentsToImport.length });
+  const resultPaths = [];
+  
+  for (const att of attachmentsToImport) {
+    try {
+      if (!att.messageId || !att.id) continue;
+      
+      await logDebug('info', 'import', `Downloading ${att.name}`, { id: att.id.substring(0, 20) });
+      
+      // 1. Pobierz dane z Gmaila (Base64)
+      const gmailRes = await getAttachmentData(att.messageId, att.id);
+      if (!gmailRes.success || !gmailRes.data) {
+        await logDebug('error', 'import', `Failed to download ${att.name}`, gmailRes.error);
+        continue;
+      }
+      
+      // 2. Przygotuj format jak dla manualnego uploadu
+      const fileObj = {
+        name: att.name,
+        data: `data:${att.mimeType || 'application/octet-stream'};base64,${gmailRes.data.replace(/-/g, '+').replace(/_/g, '/')}`
+      };
+      
+      // 3. Wyślij bezpośrednio do CRM (upload.php)
+      const url = await uploadFileToCRM(fileObj);
+      if (url) {
+        resultPaths.push(url);
+        await logDebug('info', 'import', `Successfully uploaded ${att.name}`, { url });
+      }
+    } catch (e) {
+      await logDebug('error', 'import', `Error processing ${att.name}`, e.message);
     }
-    return resultPaths;
-  } catch (error) { throw error; }
+  }
+  
+  return resultPaths;
 }
 
 async function getRealMessageId(idOrThreadId) {
