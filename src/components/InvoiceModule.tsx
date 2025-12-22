@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PaymentStatus, Invoice } from '../types';
 import { Plus, Trash2, FileText, Send, Download, ExternalLink, Loader2, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import invoiceService, { InvoiceItemData } from '../services/invoiceService';
