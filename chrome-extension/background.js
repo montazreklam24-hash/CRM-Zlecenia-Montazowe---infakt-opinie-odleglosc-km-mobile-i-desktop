@@ -67,11 +67,15 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   
   switch (request.action) {
     case 'analyzeEmail':
-      analyzeEmail(request.data).then(sendResponse);
+      analyzeEmail(request.data)
+        .then(sendResponse)
+        .catch(err => sendResponse({ success: false, error: err.message }));
       return true; // async response
       
     case 'createJob':
-      createJobInCRM(request.data).then(sendResponse);
+      createJobInCRM(request.data)
+        .then(sendResponse)
+        .catch(err => sendResponse({ success: false, error: err.message }));
       return true;
       
     case 'getSettings':
