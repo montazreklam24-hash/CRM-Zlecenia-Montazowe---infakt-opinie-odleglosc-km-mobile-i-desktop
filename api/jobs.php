@@ -184,10 +184,12 @@ function createJob() {
         $stmt = $pdo->prepare('
             INSERT INTO jobs_ai (
                 friendly_id, title, client_id, client_name, phone, email, nip,
+                billing_name, billing_nip, billing_street, billing_building_no, 
+                billing_apartment_no, billing_post_code, billing_city, billing_email,
                 address, coordinates_lat, coordinates_lng,
                 description, notes, status, column_id, column_order, created_by,
                 gmail_message_id, gmail_thread_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ');
         
         $phone = null;
@@ -208,6 +210,15 @@ function createJob() {
             }
         }
 
+        // Helper dla pól billing (obsługa obu struktur)
+        $getBilling = function($key, $nestedKey) use ($data) {
+            if (isset($data[$key])) return $data[$key];
+            if (isset($data['billing']) && is_array($data['billing']) && isset($data['billing'][$nestedKey])) {
+                return $data['billing'][$nestedKey];
+            }
+            return null;
+        };
+
         $stmt->execute(array(
             $friendlyId,
             $title,
@@ -216,6 +227,17 @@ function createJob() {
             $phone,
             isset($data['email']) ? $data['email'] : null,
             isset($data['nip']) ? $data['nip'] : null,
+            
+            // Dane do faktury (używamy helpera)
+            $getBilling('billingName', 'name'),
+            $getBilling('billingNip', 'nip'),
+            $getBilling('billingStreet', 'street'),
+            $getBilling('billingBuilding', 'buildingNo'),
+            $getBilling('billingApartment', 'apartmentNo'),
+            $getBilling('billingPostcode', 'postCode'),
+            $getBilling('billingCity', 'city'),
+            $getBilling('billingEmail', 'email'),
+            
             isset($data['address']) ? $data['address'] : null,
             $coordLat,
             $coordLng,
@@ -284,13 +306,38 @@ function updateJob($id) {
             'nip' => 'nip',
             'address' => 'address',
             'scopeWorkText' => 'description',
-            'description' => 'description'
+            'description' => 'description',
         );
         
         foreach ($fieldMap as $frontendField => $dbField) {
             if (isset($data[$frontendField])) {
                 $updates[] = "$dbField = ?";
                 $params[] = $data[$frontendField];
+            }
+        }
+
+        // Mapowanie pól bilingowych (obsługa płaskiej struktury i zagnieżdżonej)
+        $billingMap = array(
+            'billingName' => array('db' => 'billing_name', 'nested' => 'name'),
+            'billingNip' => array('db' => 'billing_nip', 'nested' => 'nip'),
+            'billingStreet' => array('db' => 'billing_street', 'nested' => 'street'),
+            'billingBuilding' => array('db' => 'billing_building_no', 'nested' => 'buildingNo'),
+            'billingApartment' => array('db' => 'billing_apartment_no', 'nested' => 'apartmentNo'),
+            'billingPostcode' => array('db' => 'billing_post_code', 'nested' => 'postCode'),
+            'billingCity' => array('db' => 'billing_city', 'nested' => 'city'),
+            'billingEmail' => array('db' => 'billing_email', 'nested' => 'email'),
+        );
+
+        foreach ($billingMap as $flatKey => $cfg) {
+            $dbField = $cfg['db'];
+            $nestedKey = $cfg['nested'];
+            
+            if (isset($data[$flatKey])) {
+                $updates[] = "$dbField = ?";
+                $params[] = $data[$flatKey];
+            } elseif (isset($data['billing']) && is_array($data['billing']) && isset($data['billing'][$nestedKey])) {
+                $updates[] = "$dbField = ?";
+                $params[] = $data['billing'][$nestedKey];
             }
         }
         
@@ -467,6 +514,16 @@ function mapJobToFrontend($job) {
             'email' => $job['email'],
             'nip' => $job['nip'],
             'address' => $job['address'],
+            'billing' => array(
+                'name' => $job['billing_name'],
+                'nip' => $job['billing_nip'],
+                'street' => $job['billing_street'],
+                'buildingNo' => $job['billing_building_no'],
+                'apartmentNo' => $job['billing_apartment_no'],
+                'postCode' => $job['billing_post_code'],
+                'city' => $job['billing_city'],
+                'email' => $job['billing_email'],
+            ),
             'coordinates' => $coords,
             'scopeWorkText' => $job['description'],
             'payment' => array(

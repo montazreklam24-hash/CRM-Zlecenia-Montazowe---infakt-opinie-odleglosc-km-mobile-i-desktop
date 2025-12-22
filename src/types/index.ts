@@ -191,6 +191,16 @@ export interface JobOrderData {
   scopeWorkText?: string;
   description?: string;
   scopeWorkImages?: string;
+  billing?: {
+    name: string | null;
+    nip: string | null;
+    street: string | null;
+    buildingNo: string | null;
+    apartmentNo: string | null;
+    postCode: string | null;
+    city: string | null;
+    email: string | null;
+  };
   scheduledDate?: string;
   timeSlotStart?: string; // np. "08:00"
   timeSlotEnd?: string;   // np. "16:00"

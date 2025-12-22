@@ -174,6 +174,16 @@ export const invoiceService = {
   },
 
   /**
+   * Pobierz wszystkie faktury
+   */
+  async getAllInvoices(params?: { type?: string; status?: string }): Promise<{ success: boolean; invoices: Invoice[] }> {
+    const query = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return apiRequest<{ success: boolean; invoices: Invoice[] }>(`/invoices${query}`, {
+      method: 'GET',
+    });
+  },
+
+  /**
    * Oznacz fakturę jako opłaconą
    */
   async markAsPaid(invoiceId: number, paidDate?: string): Promise<{ success: boolean }> {

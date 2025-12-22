@@ -619,7 +619,17 @@ async function createJobInCRM(jobData) {
       scopeWorkText: jobData.description,
       gmailMessageId: finalMessageId || null,
       projectImages: projectImages, 
-      columnId: 'PREPARE'
+      columnId: 'PREPARE',
+      
+      // Dane do faktury
+      billingName: jobData.billingName,
+      billingNip: jobData.billingNip,
+      billingStreet: jobData.billingStreet,
+      billingBuilding: jobData.billingBuilding,
+      billingApartment: jobData.billingApartment,
+      billingPostcode: jobData.billingPostcode,
+      billingCity: jobData.billingCity,
+      billingEmail: jobData.billingEmail
     });
     return { success: true, job: result.job, warning: attachmentWarning };
   } catch (error) { return { success: false, error: error.message }; }

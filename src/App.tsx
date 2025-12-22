@@ -9,6 +9,7 @@ import Layout from './components/Layout';
 import InvoiceModule from './components/InvoiceModule';
 import ClientModule from './components/ClientModule';
 import MapPage from './pages/MapPage';
+import InvoicingPage from './pages/InvoicingPage';
 import { geminiService, authService, jobsService } from './services/apiService';
 import { User, UserRole, Job, JobOrderData, JobStatus } from './types';
 import { Loader2 } from 'lucide-react';
@@ -51,6 +52,16 @@ const App: React.FC = () => {
     isProcessing: false,
     error: null
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const jobId = params.get('job');
+    if (jobId && state.user) {
+      jobsService.getJob(jobId).then(job => {
+        if (job) handleSelectJob(job);
+      }).catch(err => console.error('Failed to load job from URL:', err));
+    }
+  }, [state.user]);
 
   const [dashboardRefreshTrigger, setDashboardRefreshTrigger] = useState(0);
   
@@ -214,7 +225,7 @@ const App: React.FC = () => {
             />
           } />
           <Route path="/map" element={<MapPage onSelectJob={handleSelectJob} />} />
-          <Route path="/invoices" element={<InvoiceModule />} />
+          <Route path="/invoices" element={<InvoicingPage />} />
           <Route path="/clients" element={<ClientModule />} />
         </Route>
       </Routes>

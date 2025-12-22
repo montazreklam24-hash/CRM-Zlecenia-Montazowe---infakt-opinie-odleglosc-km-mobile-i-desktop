@@ -175,6 +175,51 @@ function renderSidebar(state) {
                     <label>Adres</label>
                     <textarea id="crm-input-address" rows="2"></textarea>
                 </div>
+
+                <!-- BILLING DATA SECTION -->
+                <div class="crm-field">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <label style="margin-bottom: 0;">Dane do faktury</label>
+                        <button id="crm-copy-main-btn" class="crm-btn-mini" style="font-size: 10px; padding: 2px 6px;">Kopiuj z głównych</button>
+                    </div>
+                    <div id="crm-billing-section" style="background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                        <div class="crm-field">
+                            <label style="font-size: 11px;">Nazwa firmy / Imię i Nazwisko</label>
+                            <input id="crm-input-billing-name" style="font-size: 12px; padding: 6px;">
+                        </div>
+                        <div class="crm-field">
+                            <label style="font-size: 11px;">NIP</label>
+                            <input id="crm-input-billing-nip" style="font-size: 12px; padding: 6px;">
+                        </div>
+                        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px;">
+                            <div class="crm-field">
+                                <label style="font-size: 11px;">Ulica</label>
+                                <input id="crm-input-billing-street" style="font-size: 12px; padding: 6px;">
+                            </div>
+                            <div class="crm-field">
+                                <label style="font-size: 11px;">Nr / Lok.</label>
+                                <div style="display: flex; gap: 4px;">
+                                    <input id="crm-input-billing-building" style="font-size: 12px; padding: 6px; width: 60%;">
+                                    <input id="crm-input-billing-apartment" style="font-size: 12px; padding: 6px; width: 40%;">
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 8px;">
+                            <div class="crm-field">
+                                <label style="font-size: 11px;">Kod pocztowy</label>
+                                <input id="crm-input-billing-postcode" style="font-size: 12px; padding: 6px;">
+                            </div>
+                            <div class="crm-field">
+                                <label style="font-size: 11px;">Miasto</label>
+                                <input id="crm-input-billing-city" style="font-size: 12px; padding: 6px;">
+                            </div>
+                        </div>
+                        <div class="crm-field" style="margin-bottom: 0;">
+                            <label style="font-size: 11px;">Email do faktury</label>
+                            <input id="crm-input-billing-email" style="font-size: 12px; padding: 6px;">
+                        </div>
+                    </div>
+                </div>
                 
                 <div class="crm-field">
                     <label>Zakres prac</label>
@@ -804,6 +849,58 @@ function setupFormHandlers(content) {
                 document.getElementById('crm-input-address').value = d.address || '';
                 document.getElementById('crm-input-scope').value = d.scopeWorkText || d.scopeOfWork || '';
 
+                // Billing info from AI (if exists)
+                if (d.billing) {
+                    if (d.billing.name) document.getElementById('crm-input-billing-name').value = d.billing.name;
+                    if (d.billing.nip) document.getElementById('crm-input-billing-nip').value = d.billing.nip;
+                    if (d.billing.street) document.getElementById('crm-input-billing-street').value = d.billing.street;
+                    if (d.billing.buildingNo) document.getElementById('crm-input-billing-building').value = d.billing.buildingNo;
+                    if (d.billing.apartmentNo) document.getElementById('crm-input-billing-apartment').value = d.billing.apartmentNo;
+                    if (d.billing.postCode) document.getElementById('crm-input-billing-postcode').value = d.billing.postCode;
+                    if (d.billing.city) document.getElementById('crm-input-billing-city').value = d.billing.city;
+                    // Domyślnie email do faktury = email klienta, chyba że AI znalazło inny
+                    document.getElementById('crm-input-billing-email').value = d.billing.email || d.email || '';
+                } else {
+                    // Fallback: jeśli AI nie dało sekcji billing, wypełnij NIP i email z głównych danych
+                    if (d.nip) document.getElementById('crm-input-billing-nip').value = d.nip;
+                    if (d.email) document.getElementById('crm-input-billing-email').value = d.email;
+                }
+
+                // AUTOMATYCZNY GUS: Jeśli mamy NIP ale nie mamy nazwy firmy, pobierz z GUS
+                const billingNipValue = document.getElementById('crm-input-billing-nip').value.replace(/[^\d]/g, '');
+                const billingNameValue = document.getElementById('crm-input-billing-name').value.trim();
+                
+                if (billingNipValue.length === 10 && !billingNameValue) {
+                    console.log('[CRM] Auto-GUS: Mam NIP bez nazwy, pobieram z GUS...');
+                    try {
+                        const gusResponse = await chrome.runtime.sendMessage({
+                            action: 'lookupGus',
+                            nip: billingNipValue
+                        });
+                        
+                        if (gusResponse.success && gusResponse.company) {
+                            const c = gusResponse.company;
+                            console.log('[CRM] Auto-GUS: Znaleziono firmę:', c.name);
+                            
+                            if (c.name) document.getElementById('crm-input-billing-name').value = c.name;
+                            if (c.street) {
+                                const streetMatch = c.street.match(/^(.*?)\s(\d+[a-zA-Z]?)(?:\/(\d+))?$/);
+                                if (streetMatch) {
+                                    document.getElementById('crm-input-billing-street').value = streetMatch[1];
+                                    document.getElementById('crm-input-billing-building').value = streetMatch[2];
+                                    if (streetMatch[3]) document.getElementById('crm-input-billing-apartment').value = streetMatch[3];
+                                } else {
+                                    document.getElementById('crm-input-billing-street').value = c.street;
+                                }
+                            }
+                            if (c.postCode) document.getElementById('crm-input-billing-postcode').value = c.postCode;
+                            if (c.city) document.getElementById('crm-input-billing-city').value = c.city;
+                        }
+                    } catch (gusErr) {
+                        console.warn('[CRM] Auto-GUS failed:', gusErr);
+                    }
+                }
+
                 // Dodaj sugestie dla telefonu
                 renderSuggestions('crm-input-phone', d.phoneCandidates);
                 // Dodaj sugestie dla adresu
@@ -843,18 +940,29 @@ function setupFormHandlers(content) {
 
                 if (response.success && response.company) {
                     const c = response.company;
-                    // Uzupełnij dane
-                    if (c.name) document.getElementById('crm-input-title').value = c.name.substring(0, 50);
                     
-                    let fullAddr = '';
+                    // UWAGA: NIE nadpisujemy tytułu zlecenia! Tytuł pozostaje jaki jest.
+                    // NIE nadpisujemy adresu głównego - to adres montażu, nie firmy!
+                    
+                    // Uzupełnij TYLKO dane do faktury
+                    if (c.name) document.getElementById('crm-input-billing-name').value = c.name;
+                    document.getElementById('crm-input-billing-nip').value = nip;
                     if (c.street) {
-                        fullAddr = c.street;
-                        if (c.postCode || c.city) fullAddr += ', ' + [c.postCode, c.city].filter(Boolean).join(' ');
+                        // Spróbuj wyciągnąć numer domu z ulicy
+                        const streetMatch = c.street.match(/^(.*?)\s(\d+[a-zA-Z]?)(?:\/(\d+))?$/);
+                        if (streetMatch) {
+                            document.getElementById('crm-input-billing-street').value = streetMatch[1];
+                            document.getElementById('crm-input-billing-building').value = streetMatch[2];
+                            if (streetMatch[3]) document.getElementById('crm-input-billing-apartment').value = streetMatch[3];
+                        } else {
+                            document.getElementById('crm-input-billing-street').value = c.street;
+                        }
                     }
-                    if (fullAddr) document.getElementById('crm-input-address').value = fullAddr;
+                    if (c.postCode) document.getElementById('crm-input-billing-postcode').value = c.postCode;
+                    if (c.city) document.getElementById('crm-input-billing-city').value = c.city;
                     
                     // Poinformuj użytkownika
-                    alert('Znaleziono firmę: ' + c.name);
+                    console.log('[CRM] GUS: Pobrano dane dla firmy:', c.name);
                 } else {
                     alert('Błąd GUS: ' + (response.error || 'Nie znaleziono firmy'));
                 }
@@ -863,6 +971,45 @@ function setupFormHandlers(content) {
             } finally {
                 gusBtn.innerText = originalText;
                 gusBtn.disabled = false;
+            }
+        };
+    }
+
+    // COPY BILLING BUTTON
+    const copyBillingBtn = content.querySelector('#crm-copy-main-btn');
+    if (copyBillingBtn) {
+        copyBillingBtn.onclick = () => {
+            document.getElementById('crm-input-billing-name').value = document.getElementById('crm-input-title').value;
+            document.getElementById('crm-input-billing-nip').value = document.getElementById('crm-input-nip').value;
+            document.getElementById('crm-input-billing-email').value = document.getElementById('crm-input-email').value;
+            
+            // Spróbuj wyciągnąć miasto i kod z adresu
+            const fullAddress = document.getElementById('crm-input-address').value;
+            if (fullAddress) {
+                // Prosta próba parsowania: "Ulica 12/3, 00-000 Miasto"
+                const parts = fullAddress.split(',');
+                if (parts.length > 0) {
+                    const streetPart = parts[0].trim();
+                    // Spróbuj wyciągnąć numer domu
+                    const streetMatch = streetPart.match(/^(.*?)\s(\d+[a-zA-Z]?)(?:\/(\d+))?$/);
+                    if (streetMatch) {
+                        document.getElementById('crm-input-billing-street').value = streetMatch[1];
+                        document.getElementById('crm-input-billing-building').value = streetMatch[2];
+                        if (streetMatch[3]) document.getElementById('crm-input-billing-apartment').value = streetMatch[3];
+                    } else {
+                        document.getElementById('crm-input-billing-street').value = streetPart;
+                    }
+                }
+                if (parts.length > 1) {
+                    const cityPart = parts[1].trim();
+                    const cityMatch = cityPart.match(/^(\d{2}-\d{3})\s+(.*)$/);
+                    if (cityMatch) {
+                        document.getElementById('crm-input-billing-postcode').value = cityMatch[1];
+                        document.getElementById('crm-input-billing-city').value = cityMatch[2];
+                    } else {
+                        document.getElementById('crm-input-billing-city').value = cityPart;
+                    }
+                }
             }
         };
     }
@@ -880,6 +1027,16 @@ function setupFormHandlers(content) {
         const nip = document.getElementById('crm-input-nip').value;
         const address = document.getElementById('crm-input-address').value;
         const scope = document.getElementById('crm-input-scope').value;
+        
+        // Dane do faktury
+        const billingName = document.getElementById('crm-input-billing-name').value;
+        const billingNip = document.getElementById('crm-input-billing-nip').value;
+        const billingStreet = document.getElementById('crm-input-billing-street').value;
+        const billingBuilding = document.getElementById('crm-input-billing-building').value;
+        const billingApartment = document.getElementById('crm-input-billing-apartment').value;
+        const billingPostcode = document.getElementById('crm-input-billing-postcode').value;
+        const billingCity = document.getElementById('crm-input-billing-city').value;
+        const billingEmail = document.getElementById('crm-input-billing-email').value;
         
         // ID - użyj zapisanego lub pobierz ponownie
         let messageId = lastMessageId || getCurrentMessageId();
@@ -921,7 +1078,17 @@ function setupFormHandlers(content) {
                     gmailMessageId: messageId,
                     manualAttachments: uploadedFiles,
                     selectedAttachments: selectedAttachmentsFull, // Przekazujemy pełne obiekty
-                    selectedAttachmentIds: selectedAttachmentIds // Dla wstecznej kompatybilności (opcjonalnie)
+                    selectedAttachmentIds: selectedAttachmentIds, // Dla wstecznej kompatybilności (opcjonalnie)
+                    
+                    // Dane do faktury
+                    billingName,
+                    billingNip,
+                    billingStreet,
+                    billingBuilding,
+                    billingApartment,
+                    billingPostcode,
+                    billingCity,
+                    billingEmail
                 }
             });
 

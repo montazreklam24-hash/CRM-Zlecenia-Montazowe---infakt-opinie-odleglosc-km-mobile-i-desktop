@@ -524,6 +524,69 @@ function handleGetJobInvoices($jobId) {
 // GŁÓWNA FUNKCJA HANDLERA (wywoływana z index.php)
 // =============================================================================
 
+/**
+ * GET /api/invoices
+ * Pobierz listę wszystkich faktur
+ */
+function handleGetAllInvoices() {
+    $user = requireAuth();
+    
+    try {
+        $pdo = getDB();
+        
+        // Pobierz parametry filtrowania (opcjonalnie)
+        $type = isset($_GET['type']) ? $_GET['type'] : null;
+        $status = isset($_GET['status']) ? $_GET['status'] : null;
+        
+        $query = "
+            SELECT i.*, j.title as job_title, j.friendly_id as job_friendly_id 
+            FROM invoices i
+            LEFT JOIN jobs_ai j ON i.job_id = j.id
+            WHERE 1=1
+        ";
+        $params = array();
+        
+        if ($type) {
+            $query .= " AND i.type = ?";
+            $params[] = $type;
+        }
+        
+        if ($status) {
+            $query .= " AND i.status = ?";
+            $params[] = $status;
+        }
+        
+        $query .= " ORDER BY i.created_at DESC";
+        
+        $stmt = $pdo->prepare($query);
+        $stmt->execute($params);
+        $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $mapped = array();
+        foreach ($invoices as $inv) {
+            $mapped[] = array(
+                'id' => intval($inv['id']),
+                'jobId' => $inv['job_id'],
+                'jobTitle' => $inv['job_title'],
+                'jobFriendlyId' => $inv['job_friendly_id'],
+                'infaktId' => intval($inv['infakt_id']),
+                'infaktNumber' => $inv['infakt_number'],
+                'type' => $inv['type'],
+                'clientId' => intval($inv['client_id']),
+                'totalNet' => floatval($inv['total_net']),
+                'totalGross' => floatval($inv['total_gross']),
+                'status' => $inv['status'],
+                'shareLink' => $inv['share_link'],
+                'createdAt' => $inv['created_at']
+            );
+        }
+        
+        jsonResponse(array('success' => true, 'invoices' => $mapped));
+    } catch (Exception $e) {
+        jsonResponse(array('success' => true, 'invoices' => array(), 'error' => $e->getMessage()));
+    }
+}
+
 function handleInvoices($method, $id = null) {
     // Pobierz dodatkową część ścieżki (np. /invoices/proforma -> proforma)
     $requestUri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
@@ -566,8 +629,8 @@ function handleInvoices($method, $id = null) {
         } elseif ($id && is_numeric($id)) {
             handleGetInvoice($id);
         } else {
-            // Lista faktur (opcjonalnie)
-            jsonResponse(array('error' => 'Specify invoice ID or action'), 400);
+            // Lista wszystkich faktur
+            handleGetAllInvoices();
         }
     } else {
         jsonResponse(array('error' => 'Method not allowed'), 405);

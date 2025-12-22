@@ -4,10 +4,12 @@ import {
   ArrowLeft, CheckCircle2, Loader2, Camera, Save, Edit2, 
   ListTodo, Plus, Trash2, Copy, MessageSquare, Star, FileText,
   X, Share2, ScrollText, ScanEye, Navigation, Phone, ExternalLink,
-  Mic, MicOff, RotateCw, Calendar, Archive, ChevronDown, Clock
+  Mic, MicOff, RotateCw, Calendar, Archive, ChevronDown, Clock,
+  Receipt
 } from 'lucide-react';
 import { Job, JobOrderData, JobStatus, UserRole, ChecklistItem, PaymentStatus, JobColumnId } from '../types';
 import { jobsService, geminiService } from '../services/apiService';
+import invoiceService from '../services/invoiceService';
 import { rotateImage90, compressImage, processImageFile } from '../utils/imageUtils';
 import InvoiceModule from './InvoiceModule';
 import CompletionSection from './CompletionSection';
@@ -146,7 +148,21 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
     scopeWorkImages: d.scopeWorkImages || '',
     scheduledDate: d.scheduledDate || '',
     timeSlotStart: d.timeSlotStart || '',
-    timeSlotEnd: d.timeSlotEnd || ''
+    timeSlotEnd: d.timeSlotEnd || '',
+    billing: d.billing ? {
+      ...d.billing,
+      nip: d.billing.nip || d.nip || '',
+      email: d.billing.email || d.email || '' // Domyślnie email z korespondencji
+    } : {
+      name: '',
+      nip: d.nip || '',
+      street: '',
+      buildingNo: '',
+      apartmentNo: '',
+      postCode: '',
+      city: '',
+      email: d.email || '' // Domyślnie email z korespondencji
+    }
   });
 
   const [editedData, setEditedData] = useState<JobOrderData>(
@@ -182,6 +198,63 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
   // Voice Input
   const { isListening, transcript, resetTranscript, startListening, stopListening, isSupported } = useVoiceInput();
   const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
+  const lastAutoNip = useRef<string | null>(null);
+
+  // Automatyczny GUS po wpisaniu NIP - TYLKO wypełnia billing, NIE dotyka tytułu/clientName!
+  useEffect(() => {
+    const nip = editedData.billing?.nip?.replace(/[^\d]/g, '');
+    
+    if (isEditing && nip && nip.length === 10) {
+      // Nie sprawdzaj jeśli to ten sam NIP co poprzednio (chyba że nazwa billing jest pusta)
+      const isNewNip = nip !== lastAutoNip.current;
+      const isBillingNameEmpty = !editedData.billing?.name || editedData.billing.name.length < 3;
+
+      if (isNewNip || isBillingNameEmpty) {
+        const timer = setTimeout(async () => {
+          lastAutoNip.current = nip;
+          
+          setIsProcessing(true);
+          try {
+            console.log('[GUS] Automatyczne sprawdzanie NIP:', nip);
+            const res = await invoiceService.lookupNip(nip);
+            if (res.success && res.company) {
+              const { name, street, city, postCode } = res.company;
+              let st = street;
+              let bNo = '';
+              let aNo = '';
+              const streetMatch = street.match(/^(.*?)\s(\d+[a-zA-Z]?)(?:\/(\d+))?$/);
+              if (streetMatch) {
+                st = streetMatch[1];
+                bNo = streetMatch[2];
+                aNo = streetMatch[3] || '';
+              }
+
+              // TYLKO aktualizuj billing - NIE dotykaj jobTitle ani clientName!
+              setEditedData(prev => ({
+                ...prev,
+                billing: {
+                  ...(prev.billing || {}),
+                  name,
+                  street: st,
+                  buildingNo: bNo,
+                  apartmentNo: aNo,
+                  city,
+                  postCode
+                }
+              }));
+              console.log('[GUS] Dane billing wypełnione dla:', name);
+            }
+          } catch (e) {
+            console.error('Auto-GUS failed:', e);
+          } finally {
+            setIsProcessing(false);
+          }
+        }, 800);
+
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [editedData.billing?.nip, isEditing]);
 
   useEffect(() => {
     if (transcript && activeVoiceField) {
@@ -955,6 +1028,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
               installAddress={editedData.address}
               phone={editedData.phoneNumber}
               nip={editedData.nip}
+              billing={editedData.billing}
               paymentStatus={job.paymentStatus || PaymentStatus.NONE}
               totalGross={job.totalGross || 0}
               paidAmount={job.paidAmount || 0}
@@ -969,12 +1043,20 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                 }
               }}
               onClientDataChange={(billingData) => {
+                // TYLKO aktualizuj dane billing - NIE dotykaj głównych pól kontaktowych!
                 setEditedData(prev => ({
                   ...prev,
-                  companyName: billingData.companyName || prev.companyName,
-                  nip: billingData.nip || prev.nip,
-                  email: billingData.email || prev.email,
-                  phoneNumber: billingData.phone || prev.phoneNumber,
+                  billing: {
+                    ...(prev.billing || {}),
+                    name: billingData.companyName || prev.billing?.name || '',
+                    nip: billingData.nip || prev.billing?.nip || '',
+                    email: billingData.email || prev.billing?.email || '',
+                    street: billingData.street || prev.billing?.street || '',
+                    buildingNo: billingData.buildingNo || prev.billing?.buildingNo || '',
+                    apartmentNo: billingData.apartmentNo || prev.billing?.apartmentNo || '',
+                    city: billingData.city || prev.billing?.city || '',
+                    postCode: billingData.postCode || prev.billing?.postCode || ''
+                  }
                 }));
               }}
             />
@@ -1235,6 +1317,205 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
               </div>
             </div>
           </div>
+
+          {/* Billing Data - Sekcja do edycji */}
+          {(isEditing || editedData.billing?.name || editedData.billing?.nip) && (
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <Receipt className="w-4 h-4 text-blue-500" /> DANE DO FAKTURY
+                </p>
+                {isEditing && (
+                  <button 
+                    onClick={() => {
+                      const fullAddress = editedData.address || '';
+                      let street = '';
+                      let buildingNo = '';
+                      let apartmentNo = '';
+                      let postCode = '';
+                      let city = '';
+
+                      // Prosta próba parsowania adresu: "Ulica 12/3, 00-000 Miasto"
+                      if (fullAddress) {
+                        const parts = fullAddress.split(',');
+                        if (parts.length > 0) {
+                          const streetPart = parts[0].trim();
+                          const streetMatch = streetPart.match(/^(.*?)\s(\d+[a-zA-Z]?)(?:\/(\d+))?$/);
+                          if (streetMatch) {
+                            street = streetMatch[1];
+                            buildingNo = streetMatch[2];
+                            apartmentNo = streetMatch[3] || '';
+                          } else {
+                            street = streetPart;
+                          }
+                        }
+                        if (parts.length > 1) {
+                          const cityPart = parts[1].trim();
+                          const cityMatch = cityPart.match(/^(\d{2}-\d{3})\s+(.*)$/);
+                          if (cityMatch) {
+                            postCode = cityMatch[1];
+                            city = cityMatch[2];
+                          } else {
+                            city = cityPart;
+                          }
+                        }
+                      }
+
+                      handleDataChange('billing', {
+                        name: editedData.clientName || editedData.jobTitle,
+                        nip: editedData.nip || '',
+                        street,
+                        buildingNo,
+                        apartmentNo,
+                        postCode,
+                        city,
+                        email: editedData.email || ''
+                      });
+                    }}
+                    className="text-[10px] font-bold text-blue-600 uppercase hover:underline"
+                  >
+                    Kopiuj z głównych
+                  </button>
+                )}
+              </div>
+              
+              {isEditing ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Nazwa firmy / Nabywca</label>
+                    <input 
+                      value={editedData.billing?.name || ''} 
+                      onChange={(e) => handleDataChange('billing', { ...editedData.billing, name: e.target.value })}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">NIP</label>
+                    <div className="flex gap-1 mt-1">
+                      <input 
+                        value={editedData.billing?.nip || ''} 
+                        onChange={(e) => handleDataChange('billing', { ...editedData.billing, nip: e.target.value })}
+                        className="flex-1 bg-white border border-slate-200 rounded-lg p-2 text-sm focus:border-blue-400 outline-none"
+                        placeholder="NIP firmy..."
+                      />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const nip = editedData.billing?.nip?.replace(/[^\d]/g, '');
+                          if (!nip || nip.length !== 10) {
+                            alert('Wpisz poprawny NIP (10 cyfr)');
+                            return;
+                          }
+                          setIsProcessing(true);
+                          try {
+                            const res = await invoiceService.lookupNip(nip);
+                            if (res.success && res.company) {
+                              const { name, street, city, postCode } = res.company;
+                              
+                              // Rozbij ulicę na numer
+                              let st = street;
+                              let bNo = '';
+                              let aNo = '';
+                              const streetMatch = street.match(/^(.*?)\s(\d+[a-zA-Z]?)(?:\/(\d+))?$/);
+                              if (streetMatch) {
+                                st = streetMatch[1];
+                                bNo = streetMatch[2];
+                                aNo = streetMatch[3] || '';
+                              }
+
+                              handleDataChange('billing', {
+                                ...editedData.billing,
+                                name,
+                                street: st,
+                                buildingNo: bNo,
+                                apartmentNo: aNo,
+                                city,
+                                postCode
+                              });
+                              
+                              // NIE nadpisujemy clientName - to pole kontaktu, nie fakturowania
+                            } else {
+                              alert('Nie znaleziono firmy w GUS: ' + (res.error || 'Błąd'));
+                            }
+                          } catch (e) {
+                            alert('Błąd połączenia z GUS');
+                          } finally {
+                            setIsProcessing(false);
+                          }
+                        }}
+                        disabled={isProcessing}
+                        className="px-3 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-[10px] font-black hover:bg-blue-100 transition-colors uppercase tracking-tight"
+                      >
+                        GUS
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Email do faktury</label>
+                    <input 
+                      value={editedData.billing?.email || ''} 
+                      onChange={(e) => handleDataChange('billing', { ...editedData.billing, email: e.target.value })}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm mt-1"
+                    />
+                  </div>
+                  <div className="md:col-span-2 grid grid-cols-3 gap-3">
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Ulica</label>
+                      <input 
+                        value={editedData.billing?.street || ''} 
+                        onChange={(e) => handleDataChange('billing', { ...editedData.billing, street: e.target.value })}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm mt-1"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Nr</label>
+                        <input 
+                          value={editedData.billing?.buildingNo || ''} 
+                          onChange={(e) => handleDataChange('billing', { ...editedData.billing, buildingNo: e.target.value })}
+                          className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm mt-1"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Lok</label>
+                        <input 
+                          value={editedData.billing?.apartmentNo || ''} 
+                          onChange={(e) => handleDataChange('billing', { ...editedData.billing, apartmentNo: e.target.value })}
+                          className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm mt-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 md:col-span-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Kod</label>
+                      <input 
+                        value={editedData.billing?.postCode || ''} 
+                        onChange={(e) => handleDataChange('billing', { ...editedData.billing, postCode: e.target.value })}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm mt-1"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Miasto</label>
+                      <input 
+                        value={editedData.billing?.city || ''} 
+                        onChange={(e) => handleDataChange('billing', { ...editedData.billing, city: e.target.value })}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm mt-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-slate-700">
+                  <p className="font-bold">{editedData.billing?.name}</p>
+                  {editedData.billing?.nip && <p>NIP: {editedData.billing.nip}</p>}
+                  <p>{editedData.billing?.street} {editedData.billing?.buildingNo}{editedData.billing?.apartmentNo ? '/' + editedData.billing.apartmentNo : ''}</p>
+                  <p>{editedData.billing?.postCode} {editedData.billing?.city}</p>
+                  {editedData.billing?.email && <p className="text-blue-600 mt-1">{editedData.billing.email}</p>}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Scope of Work */}
           {(editedData.scopeWorkText || isEditing) && (

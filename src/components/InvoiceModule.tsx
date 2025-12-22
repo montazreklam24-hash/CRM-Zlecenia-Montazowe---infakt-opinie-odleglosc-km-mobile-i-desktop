@@ -11,6 +11,16 @@ interface InvoiceModuleProps {
   installAddress?: string;
   phone?: string;
   nip?: string;
+  billing?: {
+    name: string | null;
+    nip: string | null;
+    street: string | null;
+    buildingNo: string | null;
+    apartmentNo: string | null;
+    postCode: string | null;
+    city: string | null;
+    email: string | null;
+  };
   paymentStatus?: PaymentStatus;
   totalGross?: number;
   paidAmount?: number;
@@ -31,7 +41,8 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
   invoices: initialInvoices = [],
   isAdmin = true,
   onStatusChange,
-  onClientDataChange
+  onClientDataChange,
+  billing: initialBilling
 }) => {
   const [items, setItems] = useState<InvoiceItemData[]>([
     { name: 'Usługa montażowa', quantity: 1, unitPriceNet: 0, vatRate: 23 }
@@ -39,11 +50,117 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
   const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [showBilling, setShowBilling] = useState(false);
+  const [billing, setBilling] = useState(initialBilling || {
+    name: clientName || '',
+    nip: nip || '',
+    street: '',
+    buildingNo: '',
+    apartmentNo: '',
+    postCode: '',
+    city: '',
+    email: clientEmail || ''
+  });
+  const lastAutoNip = useRef<string | null>(null);
+
+  // Automatyczny GUS po wpisaniu NIP w module fakturowania
+  useEffect(() => {
+    const nipStr = billing.nip?.replace(/[^\d]/g, '');
+    if (showForm && nipStr && nipStr.length === 10) {
+      const isNewNip = nipStr !== lastAutoNip.current;
+      const isNameEmpty = !billing.name || billing.name.length < 3;
+
+      if (isNewNip || isNameEmpty) {
+        const timer = setTimeout(async () => {
+          lastAutoNip.current = nipStr;
+          
+          setIsProcessing(true);
+          try {
+            console.log('[GUS] Automatyczne sprawdzanie NIP (Faktura):', nipStr);
+            const res = await invoiceService.lookupNip(nipStr);
+            if (res.success && res.company) {
+              const { name, street, city, postCode } = res.company;
+              let st = street;
+              let bNo = '';
+              let aNo = '';
+              const streetMatch = street.match(/^(.*?)\s(\d+[a-zA-Z]?)(?:\/(\d+))?$/);
+              if (streetMatch) {
+                st = streetMatch[1];
+                bNo = streetMatch[2];
+                aNo = streetMatch[3] || '';
+              }
+
+              const updatedBilling = {
+                ...billing,
+                name,
+                street: st,
+                buildingNo: bNo,
+                apartmentNo: aNo,
+                city,
+                postCode
+              };
+              
+              setBilling(prev => ({
+                ...prev,
+                ...updatedBilling
+              }));
+              
+              if (onClientDataChange) {
+                onClientDataChange({
+                  companyName: name,
+                  nip: nipStr,
+                  email: billing.email,
+                  phone: phone,
+                  street: st,
+                  city,
+                  postCode,
+                  buildingNo: bNo,
+                  apartmentNo: aNo
+                });
+              }
+            }
+          } catch (e) {
+            console.error('Auto-GUS failed:', e);
+          } finally {
+            setIsProcessing(false);
+          }
+        }, 800);
+
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [billing.nip, showForm]);
 
   // Sync invoices if they change from props
   useEffect(() => {
     setInvoices(initialInvoices);
   }, [initialInvoices]);
+
+  // Sync billing if it changes from props
+  useEffect(() => {
+    if (initialBilling) {
+      setBilling(initialBilling);
+    }
+  }, [initialBilling]);
+
+  const handleBillingChange = (field: string, value: string) => {
+    const newBilling = { ...billing, [field]: value };
+    setBilling(newBilling);
+    if (onClientDataChange) {
+      // Przekonwertuj na format oczekiwany przez JobCard
+      onClientDataChange({
+        companyName: newBilling.name,
+        nip: newBilling.nip,
+        email: newBilling.email,
+        phone: phone,
+        street: newBilling.street,
+        city: newBilling.city,
+        postCode: newBilling.postCode,
+        buildingNo: newBilling.buildingNo,
+        apartmentNo: newBilling.apartmentNo
+      });
+    }
+  };
 
   if (!isAdmin) return null;
 
@@ -71,7 +188,9 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
   const { net: totalNet, gross: totalGrossCalc } = calculateTotals();
 
   const handleCreateProforma = async () => {
-    if (!clientName) return alert('Brak nazwy klienta!');
+    const billingName = billing?.name || clientName;
+    if (!billingName) return alert('Brak nazwy klienta/firmy do faktury!');
+    
     if (items.some(i => !i.name || i.unitPriceNet <= 0)) {
       if (!window.confirm('Niektóre pozycje mają zerową cenę lub brak nazwy. Kontynuować?')) return;
     }
@@ -79,11 +198,13 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
     setIsProcessing(true);
     try {
       const res = await invoiceService.createProforma(jobId, items, {
-        companyName: clientName,
-        email: clientEmail,
-        nip,
-        phone,
-        street: installAddress
+        companyName: billingName,
+        email: billing?.email || clientEmail,
+        nip: billing?.nip || nip,
+        phone: phone,
+        street: billing?.street ? `${billing.street} ${billing.buildingNo || ''}${billing.apartmentNo ? '/' + billing.apartmentNo : ''}`.trim() : installAddress,
+        city: billing?.city || '',
+        postCode: billing?.postCode || ''
       }, {
         installAddress,
         sendEmail: true
@@ -104,15 +225,19 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
   };
 
   const handleCreateInvoice = async () => {
-    if (!clientName) return alert('Brak nazwy klienta!');
+    const billingName = billing?.name || clientName;
+    if (!billingName) return alert('Brak nazwy klienta/firmy do faktury!');
+    
     setIsProcessing(true);
     try {
       const res = await invoiceService.createInvoice(jobId, items, {
-        companyName: clientName,
-        email: clientEmail,
-        nip,
-        phone,
-        street: installAddress
+        companyName: billingName,
+        email: billing?.email || clientEmail,
+        nip: billing?.nip || nip,
+        phone: phone,
+        street: billing?.street ? `${billing.street} ${billing.buildingNo || ''}${billing.apartmentNo ? '/' + billing.apartmentNo : ''}`.trim() : installAddress,
+        city: billing?.city || '',
+        postCode: billing?.postCode || ''
       }, {
         installAddress,
         sendEmail: true,
@@ -246,10 +371,157 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
           <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200 animate-in fade-in slide-in-from-top-4 duration-300">
             <div className="flex justify-between items-center mb-4">
               <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest">Nowy dokument</h4>
-              <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setShowBilling(!showBilling)}
+                  className={`text-[10px] font-bold px-2 py-1 rounded border transition-colors ${
+                    showBilling ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50'
+                  }`}
+                >
+                  {showBilling ? 'Ukryj dane nabywcy' : 'Edytuj dane nabywcy'}
+                </button>
+                <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
+
+            {showBilling && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6 p-4 bg-white rounded-xl border border-blue-100 shadow-sm">
+                <div className="md:col-span-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Nazwa Firmy / Nabywca</label>
+                  <input 
+                    value={billing.name || ''} 
+                    onChange={(e) => handleBillingChange('name', e.target.value)}
+                    className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-400 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">NIP</label>
+                  <div className="flex gap-1 mt-1">
+                    <input 
+                      value={billing.nip || ''} 
+                      onChange={(e) => handleBillingChange('nip', e.target.value)}
+                      className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-400 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const nipStr = billing.nip?.replace(/[^\d]/g, '');
+                        if (!nipStr || nipStr.length !== 10) {
+                          alert('Wpisz poprawny NIP (10 cyfr)');
+                          return;
+                        }
+                        setIsProcessing(true);
+                        try {
+                          const res = await invoiceService.lookupNip(nipStr);
+                          if (res.success && res.company) {
+                            const { name, street, city, postCode } = res.company;
+                            let st = street;
+                            let bNo = '';
+                            let aNo = '';
+                            const streetMatch = street.match(/^(.*?)\s(\d+[a-zA-Z]?)(?:\/(\d+))?$/);
+                            if (streetMatch) {
+                              st = streetMatch[1];
+                              bNo = streetMatch[2];
+                              aNo = streetMatch[3] || '';
+                            }
+
+                            const newBilling = {
+                              ...billing,
+                              name,
+                              street: st,
+                              buildingNo: bNo,
+                              apartmentNo: aNo,
+                              city,
+                              postCode
+                            };
+                            setBilling(newBilling);
+                            
+                            // Powiadom rodzica o zmianie
+                            if (onClientDataChange) {
+                              onClientDataChange({
+                                companyName: name,
+                                nip: nipStr,
+                                email: billing.email,
+                                phone: phone,
+                                street: st,
+                                city,
+                                postCode,
+                                buildingNo: bNo,
+                                apartmentNo: aNo
+                              });
+                            }
+                          } else {
+                            alert('Nie znaleziono firmy w GUS: ' + (res.error || 'Błąd'));
+                          }
+                        } catch (e) {
+                          alert('Błąd połączenia z GUS');
+                        } finally {
+                          setIsProcessing(false);
+                        }
+                      }}
+                      disabled={isProcessing}
+                      className="px-3 bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[10px] font-black hover:bg-blue-200 transition-colors uppercase"
+                    >
+                      GUS
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Email do faktury</label>
+                  <input 
+                    value={billing.email || ''} 
+                    onChange={(e) => handleBillingChange('email', e.target.value)}
+                    className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-400 outline-none"
+                  />
+                </div>
+                <div className="md:col-span-2 grid grid-cols-3 gap-2">
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Ulica</label>
+                    <input 
+                      value={billing.street || ''} 
+                      onChange={(e) => handleBillingChange('street', e.target.value)}
+                      className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-400 outline-none"
+                    />
+                  </div>
+                  <div className="flex gap-1">
+                    <div className="flex-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Nr</label>
+                      <input 
+                        value={billing.buildingNo || ''} 
+                        onChange={(e) => handleBillingChange('buildingNo', e.target.value)}
+                        className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-center focus:border-blue-400 outline-none"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Lok</label>
+                      <input 
+                        value={billing.apartmentNo || ''} 
+                        onChange={(e) => handleBillingChange('apartmentNo', e.target.value)}
+                        className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-center focus:border-blue-400 outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Kod pocztowy</label>
+                  <input 
+                    value={billing.postCode || ''} 
+                    onChange={(e) => handleBillingChange('postCode', e.target.value)}
+                    className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-400 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Miasto</label>
+                  <input 
+                    value={billing.city || ''} 
+                    onChange={(e) => handleBillingChange('city', e.target.value)}
+                    className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-400 outline-none"
+                  />
+                </div>
+              </div>
+            )}
             
             <div className="space-y-3 mb-6">
               {items.map((item, idx) => (
