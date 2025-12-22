@@ -240,26 +240,76 @@ function extractPhoneFromText(text) {
     return null;
   }
   
-  // Formatuj numer
-  let formatted = validPhone.cleaned;
-  if (formatted.length === 9) {
-    // Polski numer komórkowy: XXX XXX XXX
-    formatted = formatted.match(/.{1,3}/g).join(' ');
-  } else if (formatted.length >= 7) {
-    // Inne numery: dodaj spacje co 3 cyfry od końca
-    const parts = [];
-    let remaining = formatted;
-    while (remaining.length > 3) {
-      parts.unshift(remaining.slice(-3));
-      remaining = remaining.slice(0, -3);
+    // Formatuj numer
+    let formatted = validPhone.cleaned;
+    if (formatted.length === 9) {
+      // Polski numer komórkowy: XXX XXX XXX
+      formatted = formatted.match(/.{1,3}/g).join(' ');
+    } else if (formatted.length >= 7) {
+      // Inne numery: dodaj spacje co 3 cyfry od końca
+      const parts = [];
+      let remaining = formatted;
+      while (remaining.length > 3) {
+        parts.unshift(remaining.slice(-3));
+        remaining = remaining.slice(0, -3);
+      }
+      if (remaining.length > 0) {
+        parts.unshift(remaining);
+      }
+      formatted = parts.join(' ');
     }
-    if (remaining.length > 0) {
-      parts.unshift(remaining);
-    }
-    formatted = parts.join(' ');
+    
+    return formatted;
+}
+
+// Funkcja pomocnicza do wyciągania NIP z tekstu (fallback)
+function extractNipFromText(text) {
+  if (!text) return null;
+  
+  // Wzorce NIP: 123-456-78-90, 1234567890, PL1234567890
+  // Szukamy ciągów 10 cyfr, ewentualnie z myślnikami
+  const nipRegex = /(?:NIP|VAT)[\s:.-]*((?:PL)?\s*\d{3}[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2})|(\d{3}-\d{3}-\d{2}-\d{2})|(\d{3}-\d{2}-\d{2}-\d{3})/gi;
+  
+  const matches = [...text.matchAll(nipRegex)];
+  for (const match of matches) {
+      // Znajdź grupę która złapała
+      const raw = match[0];
+      const cleaned = raw.toUpperCase().replace(/[^0-9]/g, ''); // Usuń wszystko co nie jest cyfrą
+      
+      // Walidacja długości (10 cyfr)
+      if (cleaned.length === 10) {
+          // Walidacja sumy kontrolnej NIP (opcjonalna, ale dobra dla pewności)
+          if (isValidNip(cleaned)) {
+              return formatNip(cleaned);
+          }
+      }
   }
   
-  return formatted;
+  // Przeszukaj same ciągi cyfr jeśli regex z prefixem nie znalazł
+  const digitMatches = text.match(/\b\d{10}\b/g) || [];
+  for (const digits of digitMatches) {
+      if (isValidNip(digits)) {
+          return formatNip(digits);
+      }
+  }
+  
+  return null;
+}
+
+function isValidNip(nip) {
+    if (nip.length !== 10) return false;
+    const weights = [6, 5, 7, 2, 3, 4, 5, 6, 7];
+    let sum = 0;
+    for (let i = 0; i < 9; i++) {
+        sum += parseInt(nip[i]) * weights[i];
+    }
+    const control = sum % 11;
+    return control === parseInt(nip[9]);
+}
+
+function formatNip(nip) {
+    // 1234567890 -> 123-456-78-90
+    return nip.replace(/(\d{3})(\d{3})(\d{2})(\d{2})/, '$1-$2-$3-$4');
 }
 
 async function analyzeEmail(emailData) {
@@ -772,6 +822,21 @@ Jeśli nie znalazłeś danego pola, ustaw null.
       }
     }
     
+    // Fallback dla NIP
+    if (!parsed.nip || parsed.nip === 'null' || parsed.nip === null) {
+        const nipMatch = extractNipFromText(emailData.body);
+        if (nipMatch) {
+            parsed.nip = nipMatch;
+            await logDebug('info', 'analyze', 'NIP extracted via fallback regex', { nip: parsed.nip });
+        }
+    } else {
+        // Formatuj NIP z Gemini
+        const cleanedNip = parsed.nip.replace(/[^0-9]/g, '');
+        if (cleanedNip.length === 10) {
+            parsed.nip = formatNip(cleanedNip);
+        }
+    }
+    
     // Formatuj adres do stringa
     let fullAddress = '';
     if (parsed.address) {
@@ -932,7 +997,7 @@ async function getAttachmentData(messageId, attachmentId) {
 }
 
 /**
- * Pobiera listę załączników dla danej wiadomości bezpośrednio z Gmail API
+ * Pobiera listę załączników dla danej wiadomości LUB CAŁEGO WĄTKU bezpośrednio z Gmail API
  */
 async function getGmailAttachments(messageId) {
   if (!messageId) {
@@ -940,52 +1005,67 @@ async function getGmailAttachments(messageId) {
     return { success: false, error: 'Brak Message ID' };
   }
   
-  await logDebug('info', 'getAttachments', 'Fetching attachments list', { messageId });
+  await logDebug('info', 'getAttachments', 'Fetching attachments list for thread', { messageId });
   
   try {
     const token = await getAuthToken();
     const realId = await getRealMessageId(messageId);
     
-    // Pobierz szczegóły wiadomości
-    const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${realId}`;
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
+    // 1. Pobierz ID wątku dla tej wiadomości
+    const msgUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${realId}?format=minimal`;
+    const msgResp = await fetch(msgUrl, { headers: { 'Authorization': `Bearer ${token}` } });
     
-    if (!response.ok) {
-      throw new Error(`Gmail API error: ${response.status}`);
-    }
+    if (!msgResp.ok) throw new Error(`Gmail API error (msg): ${msgResp.status}`);
+    const msgData = await msgResp.json();
+    const threadId = msgData.threadId;
+
+    if (!threadId) throw new Error('Could not find threadId');
+
+    // 2. Pobierz CAŁY wątek
+    const threadUrl = `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}?format=full`;
+    const threadResp = await fetch(threadUrl, { headers: { 'Authorization': `Bearer ${token}` } });
     
-    const data = await response.json();
+    if (!threadResp.ok) throw new Error(`Gmail API error (thread): ${threadResp.status}`);
+    const threadData = await threadResp.json();
+
     const attachments = [];
     
-    function findAttachments(parts) {
+    function findAttachments(parts, msgId, msgDate) {
       if (!parts) return;
       for (const part of parts) {
         if (part.filename && part.body && (part.body.attachmentId || part.body.data)) {
           attachments.push({
             id: part.body.attachmentId || `inline-${Math.random().toString(36).substr(2, 9)}`,
+            messageId: msgId, // WAŻNE: Przypisujemy ID wiadomości do załącznika
             name: part.filename,
             mimeType: part.mimeType,
             size: part.body.size,
+            date: msgDate, // Data wiadomości
             isInline: !!part.headers?.find(h => {
               const name = h.name.toLowerCase();
               return name === 'content-id' || (name === 'content-disposition' && h.value.toLowerCase().includes('inline'));
             })
           });
         }
-        if (part.parts) findAttachments(part.parts);
+        if (part.parts) findAttachments(part.parts, msgId, msgDate);
       }
     }
     
-    if (data.payload && data.payload.parts) {
-      findAttachments(data.payload.parts);
-    } else if (data.payload && data.payload.body && (data.payload.body.attachmentId || data.payload.body.data)) {
-        // Pojedyncza część
-        findAttachments([data.payload]);
+    // Iteruj przez wszystkie wiadomości w wątku
+    if (threadData.messages && Array.isArray(threadData.messages)) {
+        for (const message of threadData.messages) {
+            const dateHeader = message.payload.headers.find(h => h.name === 'Date');
+            const msgDate = dateHeader ? dateHeader.value : null;
+
+            if (message.payload && message.payload.parts) {
+                findAttachments(message.payload.parts, message.id, msgDate);
+            } else if (message.payload && message.payload.body && (message.payload.body.attachmentId || message.payload.body.data)) {
+                 findAttachments([message.payload], message.id, msgDate);
+            }
+        }
     }
     
-    await logDebug('info', 'getAttachments', 'Found attachments', { count: attachments.length });
+    await logDebug('info', 'getAttachments', 'Found attachments in thread', { count: attachments.length });
     return { success: true, attachments };
   } catch (e) {
     await logDebug('error', 'getAttachments', 'Error fetching attachments', { error: e.message });

@@ -439,17 +439,17 @@ function openAttachmentsModal() {
             
             // Jeśli to obrazek, zacznij go ładować
             if (isImage) {
-                loadThumbnail(att.id, card.querySelector('.crm-att-preview'));
+                loadThumbnail(att.id, att.messageId, card.querySelector('.crm-att-preview'));
             }
         });
         updateCountDisplay();
     }
 
-    async function loadThumbnail(attachmentId, imgElement) {
+    async function loadThumbnail(attachmentId, messageId, imgElement) {
         // Spróbuj pobrać z cache jeśli już pobieraliśmy
         const response = await chrome.runtime.sendMessage({
             action: 'getAttachmentData',
-            messageId: lastMessageId,
+            messageId: messageId, // Użyj poprawnego ID wiadomości z której pochodzi załącznik
             attachmentId: attachmentId
         });
 
@@ -474,7 +474,7 @@ function openAttachmentsModal() {
         document.body.appendChild(zoomOverlay);
 
         // Załaduj pełny obrazek
-        loadThumbnail(att.id, zoomImg);
+        loadThumbnail(att.id, att.messageId, zoomImg);
 
         zoomOverlay.onclick = () => zoomOverlay.remove();
     }
