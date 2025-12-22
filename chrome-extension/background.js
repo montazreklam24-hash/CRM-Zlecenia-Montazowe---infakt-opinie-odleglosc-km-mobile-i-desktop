@@ -445,12 +445,10 @@ async function getGmailAttachments(messageId) {
 async function importAttachments(attachmentsToImport) {
   await logDebug('info', 'import', 'importAttachments called', { 
     isArray: Array.isArray(attachmentsToImport), 
-    length: attachmentsToImport?.length,
-    first: attachmentsToImport?.[0] 
+    length: attachmentsToImport?.length
   });
   
   if (!Array.isArray(attachmentsToImport) || attachmentsToImport.length === 0) {
-    await logDebug('warn', 'import', 'No attachments to import');
     return [];
   }
   
@@ -458,57 +456,77 @@ async function importAttachments(attachmentsToImport) {
   
   for (let i = 0; i < attachmentsToImport.length; i++) {
     const att = attachmentsToImport[i];
-    await logDebug('info', 'import', `Processing attachment ${i+1}/${attachmentsToImport.length}`, { 
-      name: att.name, 
-      messageId: att.messageId?.substring(0, 16),
-      attId: att.id?.substring(0, 30)
-    });
+    await logDebug('info', 'import', `Processing ${i+1}/${attachmentsToImport.length}: ${att.name}`);
     
     try {
-      if (!att.messageId || !att.id) {
-        await logDebug('warn', 'import', 'Skipping - missing messageId or id');
-        continue;
-      }
+      if (!att.messageId || !att.id) continue;
       
       // 1. Pobierz dane z Gmaila (Base64)
-      await logDebug('info', 'import', 'Calling getAttachmentData...');
       const gmailRes = await getAttachmentData(att.messageId, att.id);
-      await logDebug('info', 'import', 'getAttachmentData result', { 
-        success: gmailRes.success, 
-        hasData: !!gmailRes.data, 
-        dataLen: gmailRes.data?.length,
-        error: gmailRes.error 
-      });
-      
       if (!gmailRes.success || !gmailRes.data) {
-        await logDebug('error', 'import', `Failed to download ${att.name}`, gmailRes.error);
+        await logDebug('error', 'import', `Download failed: ${att.name}`, gmailRes.error);
         continue;
       }
       
-      // 2. Przygotuj format jak dla manualnego uploadu
       const mimeType = att.mimeType || 'application/octet-stream';
       const base64Data = gmailRes.data.replace(/-/g, '+').replace(/_/g, '/');
-      const fileObj = {
-        name: att.name,
-        data: `data:${mimeType};base64,${base64Data}`
-      };
-      await logDebug('info', 'import', 'Prepared fileObj', { name: fileObj.name, dataLen: fileObj.data.length });
+      let dataUrl = `data:${mimeType};base64,${base64Data}`;
+      let finalName = att.name;
       
-      // 3. Wyślij bezpośrednio do CRM (upload.php)
-      await logDebug('info', 'import', 'Calling uploadFileToCRM...');
-      const url = await uploadFileToCRM(fileObj);
-      await logDebug('info', 'import', 'uploadFileToCRM result', { url });
+      // 2. Jeśli to obraz - KOMPRESUJ (limit PHP ~2MB)
+      if (mimeType.startsWith('image/')) {
+        await logDebug('info', 'import', `Compressing image ${att.name} (original: ${dataUrl.length} chars)`);
+        const compressed = await compressImage(dataUrl);
+        if (compressed) {
+          dataUrl = compressed;
+          finalName = att.name.replace(/\.[^/.]+$/, "") + ".jpg";
+          await logDebug('info', 'import', `Compressed to ${dataUrl.length} chars`);
+        }
+      }
       
+      // 3. Wyślij do CRM
+      const url = await uploadFileToCRM({ name: finalName, data: dataUrl });
       if (url) {
         resultPaths.push(url);
+        await logDebug('info', 'import', `Uploaded: ${finalName} -> ${url}`);
       }
     } catch (e) {
-      await logDebug('error', 'import', `Exception processing ${att.name}`, { error: e.message, stack: e.stack });
+      await logDebug('error', 'import', `Exception: ${att.name}`, e.message);
     }
   }
   
-  await logDebug('info', 'import', 'importAttachments complete', { resultPaths });
   return resultPaths;
+}
+
+// Kompresja obrazu do max 1600px i JPEG 0.7
+async function compressImage(dataUrl) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 1600;
+      let { width, height } = img;
+      
+      if (width > height && width > MAX) {
+        height *= MAX / width;
+        width = MAX;
+      } else if (height > MAX) {
+        width *= MAX / height;
+        height = MAX;
+      }
+      
+      const canvas = new OffscreenCanvas(width, height);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      canvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 }).then(blob => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      }).catch(() => resolve(null));
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
 }
 
 async function getRealMessageId(idOrThreadId) {
