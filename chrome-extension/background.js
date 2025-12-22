@@ -29,6 +29,18 @@ async function logDebug(level, category, message, data = null) {
     if (logs.length > MAX_LOG_ENTRIES) logs.splice(0, logs.length - MAX_LOG_ENTRIES);
     await chrome.storage.local.set({ debugLogs: logs });
   } catch (e) { console.error('[CRM BG] Failed to save debug log:', e); }
+  
+  // Wyślij też do serwera dla łatwego debugowania
+  try {
+    const settings = await getSettings();
+    if (settings.crmUrl) {
+      fetch(settings.crmUrl.replace(/\/$/, '') + '/api/debug_log.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level, category, message, data })
+      }).catch(() => {});
+    }
+  } catch (e) {}
 }
 
 async function getDebugLogs() {
@@ -431,41 +443,71 @@ async function getGmailAttachments(messageId) {
 }
 
 async function importAttachments(attachmentsToImport) {
-  if (!Array.isArray(attachmentsToImport) || attachmentsToImport.length === 0) return [];
+  await logDebug('info', 'import', 'importAttachments called', { 
+    isArray: Array.isArray(attachmentsToImport), 
+    length: attachmentsToImport?.length,
+    first: attachmentsToImport?.[0] 
+  });
   
-  await logDebug('info', 'import', 'Starting direct import via Browser', { count: attachmentsToImport.length });
+  if (!Array.isArray(attachmentsToImport) || attachmentsToImport.length === 0) {
+    await logDebug('warn', 'import', 'No attachments to import');
+    return [];
+  }
+  
   const resultPaths = [];
   
-  for (const att of attachmentsToImport) {
+  for (let i = 0; i < attachmentsToImport.length; i++) {
+    const att = attachmentsToImport[i];
+    await logDebug('info', 'import', `Processing attachment ${i+1}/${attachmentsToImport.length}`, { 
+      name: att.name, 
+      messageId: att.messageId?.substring(0, 16),
+      attId: att.id?.substring(0, 30)
+    });
+    
     try {
-      if (!att.messageId || !att.id) continue;
-      
-      await logDebug('info', 'import', `Downloading ${att.name}`, { id: att.id.substring(0, 20) });
+      if (!att.messageId || !att.id) {
+        await logDebug('warn', 'import', 'Skipping - missing messageId or id');
+        continue;
+      }
       
       // 1. Pobierz dane z Gmaila (Base64)
+      await logDebug('info', 'import', 'Calling getAttachmentData...');
       const gmailRes = await getAttachmentData(att.messageId, att.id);
+      await logDebug('info', 'import', 'getAttachmentData result', { 
+        success: gmailRes.success, 
+        hasData: !!gmailRes.data, 
+        dataLen: gmailRes.data?.length,
+        error: gmailRes.error 
+      });
+      
       if (!gmailRes.success || !gmailRes.data) {
         await logDebug('error', 'import', `Failed to download ${att.name}`, gmailRes.error);
         continue;
       }
       
       // 2. Przygotuj format jak dla manualnego uploadu
+      const mimeType = att.mimeType || 'application/octet-stream';
+      const base64Data = gmailRes.data.replace(/-/g, '+').replace(/_/g, '/');
       const fileObj = {
         name: att.name,
-        data: `data:${att.mimeType || 'application/octet-stream'};base64,${gmailRes.data.replace(/-/g, '+').replace(/_/g, '/')}`
+        data: `data:${mimeType};base64,${base64Data}`
       };
+      await logDebug('info', 'import', 'Prepared fileObj', { name: fileObj.name, dataLen: fileObj.data.length });
       
       // 3. Wyślij bezpośrednio do CRM (upload.php)
+      await logDebug('info', 'import', 'Calling uploadFileToCRM...');
       const url = await uploadFileToCRM(fileObj);
+      await logDebug('info', 'import', 'uploadFileToCRM result', { url });
+      
       if (url) {
         resultPaths.push(url);
-        await logDebug('info', 'import', `Successfully uploaded ${att.name}`, { url });
       }
     } catch (e) {
-      await logDebug('error', 'import', `Error processing ${att.name}`, e.message);
+      await logDebug('error', 'import', `Exception processing ${att.name}`, { error: e.message, stack: e.stack });
     }
   }
   
+  await logDebug('info', 'import', 'importAttachments complete', { resultPaths });
   return resultPaths;
 }
 
