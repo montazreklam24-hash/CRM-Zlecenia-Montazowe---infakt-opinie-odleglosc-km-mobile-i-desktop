@@ -720,10 +720,31 @@ function setupFormHandlers(content) {
                 });
                 
                 if (attRes.success && attRes.attachments) {
-                    gmailAttachments = attRes.attachments;
-                    // Domyślnie zaznacz te które nie są inline i mają min. 5KB (pomiń mikro-śmieci)
+                    // 1. USUWANIE DUPLIKATÓW I FILTROWANIE ŚMIECI
+                    const seen = new Set();
+                    const blacklist = ['logo', 'montazreklam', 'newoffice', 'footer', 'stopka', 'sygnatura', 'facebook', 'instagram', 'linkedin'];
+                    
+                    gmailAttachments = attRes.attachments.filter(att => {
+                        // Unikalność (nazwa + rozmiar)
+                        const key = `${att.name}-${att.size}`;
+                        if (seen.has(key)) return false;
+                        seen.add(key);
+
+                        const nameLower = att.name.toLowerCase();
+                        
+                        // Ignoruj znane wzorce śmieciowych grafik z Gmaila (image001.png itd.)
+                        if (/^image\d{3}\.(png|jpg|jpeg|gif)$/i.test(nameLower)) return false;
+                        
+                        // Ignoruj czarną listę słów
+                        const isBlacklisted = blacklist.some(word => nameLower.includes(word));
+                        if (isBlacklisted) return false;
+
+                        return true;
+                    });
+
+                    // Domyślnie zaznacz te które NIE są inline (prawdziwe załączniki)
                     selectedAttachmentIds = gmailAttachments
-                        .filter(a => !a.isInline && a.size > 5000) 
+                        .filter(a => !a.isInline) 
                         .map(a => a.id);
                         
                     updateAttachmentsButton();
