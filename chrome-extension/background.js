@@ -337,37 +337,151 @@ async function analyzeEmail(emailData) {
     await logDebug('info', 'analyze', 'Email from field', { fromEmail, isCompany: isCompanyEmail(fromEmail) });
   }
   
-  const parts = [{ text: `Jesteś asystentem CRM. Wyciągnij dane klienta WYŁĄCZNIE na podstawie poniższego maila i historii wątku.
-- Telefon, Email klienta (IGNORUJ FIRMOWE), Firma, NIP, Imię, Adres montażu, Zakres prac, Tytuł.
-- KRYTYCZNE: Używaj TYLKO danych tekstowych z maila. NIE zmyślaj NIP-u ani telefonu, jeśli go nie ma.
-- KRYTYCZNE: Jeśli w stopce jest podany NIP (np. NIP 526-10-16-043), przepisz go DOKŁADNIE tak jak jest. NIE używaj swojej wiedzy o firmach do podstawiania innych numerów.
-- Używaj "oklejanie witryn" zamiast "montaż witryn".
+  // Przygotuj części dla Gemini (tekst + obrazy)
+  const promptText = `
+Jesteś inteligentnym asystentem CRM dla firmy "Montaż Reklam 24". Twoim zadaniem jest analiza treści wiadomości e-mail (lub całych wątków) i wyciągnięcie danych do zlecenia.
 
-Mail:
+KRYTYCZNE ZASADY:
+1. TERMINOLOGIA: Jeśli zlecenie dotyczy witryn, szyb, okien – ZAWSZE używaj słowa "oklejanie" lub "oklejenie". NIGDY "montaż witryn".
+2. IDENTYFIKACJA KLIENTA: Musisz aktywnie szukać numeru telefonu klienta w całym wątku (również w stopkach).
+3. IGNORUJ FIRMĘ: Nigdy nie zwracaj jako danych klienta telefonów firmowych (888 201 250, 22 213 95 96) ani maili firmowych (@montazreklam24.pl, @montazreklam24.com, @newoffice.pl, montazreklam24@gmail.com).
+4. ADRESY: 
+   - W polu "address" wpisz adres MONTAŻU (gdzie ekipa ma pojechać). 
+   - Jeśli w mailu jest inny adres rejestrowy/do faktury, wpisz go w pole "billingAddress".
+   - Jeśli jest tylko jeden adres, użyj go w obu miejscach.
+5. WĄTKI: Przeszukaj cały wątek, dane klienta często są w pierwszej wiadomości.
+
+ODPOWIEDZ TYLKO CZYSTYM JSONEM:
+{
+  "phone": "XXX XXX XXX lub null",
+  "email": "email klienta lub null",
+  "companyName": "nazwa firmy lub null",
+  "nip": "NIP lub null",
+  "firstName": "imię lub null",
+  "lastName": "nazwisko lub null",
+  "address": {
+    "street": "ulica bez ul.",
+    "buildingNo": "nr budynku",
+    "apartmentNo": "nr lokalu lub null",
+    "city": "miasto",
+    "postCode": "kod XX-XXX",
+    "district": "dzielnica lub null"
+  },
+  "billingAddress": {
+    "street": "ulica",
+    "buildingNo": "nr",
+    "city": "miasto",
+    "postCode": "kod"
+  },
+  "scopeOfWork": "szczegółowy opis (używaj 'oklejanie'!), max 500 znaków",
+  "suggestedTitle": "tytuł zlecenia",
+  "confidence": 0.0-1.0
+}
+
+Mail do analizy:
 ---
-${fromEmail ? `Od: ${fromEmail}` : ''}
+${fromEmail ? `Od: ${fromEmail}` : 'Od: (nieznany)'}
 Temat: ${emailData.subject || ''}
+Data: ${emailData.date || ''}
+
 ${contextBody}
 ---
-Odpowiedz TYLKO JSON: { "phone": "...", "email": "...", "companyName": "...", "nip": "...", "firstName": "...", "lastName": "...", "address": { "street": "...", "buildingNo": "...", "apartmentNo": "...", "city": "...", "postCode": "..." }, "scopeOfWork": "...", "suggestedTitle": "..." }` }];
+`;
 
-  if (emailData.images?.length > 0) {
-    for (const img of emailData.images.slice(0, 4)) {
-      if (img.data?.startsWith('data:image')) {
-        parts.push({ inlineData: { mimeType: img.mimeType || 'image/jpeg', data: img.data.split(',')[1] } });
+  const parts = [
+    { text: promptText }
+  ];
+  
+  // Dodaj obrazy jeśli są dostępne
+  if (emailData.images && emailData.images.length > 0) {
+    await logDebug('info', 'analyze', 'Adding images to analysis', { count: emailData.images.length });
+    for (const img of emailData.images.slice(0, 4)) { // Max 4 obrazy (limit Gemini)
+      if (img.data && img.data.startsWith('data:image')) {
+        // Wyciągnij base64 bez prefixu data:image/...
+        const base64Data = img.data.split(',')[1];
+        const mimeType = img.mimeType || 'image/jpeg';
+        parts.push({
+          inlineData: {
+            mimeType: mimeType,
+            data: base64Data
+          }
+        });
       }
     }
   }
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${settings.geminiApiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0.2, maxOutputTokens: 2048 } })
-    });
-    if (!response.ok) throw new Error(`Gemini error: ${response.status}`);
-    const resData = await response.json();
-    const parsed = JSON.parse(resData.candidates[0].content.parts[0].text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
+    // Funkcja pomocnicza do wywołania API Gemini
+    const callGemini = async (payloadParts) => {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${settings.geminiApiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: payloadParts }],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 2048
+            }
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Gemini API error (${response.status}): ${errorText}`);
+      }
+
+      return response.json();
+    };
+
+    let data;
+    try {
+      await logDebug('info', 'analyze', 'Sending request to Gemini', { 
+        partsCount: parts.length,
+        hasImages: parts.length > 1
+      });
+      
+      data = await callGemini(parts);
+      
+    } catch (error) {
+      // Jeśli błąd to 400 (Bad Request) i mamy obrazy - spróbuj ponownie BEZ obrazów
+      if (parts.length > 1 && error.message.includes('400')) {
+        await logDebug('warn', 'analyze', 'Gemini returned 400 with images. Retrying with text only...', { error: error.message });
+        
+        // Zostaw tylko pierwszą część (tekst)
+        const textOnlyParts = [parts[0]];
+        // Dodaj notatkę do promptu że obrazów nie udało się przetworzyć
+        textOnlyParts[0].text += '\n\n(UWAGA: Analiza obrazów nie powiodła się z powodu błędu API. Przeanalizuj tylko tekst.)';
+        
+        try {
+          data = await callGemini(textOnlyParts);
+          await logDebug('info', 'analyze', 'Retry with text only successful');
+        } catch (retryError) {
+          throw new Error(`Gemini retry failed: ${retryError.message}`);
+        }
+      } else {
+        throw error;
+      }
+    }
+    
+    if (!data.candidates || !data.candidates[0]) {
+      return { success: false, error: 'Brak odpowiedzi od Gemini' };
+    }
+    
+    let text = data.candidates[0].content.parts[0].text;
+    
+    // Usuń markdown jeśli jest
+    text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      console.error('[CRM BG] JSON parse error:', e, 'Text:', text);
+      return { success: false, error: 'Błąd parsowania odpowiedzi AI' };
+    }
     
     // KRYTYCZNA ZMIANA: Priorytet dla danych wyciągniętych REGEXEM z tekstu
     // AI (Gemini) ma tendencję do "zmyślania" danych na podstawie nazw firm z bazy wiedzy Google.
@@ -384,22 +498,60 @@ Odpowiedz TYLKO JSON: { "phone": "...", "email": "...", "companyName": "...", "n
         parsed.phone = realPhone;
         await logDebug('info', 'analyze', 'Phone overwritten by regex match', { phone: realPhone });
     }
+
     if (parsed.email && isCompanyEmail(parsed.email)) parsed.email = null;
     if (!parsed.email || parsed.email === 'null') {
         const foundEmails = contextBody.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/gi) || [];
         parsed.email = foundEmails.find(e => !isCompanyEmail(e)) || null;
     }
+
+    // Formatuj adres montażu do stringa
+    let fullAddress = '';
     if (parsed.address && typeof parsed.address === 'object') {
         const a = parsed.address;
-        parsed.address = [a.street ? a.street + (a.buildingNo ? ' ' + a.buildingNo : '') : '', a.postCode, a.city].filter(Boolean).join(', ');
+        fullAddress = [a.street ? a.street + (a.buildingNo ? ' ' + a.buildingNo : '') : '', a.postCode, a.city].filter(Boolean).join(', ');
+    } else if (typeof parsed.address === 'string') {
+        fullAddress = parsed.address;
     }
+    parsed.address = fullAddress;
+
+    // Obsługa adresu do faktury (billingAddress)
+    if (parsed.billingAddress && typeof parsed.billingAddress === 'object') {
+        const ba = parsed.billingAddress;
+        const billingStr = [ba.street ? ba.street + (ba.buildingNo ? ' ' + ba.buildingNo : '') : '', ba.postCode, ba.city].filter(Boolean).join(', ');
+        
+        // Jeśli adres do faktury jest inny niż adres montażu, dodaj go do zakresu prac/notatek
+        if (billingStr && billingStr !== fullAddress) {
+            const billingNote = `\n\n--- DANE DO FAKTURY ---\n${parsed.companyName || ''}\nNIP: ${parsed.nip || ''}\n${billingStr}`;
+            if (parsed.scopeOfWork) {
+                parsed.scopeOfWork += billingNote;
+            } else {
+                parsed.scopeOfWork = billingNote;
+            }
+            await logDebug('info', 'analyze', 'Added billing address to scopeOfWork');
+        }
+    }
+    
+    // KRYTYCZNE: Popraw tytuł - zamień "montaż witryn" na "oklejanie witryn"
+    if (parsed.suggestedTitle && parsed.suggestedTitle.includes('montaż witryn')) {
+      parsed.suggestedTitle = parsed.suggestedTitle.replace(/montaż witryn/gi, 'oklejanie witryn');
+    }
+    if (parsed.scopeOfWork && parsed.scopeOfWork.includes('montaż witryn')) {
+      parsed.scopeOfWork = parsed.scopeOfWork.replace(/montaż witryn/gi, 'oklejanie witryn');
+    }
+    
+    await logDebug('info', 'analyze', 'Final parsed data', { 
+      phone: parsed.phone,
+      email: parsed.email,
+      title: parsed.suggestedTitle?.substring(0, 50)
+    });
+    
     return { success: true, data: parsed };
   } catch (error) {
+    console.error('[CRM BG] Analyze error:', error);
     return { success: false, error: error.message };
   }
 }
-
-
 
 // =========================================================================
 // CRM API
@@ -597,11 +749,7 @@ async function getGmailAttachments(messageId) {
 }
 
 async function importAttachments(attachmentsToImport) {
-  // Support both old (messageId, ids) and new (list of objects) signatures
-  // But here we implement the new one: list of {id, messageId}
-  
   if (!Array.isArray(attachmentsToImport)) {
-      // Fallback for old calls if any
       return []; 
   }
 
@@ -612,11 +760,6 @@ async function importAttachments(attachmentsToImport) {
   try {
     const googleToken = await getAuthToken();
     const resultPaths = [];
-
-    // Group by messageId to optimize calls? Or just fetch one by one?
-    // Let's fetch one by one for simplicity first, or group if API allows.
-    // The PHP script takes messageId + selectedIds. 
-    // We can group by messageId and call API for each message.
     
     const byMessage = {};
     for (const att of attachmentsToImport) {
@@ -684,11 +827,6 @@ async function getRealMessageId(threadIdOrMessageId) {
       headers: { 'Authorization': `Bearer ${token}` } 
     });
     
-    await logDebug('info', 'messageId', 'Gmail API response', { 
-      status: response.status, 
-      ok: response.ok 
-    });
-    
     if (!response.ok) {
       const errorText = await response.text();
       await logDebug('warn', 'messageId', 'Failed to resolve thread ID, using original', { 
@@ -729,23 +867,10 @@ async function createJobInCRM(jobData) {
     let attachmentWarning = null;
 
     // 1. POBIERZ ZAŁĄCZNIKI Z GMAILA (JEŚLI WŁĄCZONE)
-    await logDebug('info', 'createJob', 'Checking import settings', { 
-      importAttachments: settings.importAttachments,
-      hasMessageId: !!finalMessageId,
-      messageId: finalMessageId,
-      selectedAttachmentsCount: jobData.selectedAttachments?.length
-    });
-    
     if (settings.importAttachments) {
-        // Nowa logika: jeśli mamy przekazaną listę obiektów selectedAttachments, używamy jej
         if (jobData.selectedAttachments && jobData.selectedAttachments.length > 0) {
             try {
                 const importedFiles = await importAttachments(jobData.selectedAttachments);
-                
-                await logDebug('info', 'createJob', 'Import completed (new method)', { 
-                    count: importedFiles.length 
-                });
-                
                 if (importedFiles.length > 0) {
                     projectImages = importedFiles;
                 }
@@ -753,21 +878,10 @@ async function createJobInCRM(jobData) {
                 attachmentWarning = "Błąd importu załączników: " + e.message;
             }
         } 
-        // Stara logika (fallback): jeśli mamy tylko ID wiadomości i listę ID
-        else if (finalMessageId) {
-             // ... code for fallback if needed, but we rely on selectedAttachments now ...
-             // Skip fallback to avoid confusion, assumption is selectedAttachments is always sent now
-             await logDebug('info', 'createJob', 'No selectedAttachments array provided, skipping import');
-        }
-    } else {
-        await logDebug('info', 'createJob', 'Import attachments disabled in settings');
     }
 
     // 2. DODAJ RĘCZNE ZAŁĄCZNIKI (MANUAL UPLOAD)
-    // TERAZ: Uploadujemy pliki NAJPIERW, i wysyłamy tylko URL-e
     if (jobData.manualAttachments && Array.isArray(jobData.manualAttachments)) {
-        console.log('[CRM BG] Uploading manual attachments:', jobData.manualAttachments.length);
-        
         const uploadPromises = jobData.manualAttachments
             .filter(file => file.data && file.data.startsWith('data:image'))
             .map(file => uploadFileToCRM(file)
@@ -786,33 +900,15 @@ async function createJobInCRM(jobData) {
     }
 
     // 3. WYŚLIJ DO CRM
-    await logDebug('info', 'createJob', 'Sending job to CRM', {
-      title: jobData.title,
-      attachmentsCount: projectImages.length,
-      attachments: projectImages,
-      hasPdf: projectImages.some(path => path.includes('.pdf')),
-      hasImages: projectImages.some(path => /\.(jpg|jpeg|png|gif|webp)$/i.test(path))
-    });
-    
     const result = await apiRequest('jobs', 'POST', {
       jobTitle: jobData.title,
       phoneNumber: jobData.phone,
       email: jobData.email,
       address: jobData.fullAddress,
       scopeWorkText: jobData.description,
-      
-      // Metadane Gmail - wysyłamy poprawne ID
       gmailMessageId: finalMessageId || null,
-      
-      // Załączniki - WSZYSTKIE pliki: obrazy, PDF-y, dokumenty (ścieżki, nie base64!)
       projectImages: projectImages, 
-      
       columnId: 'PREPARE'
-    });
-    
-    await logDebug('info', 'createJob', 'Job created successfully', {
-      jobId: result.job?.id,
-      attachmentsInResponse: result.job?.projectImages?.length || 0
     });
     
     return { 
@@ -834,7 +930,6 @@ async function createJobInCRM(jobData) {
 async function testConnection(settings) {
   try {
     const url = settings.crmUrl.replace(/\/$/, '') + '/api/ping';
-    
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -854,13 +949,8 @@ async function testConnection(settings) {
 
 async function lookupGusInCRM(nip) {
   try {
-    await logDebug('info', 'gus', 'Starting GUS lookup', { nip });
     const settings = await getSettings();
-    if (!settings.crmUrl) throw new Error('Brak adresu CRM w ustawieniach');
-    
-    // Używamy endpointu /api/gus/nip/{nip}
     const url = settings.crmUrl.replace(/\/$/, '') + '/api/gus/nip/' + nip;
-    
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -870,341 +960,69 @@ async function lookupGusInCRM(nip) {
     });
     
     const data = await response.json();
-    
     if (response.ok) {
-      await logDebug('info', 'gus', 'GUS lookup successful', { company: data.company?.name });
       return { success: true, company: data.company };
     } else {
-      await logDebug('warn', 'gus', 'GUS lookup failed', { error: data.error });
       return { success: false, error: data.error || 'Nie znaleziono firmy' };
     }
   } catch (error) {
-    await logDebug('error', 'gus', 'GUS lookup error', { error: error.message });
     return { success: false, error: error.message };
   }
 }
 
 async function testGmailConnection() {
-  await logDebug('info', 'test', 'Starting Gmail OAuth connection test');
-  
   try {
-    // 1. Pobierz token OAuth
     const token = await getAuthToken();
-    await logDebug('info', 'test', 'OAuth token obtained for test');
-    
-    // 2. Testuj połączenie z Gmail API - pobierz profil użytkownika
     const profileUrl = 'https://gmail.googleapis.com/gmail/v1/users/me/profile';
-    await logDebug('info', 'test', 'Testing Gmail API connection', { url: profileUrl });
-    
     const response = await fetch(profileUrl, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
     });
     
-    await logDebug('info', 'test', 'Gmail API response received', { 
-      status: response.status, 
-      ok: response.ok 
-    });
-    
     if (!response.ok) {
       const errorText = await response.text();
-      await logDebug('error', 'test', 'Gmail API test failed', { 
-        status: response.status, 
-        error: errorText 
-      });
-      
-      // Jeśli błąd autoryzacji, wyczyść token
       if (response.status === 401 || response.status === 403) {
-        await logDebug('warn', 'test', 'Clearing invalid token');
         chrome.identity.removeCachedAuthToken({ token }, () => {});
       }
-      
-      return { 
-        success: false, 
-        error: `Gmail API error (${response.status}): ${errorText.substring(0, 100)}` 
-      };
+      return { success: false, error: `Gmail API error (${response.status})` };
     }
     
     const profile = await response.json();
-    await logDebug('info', 'test', 'Gmail API test successful', { 
-      emailAddress: profile.emailAddress 
-    });
-    
-    return { 
-      success: true, 
-      emailAddress: profile.emailAddress 
-    };
-    
+    return { success: true, emailAddress: profile.emailAddress };
   } catch (error) {
-    await logDebug('error', 'test', 'Gmail connection test error', { 
-      message: error.message, 
-      stack: error.stack 
-    });
-    return { 
-      success: false, 
-      error: error.message 
-    };
+    return { success: false, error: error.message };
   }
 }
 
-/**
- * Testuje pobieranie konkretnego maila przez Gmail API
- * Zwraca szczegółowe informacje o mailu: nadawca, załączniki, treść
- * Akceptuje Message ID lub URL Gmail
- */
 async function testGmailMessage(messageIdOrUrl) {
   try {
-    await logDebug('info', 'testMessage', 'Testing Gmail message fetch', { input: messageIdOrUrl });
-    
-    if (!messageIdOrUrl || typeof messageIdOrUrl !== 'string') {
-      return {
-        success: false,
-        error: 'Brak Message ID lub URL'
-      };
-    }
-    
-    // Wyciągnij Message ID z URL jeśli podano URL
     let messageId = messageIdOrUrl.trim();
-    let finalMessageId = null;
-    
     if (messageId.includes('mail.google.com')) {
-      try {
-        // To jest URL - wyciągnij Message ID z hash
         const urlObj = new URL(messageId);
         const hash = urlObj.hash || '';
         const hashParts = hash.split('/');
-        
         for (const part of hashParts) {
           const cleanId = part.split('?')[0].split('#')[0].trim();
-          // Message ID w Gmail to zwykle 16-20 znaków hex
-          if (cleanId && cleanId.length >= 16 && cleanId.length <= 20 && 
-              !cleanId.startsWith('FM') && !cleanId.startsWith('msg-') &&
-              /^[a-zA-Z0-9_-]+$/.test(cleanId)) {
+          if (cleanId && cleanId.length >= 16 && cleanId.length <= 20) {
             messageId = cleanId;
-            await logDebug('info', 'testMessage', 'Extracted Message ID from URL', { url: messageIdOrUrl, messageId });
             break;
           }
         }
-        
-        if (messageId === messageIdOrUrl.trim()) {
-          // Nie znaleziono Message ID w URL - spróbuj z ostatniej części hash
-          const lastPart = hashParts[hashParts.length - 1]?.split('?')[0]?.split('#')[0]?.trim();
-          if (lastPart && lastPart.length >= 10) {
-            messageId = lastPart;
-            await logDebug('info', 'testMessage', 'Using last part of hash as Message ID', { messageId });
-          } else {
-            return {
-              success: false,
-              error: 'Nie znaleziono Message ID w podanym URL. Wklej bezpośrednio Message ID (np. z konsoli przeglądarki).'
-            };
-          }
-        }
-      } catch (urlError) {
-        await logDebug('error', 'testMessage', 'Error parsing URL', { error: urlError.message });
-        return {
-          success: false,
-          error: `Błąd parsowania URL: ${urlError.message}. Wklej bezpośrednio Message ID.`
-        };
-      }
     }
     
-    if (!messageId || messageId.length < 10) {
-      return {
-        success: false,
-        error: `Nieprawidłowy Message ID: "${messageId}". Musi mieć co najmniej 10 znaków.`
-      };
-    }
-    
-    // 1. Pobierz token OAuth
     const token = await getAuthToken();
+    const finalMessageId = await getRealMessageId(messageId);
     
-    // 2. Waliduj Message ID przed użyciem
-    await logDebug('info', 'testMessage', 'Validating Message ID', { 
-      messageId, 
-      length: messageId.length,
-      startsWithFM: messageId.startsWith('FM'),
-      isValidFormat: /^[a-zA-Z0-9_-]+$/.test(messageId)
-    });
-    
-    // Message ID musi być krótki hex (16-20 znaków) i nie może być Thread ID
-    if (messageId.length > 20 || messageId.startsWith('FM') || messageId.startsWith('msg-')) {
-      await logDebug('info', 'testMessage', 'Looks like Thread ID, resolving', { messageId });
-      finalMessageId = await getRealMessageId(messageId);
-      await logDebug('info', 'testMessage', 'Resolved to Message ID', { original: messageId, resolved: finalMessageId });
-      
-      if (!finalMessageId || finalMessageId === messageId) {
-        return {
-          success: false,
-          error: `Nie można rozwiązać Thread ID "${messageId}". Upewnij się że:\n1. Otworzyłeś konkretny mail (nie listę maili)\n2. Mail jest w pełni załadowany\n3. Spróbuj użyć przycisku "Pobierz z Gmail" gdy masz otwarty konkretny mail`
-        };
-      }
-    } else {
-      finalMessageId = messageId;
-    }
-    
-    // Finalna walidacja Message ID
-    if (!finalMessageId || finalMessageId.length < 16 || finalMessageId.length > 20) {
-      return {
-        success: false,
-        error: `Nieprawidłowy Message ID: "${finalMessageId}" (długość: ${finalMessageId?.length || 0}). Message ID musi mieć 16-20 znaków.`
-      };
-    }
-    
-    if (!/^[a-zA-Z0-9_-]+$/.test(finalMessageId)) {
-      return {
-        success: false,
-        error: `Nieprawidłowy format Message ID: "${finalMessageId}". Dozwolone tylko litery, cyfry, _ i -.`
-      };
-    }
-    
-    // 3. Pobierz szczegóły maila
     const messageUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${finalMessageId}`;
-    await logDebug('info', 'testMessage', 'Fetching message', { url: messageUrl, messageId: finalMessageId });
+    const response = await fetch(messageUrl, { headers: { 'Authorization': `Bearer ${token}` } });
     
-    const response = await fetch(messageUrl, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      await logDebug('error', 'testMessage', 'Failed to fetch message', { 
-        status: response.status, 
-        error: errorText 
-      });
-      return {
-        success: false,
-        error: `Gmail API error (${response.status}): ${errorText.substring(0, 200)}`
-      };
-    }
+    if (!response.ok) return { success: false, error: `Gmail API error (${response.status})` };
     
     const messageData = await response.json();
-    
-    // 4. Wyciągnij dane z maila
-    const headers = messageData.payload?.headers || [];
-    const getHeader = (name) => {
-      const header = headers.find(h => h.name.toLowerCase() === name.toLowerCase());
-      return header ? header.value : null;
-    };
-    
-    const from = getHeader('From');
-    const to = getHeader('To');
-    const subject = getHeader('Subject');
-    const date = getHeader('Date');
-    
-    // 5. Wyciągnij załączniki
-    const attachments = [];
-    function extractAttachments(parts) {
-      if (!Array.isArray(parts)) return;
-      for (const part of parts) {
-        if (part.filename && part.body?.attachmentId) {
-          attachments.push({
-            filename: part.filename,
-            mimeType: part.mimeType,
-            size: part.body.size,
-            attachmentId: part.body.attachmentId
-          });
-        }
-        if (part.parts) {
-          extractAttachments(part.parts);
-        }
-      }
-    }
-    
-    if (messageData.payload?.parts) {
-      extractAttachments(messageData.payload.parts);
-    }
-    
-    // 6. Wyciągnij treść maila (snippet lub pierwsze 500 znaków)
-    const snippet = messageData.snippet || '';
-    let bodyText = '';
-    function extractBody(parts) {
-      if (!Array.isArray(parts)) return;
-      for (const part of parts) {
-        if (part.mimeType === 'text/plain' && part.body?.data) {
-          const base64 = part.body.data.replace(/-/g, '+').replace(/_/g, '/');
-          bodyText = atob(base64).substring(0, 1000);
-          return;
-        }
-        if (part.parts) {
-          extractBody(part.parts);
-        }
-      }
-    }
-    if (messageData.payload?.parts) {
-      extractBody(messageData.payload.parts);
-    }
-    
-    // 7. Sprawdź czy email nadawcy jest firmowy
-    const fromEmail = from ? from.match(/<([^>]+)>/) : null;
-    const fromEmailAddress = fromEmail ? fromEmail[1] : (from || '').split('<')[0].trim();
-    const isCompanyEmail = fromEmailAddress ? COMPANY_EMAILS.some(ce => fromEmailAddress.toLowerCase().includes(ce.toLowerCase())) : false;
-    
-    // 8. Sprawdź czy telefon w treści to numer CRM
-    const phoneRegex = /(\+?48\s?)?(\d{3}[\s\-]?\d{3}[\s\-]?\d{3}|\d{9})/g;
-    const phonesInBody = (snippet + bodyText).match(phoneRegex) || [];
-    const hasCrmPhone = phonesInBody.some(p => p.replace(/\D/g, '').includes('888201250'));
-    
-    const result = {
-      success: true,
-      messageId: finalMessageId,
-      from: from,
-      fromEmail: fromEmailAddress,
-      isCompanyEmail: isCompanyEmail,
-      to: to,
-      subject: subject,
-      date: date,
-      snippet: snippet.substring(0, 200),
-      bodyPreview: bodyText.substring(0, 200),
-      attachments: attachments.map(att => ({
-        filename: att.filename,
-        mimeType: att.mimeType,
-        size: att.size,
-        sizeKB: Math.round(att.size / 1024)
-      })),
-      attachmentsCount: attachments.length,
-      phonesFound: phonesInBody,
-      hasCrmPhone: hasCrmPhone,
-      analysis: {
-        shouldIgnoreEmail: isCompanyEmail,
-        shouldIgnorePhone: hasCrmPhone,
-        attachmentsToImport: attachments.length
-      }
-    };
-    
-    await logDebug('info', 'testMessage', 'Message analysis complete', result);
-    
-    // Upewnij się że zawsze zwracamy obiekt z success
-    if (!result || typeof result !== 'object' || result.success === undefined) {
-      console.error('[CRM BG] testGmailMessage: Invalid result format', result);
-      return {
-        success: false,
-        error: 'Funkcja zwróciła nieprawidłowy format odpowiedzi',
-        rawResult: result
-      };
-    }
-    
-    console.log('[CRM BG] testGmailMessage: Returning result', { success: result.success });
-    return result;
-    
+    return { success: true, snippet: messageData.snippet };
   } catch (error) {
-    await logDebug('error', 'testMessage', 'Error testing message', { 
-      message: error.message, 
-      stack: error.stack,
-      input: messageIdOrUrl
-    });
-    
-    const errorResult = {
-      success: false,
-      error: error.message || 'Nieznany błąd',
-      details: error.stack ? error.stack.substring(0, 500) : null,
-      input: messageIdOrUrl
-    };
-    
-    console.error('[CRM BG] testGmailMessage error:', errorResult);
-    return errorResult;
+    return { success: false, error: error.message };
   }
 }
 
@@ -1234,10 +1052,6 @@ async function saveSettings(settings) {
 
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
-    console.log('[CRM] Extension installed');
     chrome.storage.sync.set(DEFAULT_SETTINGS);
-    chrome.action.openPopup();
   }
 });
-
-
