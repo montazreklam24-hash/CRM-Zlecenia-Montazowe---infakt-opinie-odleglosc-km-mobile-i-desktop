@@ -25,14 +25,11 @@ function debugImport($msg) {
 $input = json_decode(file_get_contents('php://input'), true);
 $id = $input['messageId'] ?? $input['id'] ?? null;
 $token = $input['token'] ?? null;
-$selectedIds = $input['selectedIds'] ?? null; // Lista ID załączników do pobrania
+// USUNIĘTO selectedIds - teraz zawsze pobieramy WSZYSTKO, filtrowanie po nazwie robi rozszerzenie
 
 // Log input parameters (without token)
 debugImport("=== NEW REQUEST ===");
-debugImport("INPUT params: ID=$id, SelectedIds count=" . ($selectedIds ? count($selectedIds) : 'NULL'));
-if ($selectedIds) {
-    debugImport("Selected IDs (ALL): " . json_encode($selectedIds));
-}
+debugImport("INPUT params: ID=$id (pobieramy WSZYSTKIE załączniki)");
 
 if (!$id || !$token) {
   http_response_code(400);
@@ -75,124 +72,77 @@ function googleApiGetRaw(string $url, string $token): array {
   return ['ok' => ($httpCode >= 200 && $httpCode < 300), 'code' => $httpCode, 'error' => null, 'json' => $json];
 }
 
-function collectAttachmentsFromPart(array $part, string $messageId, array &$out, $selectedIds = null): void {
+// UPROSZCZONA WERSJA - Zawsze zbiera WSZYSTKIE załączniki
+function collectAttachmentsFromPart(array $part, string $messageId, array &$out): void {
   $mimeType = $part['mimeType'] ?? '';
   $filename = $part['filename'] ?? '';
   $body = $part['body'] ?? [];
   $attachmentId = $body['attachmentId'] ?? null;
   $inlineData = $body['data'] ?? null;
-  
-  // DEBUG: Log structure only if interesting
-  if ($attachmentId || $inlineData) {
-      debugImport("Part: Mime=$mimeType, File=$filename, AttId=" . ($attachmentId ? 'YES' : 'NO') . ", Data=" . ($inlineData ? 'YES' : 'NO'));
-  }
 
+  // Załącznik z ID (typowy przypadek)
   if ($attachmentId) {
-    $attachmentId = (string)$attachmentId;
-    debugImport("Checking attachment: " . substr($attachmentId, 0, 40) . "... (len: " . strlen($attachmentId) . ")");
-    
-    if ($selectedIds !== null) {
-        $isSelected = false;
-        foreach ($selectedIds as $sId) {
-            $sId = trim((string)$sId);
-            // Porównujemy surowe ID oraz zdekodowane base64url (na wypadek różnic w kodowaniu)
-            if ($sId === $attachmentId || 
-                strtr($sId, '-_', '+/') === strtr($attachmentId, '-_', '+/') ||
-                trim($sId, '=') === trim($attachmentId, '=')) {
-                $isSelected = true;
-                break;
-            }
-        }
-        
-        if (!$isSelected) {
-            debugImport("  -> NOT in selection. Filter IDs: " . count($selectedIds));
-            // Logujemy pierwsze ID z filtra dla porównania
-            if (count($selectedIds) > 0) {
-                $firstFilterId = (string)$selectedIds[0];
-                debugImport("  -> First filter ID: " . substr($firstFilterId, 0, 40) . "... (len: " . strlen($firstFilterId) . ")");
-            }
-        } else {
-            $isInlineImage = (strpos($mimeType, 'image/') === 0);
-            if ($filename || $isInlineImage) {
-              debugImport("  -> MATCH! Collecting: $filename");
-              $out[] = [
-                'messageId' => $messageId,
-                'attachmentId' => $attachmentId,
-                'filename' => $filename,
-                'mimeType' => $mimeType,
-                'isInline' => $isInlineImage
-              ];
-            }
-        }
-    } else {
-        // Brak filtra - zbierz wszystko
-        $isInlineImage = (strpos($mimeType, 'image/') === 0);
-        if ($filename || $isInlineImage) {
-          debugImport("  -> NO FILTER. Collecting: $filename");
-          $out[] = [
-            'messageId' => $messageId,
-            'attachmentId' => $attachmentId,
-            'filename' => $filename,
-            'mimeType' => $mimeType,
-            'isInline' => $isInlineImage
-          ];
-        }
+    $isInlineImage = (strpos($mimeType, 'image/') === 0);
+    if ($filename || $isInlineImage) {
+      debugImport("Collecting: $filename (mime: $mimeType)");
+      $out[] = [
+        'messageId' => $messageId,
+        'attachmentId' => (string)$attachmentId,
+        'filename' => $filename,
+        'mimeType' => $mimeType,
+        'isInline' => $isInlineImage
+      ];
     }
   }
 
+  // Inline obraz bez ID (rzadko)
   if (!$attachmentId && $inlineData && strpos($mimeType, 'image/') === 0) {
-    // Dla inline data (bez ID), na razie pozwalamy jeśli nie ma wyboru lub jeśli to logo? 
-    // W sumie user chce wybierać WSZYSTKO co jest załącznikiem.
-    // Jeśli selectedIds jest podane, a ten inline nie ma ID, to go pomijamy?
-    // Zwykle inline mają attachmentId w Gmail API.
-    if ($selectedIds === null) {
-        $out[] = [
-          'messageId' => $messageId,
-          'attachmentId' => null,
-          'filename' => $filename ?: ('inline_' . substr(md5($inlineData), 0, 8) . '.png'),
-          'mimeType' => $mimeType,
-          'isInline' => true,
-          'inlineData' => $inlineData
-        ];
-    }
+    $out[] = [
+      'messageId' => $messageId,
+      'attachmentId' => null,
+      'filename' => $filename ?: ('inline_' . substr(md5($inlineData), 0, 8) . '.png'),
+      'mimeType' => $mimeType,
+      'isInline' => true,
+      'inlineData' => $inlineData
+    ];
   }
 
+  // Rekurencja do pod-części
   if (!empty($part['parts']) && is_array($part['parts'])) {
     foreach ($part['parts'] as $sub) {
-      if (is_array($sub)) collectAttachmentsFromPart($sub, $messageId, $out, $selectedIds);
+      if (is_array($sub)) collectAttachmentsFromPart($sub, $messageId, $out);
     }
   }
 }
 
-function collectAttachmentsFromMessage(array $message, array &$out, $selectedIds = null): void {
+function collectAttachmentsFromMessage(array $message, array &$out): void {
   $messageId = $message['id'] ?? '';
   if (!$messageId) return;
   $payload = $message['payload'] ?? null;
   if (!$payload || !is_array($payload)) return;
-  collectAttachmentsFromPart($payload, $messageId, $out, $selectedIds);
+  collectAttachmentsFromPart($payload, $messageId, $out);
 }
 
 try {
-  debugImport("=== START IMPORT (ID: $id) ===");
+  debugImport("=== START IMPORT (ID: $id) - POBIERAMY WSZYSTKO ===");
   $attachmentsMeta = [];
 
-  // 1) Pobierz DOKŁADNIE tę wiadomość (nie wątek), 
-  // bo attachmentId są unikalne dla konkretnego messageId
+  // Spróbuj najpierw jako pojedyncza wiadomość
   $msgUrl = "https://www.googleapis.com/gmail/v1/users/me/messages/{$id}?format=full";
   $msgRes = googleApiGetRaw($msgUrl, $token);
   
   if ($msgRes['ok']) {
       debugImport("Fetched message $id correctly.");
-      collectAttachmentsFromMessage($msgRes['json'], $attachmentsMeta, $selectedIds);
+      collectAttachmentsFromMessage($msgRes['json'], $attachmentsMeta);
   } else {
       debugImport("Failed to fetch message $id. HTTP code: " . $msgRes['code']);
-      // Fallback do wątku tylko jeśli nie udało się pobrać wiadomości
+      // Fallback do wątku
       $threadUrl = "https://www.googleapis.com/gmail/v1/users/me/threads/{$id}?format=full";
       $threadRes = googleApiGetRaw($threadUrl, $token);
       if ($threadRes['ok']) {
-          debugImport("Resolved as Thread fallback.");
+          debugImport("Resolved as Thread - collecting from ALL messages.");
           foreach ($threadRes['json']['messages'] as $msg) {
-              if (is_array($msg)) collectAttachmentsFromMessage($msg, $attachmentsMeta, $selectedIds);
+              if (is_array($msg)) collectAttachmentsFromMessage($msg, $attachmentsMeta);
           }
       } else {
           throw new Exception("Nie udało się pobrać wiadomości ani wątku.");

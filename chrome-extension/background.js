@@ -442,60 +442,86 @@ async function getGmailAttachments(messageId) {
   } catch (e) { return { success: false, error: e.message }; }
 }
 
-async function importAttachments(attachmentsToImport) {
-  await logDebug('info', 'import', 'importAttachments called', { 
-    isArray: Array.isArray(attachmentsToImport), 
-    length: attachmentsToImport?.length
+/**
+ * NOWE PODEJŚCIE:
+ * 1. PHP pobiera WSZYSTKIE załączniki z Gmaila i zapisuje je na serwerze
+ * 2. PHP zwraca listę z originalName i path dla każdego pliku
+ * 3. Rozszerzenie filtruje po nazwie - do CRM trafiają tylko wybrane
+ */
+async function importAttachments(selectedAttachments, gmailMessageId) {
+  await logDebug('info', 'import', 'importAttachments called (NEW approach)', { 
+    selectedCount: selectedAttachments?.length,
+    gmailMessageId
   });
   
-  if (!Array.isArray(attachmentsToImport) || attachmentsToImport.length === 0) {
+  if (!gmailMessageId) {
+    await logDebug('error', 'import', 'No gmailMessageId provided');
     return [];
   }
   
-  const resultPaths = [];
+  const settings = await getSettings();
   
-  for (let i = 0; i < attachmentsToImport.length; i++) {
-    const att = attachmentsToImport[i];
-    await logDebug('info', 'import', `Processing ${i+1}/${attachmentsToImport.length}: ${att.name}`);
-    
-    try {
-      if (!att.messageId || !att.id) continue;
-      
-      // 1. Pobierz dane z Gmaila (Base64)
-      const gmailRes = await getAttachmentData(att.messageId, att.id);
-      if (!gmailRes.success || !gmailRes.data) {
-        await logDebug('error', 'import', `Download failed: ${att.name}`, gmailRes.error);
-        continue;
-      }
-      
-      const mimeType = att.mimeType || 'application/octet-stream';
-      const base64Data = gmailRes.data.replace(/-/g, '+').replace(/_/g, '/');
-      let dataUrl = `data:${mimeType};base64,${base64Data}`;
-      let finalName = att.name;
-      
-      // 2. Jeśli to obraz - KOMPRESUJ (limit PHP ~2MB)
-      if (mimeType.startsWith('image/')) {
-        await logDebug('info', 'import', `Compressing image ${att.name} (original: ${dataUrl.length} chars)`);
-        const compressed = await compressImage(dataUrl);
-        if (compressed) {
-          dataUrl = compressed;
-          finalName = att.name.replace(/\.[^/.]+$/, "") + ".jpg";
-          await logDebug('info', 'import', `Compressed to ${dataUrl.length} chars`);
-        }
-      }
-      
-      // 3. Wyślij do CRM
-      const url = await uploadFileToCRM({ name: finalName, data: dataUrl });
-      if (url) {
-        resultPaths.push(url);
-        await logDebug('info', 'import', `Uploaded: ${finalName} -> ${url}`);
-      }
-    } catch (e) {
-      await logDebug('error', 'import', `Exception: ${att.name}`, e.message);
-    }
+  // 1. Pobierz token Gmail
+  let token;
+  try {
+    token = await getAuthToken();
+  } catch (e) {
+    await logDebug('error', 'import', 'Failed to get Gmail token', e.message);
+    return [];
   }
   
-  return resultPaths;
+  // 2. Wyślij do PHP - pobierz WSZYSTKIE załączniki
+  const url = settings.crmUrl.replace(/\/$/, '') + '/api/import_gmail.php';
+  await logDebug('info', 'import', 'Calling PHP to fetch ALL attachments', { url, messageId: gmailMessageId });
+  
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + settings.crmToken
+      },
+      body: JSON.stringify({ 
+        messageId: gmailMessageId, 
+        token: token 
+      })
+    });
+    
+    const data = await resp.json();
+    await logDebug('info', 'import', 'PHP response', { 
+      success: data.success, 
+      attachmentsCount: data.attachments?.length,
+      error: data.error
+    });
+    
+    if (!data.success || !data.attachments) {
+      await logDebug('error', 'import', 'PHP import failed', data.error);
+      return [];
+    }
+    
+    // 3. FILTRUJ po nazwie - tylko wybrane załączniki trafiają do karty
+    const selectedNames = new Set((selectedAttachments || []).map(a => a.name?.toLowerCase()));
+    await logDebug('info', 'import', 'Filtering by names', { 
+      allFromPHP: data.attachments.map(a => a.originalName),
+      selectedNames: Array.from(selectedNames)
+    });
+    
+    const filteredPaths = data.attachments
+      .filter(a => selectedNames.has(a.originalName?.toLowerCase()))
+      .map(a => a.path);
+    
+    await logDebug('info', 'import', 'Filtered result', { 
+      totalFromPHP: data.attachments.length,
+      filtered: filteredPaths.length,
+      paths: filteredPaths
+    });
+    
+    return filteredPaths;
+    
+  } catch (e) {
+    await logDebug('error', 'import', 'Exception during import', e.message);
+    return [];
+  }
 }
 
 // Kompresja obrazu do max 1600px i JPEG 0.7
@@ -558,13 +584,14 @@ async function createJobInCRM(jobData) {
         importAttachmentsEnabled: settings.importAttachments
     });
 
-    if (settings.importAttachments && jobData.selectedAttachments?.length > 0) {
-        await logDebug('info', 'createJob', 'Will import Gmail attachments', {
-            count: jobData.selectedAttachments.length,
-            details: jobData.selectedAttachments
+    if (settings.importAttachments && jobData.selectedAttachments?.length > 0 && finalMessageId) {
+        await logDebug('info', 'createJob', 'Will import Gmail attachments (NEW: PHP fetches all, we filter)', {
+            selectedCount: jobData.selectedAttachments.length,
+            selectedNames: jobData.selectedAttachments.map(a => a.name),
+            gmailMessageId: finalMessageId
         });
         try {
-            projectImages = await importAttachments(jobData.selectedAttachments);
+            projectImages = await importAttachments(jobData.selectedAttachments, finalMessageId);
             await logDebug('info', 'createJob', 'Gmail attachments imported', { paths: projectImages });
         } catch (e) { 
             attachmentWarning = "Błąd importu: " + e.message;
@@ -572,7 +599,9 @@ async function createJobInCRM(jobData) {
         }
     } else {
         await logDebug('info', 'createJob', 'Skipping Gmail attachments import', {
-            reason: !settings.importAttachments ? 'disabled in settings' : 'no attachments selected'
+            reason: !settings.importAttachments ? 'disabled in settings' : 
+                    !jobData.selectedAttachments?.length ? 'no attachments selected' : 
+                    'no messageId'
         });
     }
 
