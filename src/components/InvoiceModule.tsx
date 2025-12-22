@@ -663,10 +663,10 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
               </div>
             </div>
 
-            {(!clientName || !clientEmail) && (
+            {(!billing.name || !billing.email) && (
               <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-100 rounded-xl text-amber-700 text-[10px] font-bold uppercase leading-tight">
                 <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <p>Brak pełnych danych klienta (nazwa, email). Dokumenty mogą zostać wystawione błędnie w inFakt.</p>
+                <p>Brak pełnych danych nabywcy do faktury (nazwa firmy, email). Dokumenty mogą zostać wystawione błędnie w inFakt.</p>
               </div>
             )}
           </div>
