@@ -332,6 +332,11 @@ async function analyzeEmail(emailData) {
       if (threadContent) contextBody = emailData.body + "\n\n=== PEŁNA HISTORIA ===\n" + threadContent;
   }
   
+  const fromEmail = emailData.fromEmail || emailData.from || null;
+  if (fromEmail) {
+    await logDebug('info', 'analyze', 'Email from field', { fromEmail, isCompany: isCompanyEmail(fromEmail) });
+  }
+  
   const parts = [{ text: `Jesteś asystentem CRM. Wyciągnij dane klienta WYŁĄCZNIE na podstawie poniższego maila i historii wątku.
 - Telefon, Email klienta (IGNORUJ FIRMOWE), Firma, NIP, Imię, Adres montażu, Zakres prac, Tytuł.
 - KRYTYCZNE: Używaj TYLKO danych tekstowych z maila. NIE zmyślaj NIP-u ani telefonu, jeśli go nie ma.
