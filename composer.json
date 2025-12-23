@@ -1,0 +1,13 @@
+{
+  "name": "montazreklam24/crm",
+  "description": "CRM Zlecenia Montażowe",
+  "require": {
+    "phpmailer/phpmailer": "^6.9"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "api/"
+    }
+  }
+}
+

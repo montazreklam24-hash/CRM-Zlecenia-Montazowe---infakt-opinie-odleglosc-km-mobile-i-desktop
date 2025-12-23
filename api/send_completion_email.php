@@ -41,6 +41,19 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
 
 require_once __DIR__ . '/config.php';
 
+// Załaduj PHPMailer jeśli jest dostępny
+$phpmailerLoaded = false;
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+    $phpmailerLoaded = true;
+} elseif (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+    $phpmailerLoaded = true;
+}
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
 handleCORS();
 
 // Tylko POST
@@ -77,71 +90,130 @@ $googleReviewUrl = 'https://g.page/r/CS69RHgLcp94EB0/review';
 $htmlContent = generateEmailHtml($jobTitle, $googleReviewUrl, $completionNotes);
 
 // Przygotuj email
-$subject = "=?UTF-8?B?" . base64_encode("Realizacja montażu - $jobTitle") . "?=";
-$fromEmail = "montazreklam24@gmail.com";
-$fromName = "Montaż Reklam 24";
-
-// Boundary dla multipart
-$boundary = md5(time());
-
-// Nagłówki
-$headers = array();
-$headers[] = "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$fromEmail>";
-$headers[] = "Reply-To: $fromEmail";
-$headers[] = "MIME-Version: 1.0";
-$headers[] = "X-Mailer: CRM Montaz Reklam 24";
-
-// Jeśli mamy załącznik - multipart/mixed
-if ($completionImage && strpos($completionImage, 'data:image') === 0) {
-    $headers[] = "Content-Type: multipart/mixed; boundary=\"$boundary\"";
-    
-    // Treść emaila
-    $body = "--$boundary\r\n";
-    $body .= "Content-Type: text/html; charset=UTF-8\r\n";
-    $body .= "Content-Transfer-Encoding: base64\r\n\r\n";
-    $body .= chunk_split(base64_encode($htmlContent)) . "\r\n";
-    
-    // Załącznik - zdjęcie
-    $body .= "--$boundary\r\n";
-    
-    // Wyciągnij typ i dane base64
-    if (preg_match('/^data:image\/(\w+);base64,(.+)$/', $completionImage, $matches)) {
-        $imageType = $matches[1];
-        $imageData = $matches[2];
-        $filename = "realizacja_$jobId.$imageType";
-        
-        $body .= "Content-Type: image/$imageType; name=\"$filename\"\r\n";
-        $body .= "Content-Disposition: attachment; filename=\"$filename\"\r\n";
-        $body .= "Content-Transfer-Encoding: base64\r\n\r\n";
-        $body .= chunk_split($imageData) . "\r\n";
-    }
-    
-    $body .= "--$boundary--";
-} else {
-    // Bez załącznika - prosty HTML
-    $headers[] = "Content-Type: text/html; charset=UTF-8";
-    $body = $htmlContent;
-}
-
-// Wyślij email
-$headersStr = implode("\r\n", $headers);
+$subject = "Realizacja montażu - $jobTitle";
+$fromEmail = SMTP_FROM_EMAIL;
+$fromName = SMTP_FROM_NAME;
 
 // Loguj próbę wysyłki (bez wrażliwych danych)
 error_log("Próba wysyłki email do: $toEmail, temat: $jobTitle");
-error_log("Funkcja mail() dostępna: " . (function_exists('mail') ? 'TAK' : 'NIE'));
+error_log("PHPMailer dostępny: " . ($phpmailerLoaded ? 'TAK' : 'NIE'));
 
-// Wyłącz tłumienie błędów dla mail() żeby zobaczyć szczegóły
-$result = mail($toEmail, $subject, $body, $headersStr);
-
-if (!$result) {
-    $lastError = error_get_last();
-    error_log("Wynik funkcji mail(): FAILED");
-    error_log("Ostatni błąd PHP: " . json_encode($lastError));
+// Użyj PHPMailer jeśli jest dostępny, w przeciwnym razie fallback do mail()
+if ($phpmailerLoaded) {
+    try {
+        $mail = new PHPMailer(true);
+        
+        // Konfiguracja SMTP
+        $mail->isSMTP();
+        $mail->Host = SMTP_HOST;
+        $mail->SMTPAuth = true;
+        $mail->Username = SMTP_USERNAME;
+        $mail->Password = SMTP_PASSWORD;
+        $mail->SMTPSecure = SMTP_SECURE;
+        $mail->Port = SMTP_PORT;
+        $mail->CharSet = 'UTF-8';
+        
+        // Nadawca i odbiorca
+        $mail->setFrom($fromEmail, $fromName);
+        $mail->addAddress($toEmail);
+        $mail->addReplyTo($fromEmail, $fromName);
+        
+        // Treść emaila
+        $mail->isHTML(true);
+        $mail->Subject = $subject;
+        $mail->Body = $htmlContent;
+        $mail->AltBody = strip_tags($htmlContent);
+        
+        // Dodaj załącznik jeśli jest
+        if ($completionImage && strpos($completionImage, 'data:image') === 0) {
+            if (preg_match('/^data:image\/(\w+);base64,(.+)$/', $completionImage, $matches)) {
+                $imageType = $matches[1];
+                $imageData = base64_decode($matches[2]);
+                $filename = "realizacja_$jobId.$imageType";
+                
+                $mail->addStringAttachment($imageData, $filename, 'base64', "image/$imageType");
+            }
+        }
+        
+        // Wyślij email
+        $result = $mail->send();
+        error_log("PHPMailer: Email wysłany pomyślnie do $toEmail");
+        
+    } catch (Exception $e) {
+        error_log("PHPMailer Error: " . $mail->ErrorInfo);
+        jsonResponse([
+            'success' => false,
+            'error' => 'Nie udało się wysłać emaila przez SMTP: ' . $mail->ErrorInfo,
+            'details' => $mail->ErrorInfo
+        ], 500);
+        return; // Zakończ wykonanie
+    }
 } else {
-    error_log("Wynik funkcji mail(): SUCCESS");
+    // Fallback do starej metody mail() jeśli PHPMailer nie jest dostępny
+    error_log("UWAGA: PHPMailer nie jest zainstalowany, używam funkcji mail()");
+    
+    // Boundary dla multipart
+    $boundary = md5(time());
+    
+    // Nagłówki
+    $headers = array();
+    $headers[] = "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$fromEmail>";
+    $headers[] = "Reply-To: $fromEmail";
+    $headers[] = "MIME-Version: 1.0";
+    $headers[] = "X-Mailer: CRM Montaz Reklam 24";
+    
+    // Jeśli mamy załącznik - multipart/mixed
+    if ($completionImage && strpos($completionImage, 'data:image') === 0) {
+        $headers[] = "Content-Type: multipart/mixed; boundary=\"$boundary\"";
+        
+        // Treść emaila
+        $body = "--$boundary\r\n";
+        $body .= "Content-Type: text/html; charset=UTF-8\r\n";
+        $body .= "Content-Transfer-Encoding: base64\r\n\r\n";
+        $body .= chunk_split(base64_encode($htmlContent)) . "\r\n";
+        
+        // Załącznik - zdjęcie
+        $body .= "--$boundary\r\n";
+        
+        // Wyciągnij typ i dane base64
+        if (preg_match('/^data:image\/(\w+);base64,(.+)$/', $completionImage, $matches)) {
+            $imageType = $matches[1];
+            $imageData = $matches[2];
+            $filename = "realizacja_$jobId.$imageType";
+            
+            $body .= "Content-Type: image/$imageType; name=\"$filename\"\r\n";
+            $body .= "Content-Disposition: attachment; filename=\"$filename\"\r\n";
+            $body .= "Content-Transfer-Encoding: base64\r\n\r\n";
+            $body .= chunk_split($imageData) . "\r\n";
+        }
+        
+        $body .= "--$boundary--";
+    } else {
+        // Bez załącznika - prosty HTML
+        $headers[] = "Content-Type: text/html; charset=UTF-8";
+        $body = $htmlContent;
+    }
+    
+    // Wyślij email
+    $headersStr = implode("\r\n", $headers);
+    $subjectEncoded = "=?UTF-8?B?" . base64_encode($subject) . "?=";
+    
+    error_log("Funkcja mail() dostępna: " . (function_exists('mail') ? 'TAK' : 'NIE'));
+    $result = @mail($toEmail, $subjectEncoded, $body, $headersStr);
+    
+    if (!$result) {
+        $lastError = error_get_last();
+        error_log("Wynik funkcji mail(): FAILED");
+        error_log("Ostatni błąd PHP: " . json_encode($lastError));
+    } else {
+        error_log("Wynik funkcji mail(): SUCCESS");
+    }
 }
 
-    if ($result) {
+// Sprawdź wynik wysyłki
+if (isset($result) && $result) {
+
+if ($result) {
     // Zapisz info do bazy (opcjonalnie)
     try {
         $pdo = getDB();
