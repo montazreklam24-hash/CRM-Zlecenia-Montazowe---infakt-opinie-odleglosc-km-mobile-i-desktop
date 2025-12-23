@@ -15,11 +15,11 @@
   
   /* Tła - ZDJĘCIE MIASTA Z BILLBOARDAMI */
   --bg-page: url('https://images.unsplash.com/photo-1534430480872-3498386e7856?w=1920&q=80') center/cover fixed;
-  --bg-card: rgba(255, 255, 255, 0.15);
-  --bg-card-hover: rgba(255, 255, 255, 0.20);
-  --bg-surface: rgba(255, 255, 255, 0.10);
-  --bg-input: rgba(255, 255, 255, 0.18);
-  --bg-header: rgba(255, 255, 255, 0.15);
+  --bg-card: rgba(255, 255, 255, 0.075);
+  --bg-card-hover: rgba(255, 255, 255, 0.10);
+  --bg-surface: rgba(255, 255, 255, 0.05);
+  --bg-input: rgba(255, 255, 255, 0.09);
+  --bg-header: rgba(255, 255, 255, 0.075);
   
   /* Kolory tekstu */
   --text-primary: #1e293b;
