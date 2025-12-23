@@ -35,7 +35,7 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
       bg: 'bg-blue-50', 
       text: 'text-blue-700', 
       border: 'border-blue-200',
-      icon: '­čôä', 
+      icon: '', 
       label: 'Proforma',
       gradient: 'from-blue-600 to-blue-700'
     },
@@ -43,7 +43,7 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
       bg: 'bg-purple-50', 
       text: 'text-purple-700', 
       border: 'border-purple-200',
-      icon: '­čĺŞ', 
+      icon: '', 
       label: 'Zaliczka',
       gradient: 'from-purple-400 to-purple-500'
     },
@@ -51,7 +51,7 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
       bg: 'bg-green-50', 
       text: 'text-green-700', 
       border: 'border-green-200',
-      icon: 'Ôťů', 
+      icon: '', 
       label: 'Opłacone',
       gradient: 'from-green-400 to-green-500'
     },
@@ -59,7 +59,7 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
       bg: 'bg-yellow-50', 
       text: 'text-yellow-700', 
       border: 'border-yellow-200',
-      icon: '­čĄŁ', 
+      icon: '', 
       label: 'Barter',
       gradient: 'from-yellow-400 to-yellow-500'
     },
@@ -67,7 +67,7 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
       bg: 'bg-red-50', 
       text: 'text-red-700', 
       border: 'border-red-200',
-      icon: 'ÔÜá´ŞĆ', 
+      icon: '', 
       label: 'Przeterminowane',
       gradient: 'from-red-400 to-red-500'
     }
@@ -100,7 +100,7 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
       ${cfg.bg} ${cfg.text} border ${cfg.border}
       ${sizeClasses[size]}
     `}>
-      <span>{cfg.icon}</span>
+      {cfg.icon && <span>{cfg.icon}</span>}
       <span>{cfg.label}</span>
       {showAmount && amount > 0 && (
         <span className="font-normal opacity-75 ml-1">
@@ -161,18 +161,18 @@ export const PaymentStatusIcon: React.FC<{ status: PaymentStatus; className?: st
 }) => {
   const icons: Record<PaymentStatus, string> = {
     [PaymentStatus.NONE]: '',
-    [PaymentStatus.PROFORMA]: '­čôä',
-    [PaymentStatus.PARTIAL]: '­čĺŞ',
-    [PaymentStatus.PAID]: 'Ôťů',
-    [PaymentStatus.CASH]: '­čĄŁ',
-    [PaymentStatus.OVERDUE]: 'ÔÜá´ŞĆ'
+    [PaymentStatus.PROFORMA]: '',
+    [PaymentStatus.PARTIAL]: '',
+    [PaymentStatus.PAID]: '',
+    [PaymentStatus.CASH]: '',
+    [PaymentStatus.OVERDUE]: ''
   };
 
   if (status === PaymentStatus.NONE) {
     return null;
   }
 
-  return <span className={className}>{icons[status]}</span>;
+  return icons[status] ? <span className={className}>{icons[status]}</span> : null;
 };
 
 // Mini-popup do szybkiej zmiany statusu płatności (wyświetla się przy kafelku)
@@ -200,7 +200,7 @@ export const PaymentStatusMiniMenu: React.FC<{
       />
       {/* Menu */}
       <div 
-        className={`absolute ${position === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'} right-0 bg-white rounded-lg shadow-xl border border-slate-200 p-1 min-w-[140px] animate-fade-in`}
+        className={`absolute ${position === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'} right-0 bg-white rounded-lg shadow-xl border border-slate-200 p-1 min-w-[140px]`}
         onClick={(e) => e.stopPropagation()}
         style={{ 
           zIndex: 1000
