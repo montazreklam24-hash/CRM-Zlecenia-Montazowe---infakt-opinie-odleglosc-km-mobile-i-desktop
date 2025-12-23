@@ -2060,7 +2060,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                           </button>
                           
                           {/* Status płatności - klikalny przycisk z menu */}
-                          <div className="relative">
+                          <div className="relative" style={{ zIndex: archivePaymentMenuOpen === job.id ? 1000 : 'auto' }}>
                             <button
                               onClick={(e) => { 
                                 e.stopPropagation(); 
@@ -2073,15 +2073,17 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             
                             {/* Menu zmiany statusu płatności */}
                             {archivePaymentMenuOpen === job.id && (
-                              <PaymentStatusMiniMenu
-                                currentStatus={paymentStatus}
-                                onSelect={async (newStatus) => {
-                                  await handlePaymentStatusChange(job.id, newStatus);
-                                  setArchivePaymentMenuOpen(null);
-                                }}
-                                onClose={() => setArchivePaymentMenuOpen(null)}
-                                position="bottom"
-                              />
+                              <div className="absolute right-0 top-full mt-1" style={{ zIndex: 1001 }}>
+                                <PaymentStatusMiniMenu
+                                  currentStatus={paymentStatus}
+                                  onSelect={async (newStatus) => {
+                                    await handlePaymentStatusChange(job.id, newStatus);
+                                    setArchivePaymentMenuOpen(null);
+                                  }}
+                                  onClose={() => setArchivePaymentMenuOpen(null)}
+                                  position="bottom"
+                                />
+                              </div>
                             )}
                           </div>
                           

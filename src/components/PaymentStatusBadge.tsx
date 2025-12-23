@@ -32,12 +32,12 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
       label: '' 
     },
     [PaymentStatus.PROFORMA]: { 
-      bg: 'bg-orange-50', 
-      text: 'text-orange-700', 
-      border: 'border-orange-200',
+      bg: 'bg-blue-50', 
+      text: 'text-blue-700', 
+      border: 'border-blue-200',
       icon: '­čôä', 
       label: 'Proforma',
-      gradient: 'from-orange-400 to-orange-500'
+      gradient: 'from-blue-600 to-blue-700'
     },
     [PaymentStatus.PARTIAL]: { 
       bg: 'bg-purple-50', 
@@ -115,7 +115,7 @@ export const PaymentStatusBar: React.FC<{
 }> = ({ status, onClick, showLabel = true }) => {
   const config: Record<PaymentStatus, { bg: string; label: string }> = {
     [PaymentStatus.NONE]: { bg: '', label: '' },
-    [PaymentStatus.PROFORMA]: { bg: 'bg-gradient-to-r from-orange-400 to-orange-500', label: 'PROFORMA' },
+    [PaymentStatus.PROFORMA]: { bg: 'bg-gradient-to-r from-blue-600 to-blue-700', label: 'PROFORMA' },
     [PaymentStatus.PARTIAL]: { bg: 'bg-gradient-to-r from-purple-400 to-purple-500', label: 'ZALICZKA' },
     [PaymentStatus.PAID]: { bg: 'bg-gradient-to-r from-green-400 to-green-500', label: 'OPŁACONE' },
     [PaymentStatus.CASH]: { bg: 'bg-gradient-to-r from-yellow-400 to-yellow-500', label: 'GOT├ôWKA' },
@@ -180,7 +180,7 @@ export const PaymentStatusMiniMenu: React.FC<{
 }> = ({ currentStatus, onSelect, onClose, position = 'bottom' }) => {
   const statuses: { value: PaymentStatus; label: string; bg: string }[] = [
     { value: PaymentStatus.NONE, label: 'Brak', bg: 'bg-slate-400' },
-    { value: PaymentStatus.PROFORMA, label: 'Proforma', bg: 'bg-orange-500' },
+    { value: PaymentStatus.PROFORMA, label: 'Proforma', bg: 'bg-blue-600' },
     { value: PaymentStatus.PARTIAL, label: 'Zaliczka', bg: 'bg-purple-500' },
     { value: PaymentStatus.PAID, label: 'Opłacone', bg: 'bg-green-500' },
     { value: PaymentStatus.CASH, label: 'Gotówka', bg: 'bg-yellow-500' },
@@ -196,8 +196,11 @@ export const PaymentStatusMiniMenu: React.FC<{
       />
       {/* Menu */}
       <div 
-        className={`absolute ${position === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'} left-0 right-0 z-50 bg-white rounded-lg shadow-xl border border-slate-200 p-1 animate-fade-in`}
+        className={`absolute ${position === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'} right-0 bg-white rounded-lg shadow-xl border border-slate-200 p-1 min-w-[140px] animate-fade-in`}
         onClick={(e) => e.stopPropagation()}
+        style={{ 
+          zIndex: 1000
+        }}
       >
         <div className="text-[9px] font-bold text-slate-400 uppercase px-2 py-1">Status płatności</div>
         <div className="grid grid-cols-2 gap-1">
