@@ -19,20 +19,23 @@
 
 // Wyłącz wyświetlanie błędów HTML - zawsze zwracaj JSON
 ini_set('display_errors', 0);
-error_reporting(0);
+// Włącz logowanie błędów do error_log
+error_reporting(E_ALL);
+ini_set('log_errors', 1);
 
 // Ustaw header JSON od razu
 header('Content-Type: application/json; charset=utf-8');
 
 // Obsługa błędów - zwróć jako JSON
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    error_log("PHP Error [$errno]: $errstr in $errfile:$errline");
     http_response_code(500);
     echo json_encode([
         'success' => false,
         'error' => 'PHP Error: ' . $errstr,
         'file' => basename($errfile),
         'line' => $errline
-    ]);
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 });
 
@@ -125,10 +128,18 @@ $headersStr = implode("\r\n", $headers);
 
 // Loguj próbę wysyłki (bez wrażliwych danych)
 error_log("Próba wysyłki email do: $toEmail, temat: $jobTitle");
+error_log("Funkcja mail() dostępna: " . (function_exists('mail') ? 'TAK' : 'NIE'));
 
-$result = @mail($toEmail, $subject, $body, $headersStr);
+// Wyłącz tłumienie błędów dla mail() żeby zobaczyć szczegóły
+$result = mail($toEmail, $subject, $body, $headersStr);
 
-error_log("Wynik funkcji mail(): " . ($result ? 'SUCCESS' : 'FAILED'));
+if (!$result) {
+    $lastError = error_get_last();
+    error_log("Wynik funkcji mail(): FAILED");
+    error_log("Ostatni błąd PHP: " . json_encode($lastError));
+} else {
+    error_log("Wynik funkcji mail(): SUCCESS");
+}
 
     if ($result) {
     // Zapisz info do bazy (opcjonalnie)
@@ -158,18 +169,24 @@ error_log("Wynik funkcji mail(): " . ($result ? 'SUCCESS' : 'FAILED'));
 } else {
     // Pobierz błąd
     $error = error_get_last();
-    $errorDetails = $error ? $error['message'] : 'Brak szczegółów';
-    error_log("Błąd wysyłki email do $toEmail: " . json_encode($error));
+    $errorDetails = 'Nieznany błąd';
     
-    // Sprawdź czy funkcja mail() jest dostępna
-    if (!function_exists('mail')) {
+    if ($error && isset($error['message'])) {
+        $errorDetails = $error['message'];
+    } elseif (!function_exists('mail')) {
         $errorDetails = 'Funkcja mail() nie jest dostępna na serwerze. Skontaktuj się z administratorem.';
+    } else {
+        $errorDetails = 'Funkcja mail() zwróciła false. Sprawdź konfigurację serwera SMTP lub logi PHP.';
     }
+    
+    error_log("Błąd wysyłki email do $toEmail: " . json_encode($error));
+    error_log("Szczegóły błędu: $errorDetails");
     
     jsonResponse([
         'success' => false,
         'error' => 'Nie udało się wysłać emaila. ' . $errorDetails,
-        'details' => $errorDetails
+        'details' => $errorDetails,
+        'mail_function_exists' => function_exists('mail')
     ], 500);
 }
 
