@@ -23,7 +23,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
   const { isMobile } = useDeviceType();
   const urlParams = new URLSearchParams(window.location.search);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const sidebarCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const sidebarCloseTimeoutRef = useRef<number | null>(null);
 
   const userRoleName = user?.role ? ROLE_NAMES[user.role] : 'Użytkownik';
 

@@ -80,6 +80,24 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
   useEffect(() => {
     if (!isExpanded) return; // Nie aktywuj paste gdy sekcja jest zwinięta
     
+    // Ustaw focus na dropZoneRef po rozwinięciu, żeby Ctrl+V działało od razu
+    // Używamy setTimeout żeby upewnić się że sekcja jest już wyrenderowana
+    const timeoutId = setTimeout(() => {
+      if (dropZoneRef.current) {
+        const activeElement = document.activeElement;
+        // Ustaw focus tylko jeśli nie ma już focusu na polu tekstowym
+        if (!activeElement || (
+          activeElement.tagName !== 'TEXTAREA' && 
+          activeElement.tagName !== 'INPUT' &&
+          activeElement.getAttribute('contenteditable') !== 'true'
+        )) {
+          dropZoneRef.current.focus();
+        }
+      }
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
+    
     const handlePaste = (e: ClipboardEvent) => {
       const activeElement = document.activeElement;
       

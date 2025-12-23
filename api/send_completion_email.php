@@ -212,8 +212,6 @@ if ($phpmailerLoaded) {
 
 // Sprawdź wynik wysyłki
 if (isset($result) && $result) {
-
-if ($result) {
     // Zapisz info do bazy (opcjonalnie)
     try {
         $pdo = getDB();
