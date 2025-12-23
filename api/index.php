@@ -27,7 +27,8 @@ $path = trim($path, '/');
 // Get ID from path if present (e.g., jobs/123)
 $pathParts = explode('/', $path);
 $endpoint = isset($pathParts[0]) ? $pathParts[0] : '';
-$id = isset($pathParts[1]) ? $pathParts[1] : null;
+$subEndpoint = isset($pathParts[1]) ? $pathParts[1] : null;
+$id = isset($pathParts[2]) ? $pathParts[2] : (isset($pathParts[1]) && !in_array($pathParts[1], ['callback']) ? $pathParts[1] : null);
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -51,6 +52,16 @@ switch ($endpoint) {
     case 'change-password':
         require_once __DIR__ . '/auth.php';
         handleChangePassword();
+        break;
+    
+    case 'auth':
+        // Google OAuth routing: /api/auth/google lub /api/auth/google/callback
+        if ($subEndpoint === 'google') {
+            require_once __DIR__ . '/auth_google.php';
+            // auth_google.php obsługuje routing wewnętrznie
+            exit;
+        }
+        jsonResponse(array('error' => 'Endpoint not found: ' . $endpoint . '/' . $subEndpoint), 404);
         break;
         
     case 'jobs':

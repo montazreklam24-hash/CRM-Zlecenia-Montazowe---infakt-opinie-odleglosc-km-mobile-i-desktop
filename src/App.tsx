@@ -54,7 +54,39 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
+    // Sprawdź czy jest token z Google OAuth
     const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const googleLogin = params.get('google_login');
+    const error = params.get('error');
+    
+    if (error) {
+      setState(prev => ({ ...prev, error, currentView: 'LOGIN' }));
+      // Usuń error z URL
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+    
+    if (token && googleLogin === '1') {
+      // Zapisz token
+      localStorage.setItem('crm_auth_token', token);
+      
+      // Pobierz dane użytkownika
+      authService.getCurrentUser().then(user => {
+        if (user) {
+          setState(prev => ({ ...prev, user, currentView: 'APP' }));
+          // Usuń token z URL
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      }).catch(() => {
+        // Jeśli błąd, przekieruj do logowania
+        localStorage.removeItem('crm_auth_token');
+        setState(prev => ({ ...prev, currentView: 'LOGIN' }));
+      });
+      return;
+    }
+    
+    // Oryginalny kod dla jobId z URL
     const jobId = params.get('job');
     if (jobId && state.user) {
       jobsService.getJob(jobId).then(job => {
