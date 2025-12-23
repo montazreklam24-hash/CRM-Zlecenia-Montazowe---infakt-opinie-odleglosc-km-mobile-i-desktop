@@ -54,6 +54,24 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
+    // Obsługa przycisku wstecz w przeglądarce
+    const handlePopState = (e: PopStateEvent) => {
+      // Jeśli wracamy z modala, zamknij go
+      if (state.activeModal !== 'NONE') {
+        setState(prev => ({
+          ...prev,
+          activeModal: 'NONE',
+          selectedJob: null,
+          tempJobData: null,
+          selectedImages: [],
+          error: null
+        }));
+        setDashboardRefreshTrigger(prev => prev + 1);
+      }
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    
     // Sprawdź czy jest token z Google OAuth
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
@@ -64,7 +82,7 @@ const App: React.FC = () => {
       setState(prev => ({ ...prev, error, currentView: 'LOGIN' }));
       // Usuń error z URL
       window.history.replaceState({}, '', window.location.pathname);
-      return;
+      return () => window.removeEventListener('popstate', handlePopState);
     }
     
     if (token && googleLogin === '1') {
@@ -83,17 +101,23 @@ const App: React.FC = () => {
         localStorage.removeItem('crm_auth_token');
         setState(prev => ({ ...prev, currentView: 'LOGIN' }));
       });
-      return;
+      return () => window.removeEventListener('popstate', handlePopState);
     }
     
     // Oryginalny kod dla jobId z URL
     const jobId = params.get('job');
     if (jobId && state.user) {
+      // Sprawdź czy zlecenie jest z archiwum
       jobsService.getJob(jobId).then(job => {
-        if (job) handleSelectJob(job);
+        if (job) {
+          const fromArchive = job.status === JobStatus.ARCHIVED;
+          handleSelectJob(job, fromArchive);
+        }
       }).catch(err => console.error('Failed to load job from URL:', err));
     }
-  }, [state.user]);
+    
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [state.user, state.activeModal]);
 
   const [dashboardRefreshTrigger, setDashboardRefreshTrigger] = useState(0);
   
@@ -114,6 +138,21 @@ const App: React.FC = () => {
   };
 
   const closeModal = () => {
+    // Jeśli był otwarty modal, usuń go z historii przeglądarki (cofnij o 1)
+    if (state.activeModal !== 'NONE') {
+      // Sprawdź czy w historii jest wpis dla modala
+      const currentState = window.history.state;
+      if (currentState && currentState.modal) {
+        window.history.back();
+      } else {
+        // Jeśli nie ma wpisu w historii, usuń z URL jeśli był jobId
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('job')) {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      }
+    }
+    
     setState(prev => ({
       ...prev,
       activeModal: 'NONE',
@@ -134,6 +173,16 @@ const App: React.FC = () => {
   };
 
   const handleSelectJob = (job: Job, fromArchive?: boolean) => {
+    // Zapisz informację o archiwum w localStorage
+    if (fromArchive) {
+      localStorage.setItem('dashboard_active_tab', 'ARCHIVED');
+    } else {
+      localStorage.setItem('dashboard_active_tab', 'ACTIVE');
+    }
+    
+    // Dodaj wpis do historii przeglądarki dla modala
+    window.history.pushState({ modal: 'VIEW_JOB', jobId: job.id }, '', `?job=${job.id}`);
+    
     setState(prev => ({ 
       ...prev, 
       activeModal: 'VIEW_JOB', 

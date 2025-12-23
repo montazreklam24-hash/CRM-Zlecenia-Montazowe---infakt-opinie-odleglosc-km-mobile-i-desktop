@@ -942,7 +942,13 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
 const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, onCreateNewSimple, initialTab, refreshTrigger }) => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'ACTIVE' | 'ARCHIVED'>('ACTIVE');
+  // Zapamiętuj aktywną zakładkę w localStorage i przywracaj przy odświeżeniu
+  const [activeTab, setActiveTab] = useState<'ACTIVE' | 'ARCHIVED'>(() => {
+    // Jeśli jest initialTab (z App.tsx), użyj go, w przeciwnym razie sprawdź localStorage
+    if (initialTab) return initialTab;
+    const saved = localStorage.getItem('dashboard_active_tab') as 'ACTIVE' | 'ARCHIVED' | null;
+    return saved || 'ACTIVE';
+  });
   const [viewMode, setViewMode] = useState<'BOARD' | 'KANBAN' | 'MIXED'>(() => {
     return (localStorage.getItem('dashboard_view_mode') as 'BOARD' | 'KANBAN' | 'MIXED') || 'MIXED';
   });
@@ -951,6 +957,18 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   useEffect(() => {
     localStorage.setItem('dashboard_view_mode', viewMode);
   }, [viewMode]);
+  
+  // Persist active tab
+  useEffect(() => {
+    localStorage.setItem('dashboard_active_tab', activeTab);
+  }, [activeTab]);
+  
+  // Aktualizuj activeTab gdy initialTab się zmienia (np. po powrocie z karty zlecenia)
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
   
   // Map provider - domyślnie OSM, zapamiętuje wybór
   const [mapProvider, setMapProvider] = useState<'GOOGLE' | 'OSM'>(() => {
@@ -1739,7 +1757,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
         <div className="flex justify-between items-center gap-2">
           <div className="theme-surface flex p-1 flex-shrink-0" style={{ borderRadius: 'var(--radius-lg)' }}>
             <button 
-              onClick={() => setActiveTab('ACTIVE')}
+              onClick={() => {
+                setActiveTab('ACTIVE');
+                localStorage.setItem('dashboard_active_tab', 'ACTIVE');
+              }}
               className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold transition-all"
               style={{ 
                 borderRadius: 'var(--radius-md)',
@@ -1750,7 +1771,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
               AKTYWNE ({jobs.filter(j => j.status !== JobStatus.ARCHIVED).length})
             </button>
             <button 
-              onClick={() => setActiveTab('ARCHIVED')}
+              onClick={() => {
+                setActiveTab('ARCHIVED');
+                localStorage.setItem('dashboard_active_tab', 'ARCHIVED');
+              }}
               className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold transition-all"
               style={{ 
                 borderRadius: 'var(--radius-md)',
