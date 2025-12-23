@@ -60,23 +60,28 @@ const App: React.FC = () => {
       const params = new URLSearchParams(window.location.search);
       const jobId = params.get('job');
       
-      // Jeśli nie ma jobId w URL, zamknij modal (użytkownik kliknął wstecz)
-      if (!jobId) {
-        setState(prev => {
-          // Zamknij modal tylko jeśli był otwarty
-          if (prev.activeModal !== 'NONE') {
-            return {
-              ...prev,
-              activeModal: 'NONE',
-              selectedJob: null,
-              tempJobData: null,
-              selectedImages: [],
-              error: null
-            };
+      // Jeśli modal jest otwarty i nie ma jobId w URL (lub state nie ma modal), zamknij modal
+      if (state.activeModal !== 'NONE') {
+        // Sprawdź czy state ma informację o modalu
+        const stateHasModal = e.state && (e.state as any).modal;
+        
+        // Jeśli nie ma jobId w URL lub state nie ma modala, zamknij modal
+        if (!jobId || !stateHasModal) {
+          setState(prev => ({
+            ...prev,
+            activeModal: 'NONE',
+            selectedJob: null,
+            tempJobData: null,
+            selectedImages: [],
+            error: null
+          }));
+          setDashboardRefreshTrigger(prev => prev + 1);
+          
+          // Jeśli URL nadal ma jobId, usuń go
+          if (jobId) {
+            window.history.replaceState({}, '', window.location.pathname);
           }
-          return prev;
-        });
-        setDashboardRefreshTrigger(prev => prev + 1);
+        }
       }
     };
     
