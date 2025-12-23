@@ -1,151 +1,241 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FileText, Plus, Trash2, Send, Download, 
-  Receipt, Loader2, ExternalLink, 
-  ChevronDown, ChevronUp, Edit2, Check, Search
+  Receipt, Loader2, ExternalLink, Search, Building2,
+  AlertTriangle, ChevronDown, ChevronUp, User, Mail, Phone, MapPin,
+  AlertCircle
 } from 'lucide-react';
-import { PaymentStatus, Invoice } from '../types';
-import invoiceService, { InvoiceItemData } from '../services/invoiceService';
-
-interface BillingData {
-  name?: string;
-  nip?: string;
-  street?: string;
-  buildingNo?: string;
-  apartmentNo?: string;
-  postCode?: string;
-  city?: string;
-  email?: string;
-}
+import { Invoice, InvoiceItem, PaymentStatus } from '../types';
+import { invoiceService, InvoiceItemData, InvoiceClientData } from '../services/invoiceService';
 
 interface InvoiceModuleProps {
-  jobId?: string;
+  jobId: string;
+  clientId?: number;
   clientName?: string;
   clientEmail?: string;
-  installAddress?: string;
+  installAddress?: string; // Adres MONTAŻU (nie do faktury!)
   phone?: string;
   nip?: string;
   paymentStatus?: PaymentStatus;
+  totalGross?: number;
+  paidAmount?: number;
   invoices?: Invoice[];
-  isAdmin?: boolean;
+  isAdmin: boolean;
   onStatusChange?: (status: PaymentStatus) => void;
-  onClientDataChange?: (data: any) => void;
-  billing?: BillingData;
+  onClientDataChange?: (data: InvoiceClientData) => void;
+  // Opcjonalnie dla kompatybilności wstecznej
+  billing?: {
+    name?: string;
+    nip?: string;
+    street?: string;
+    buildingNo?: string;
+    apartmentNo?: string;
+    postCode?: string;
+    city?: string;
+    email?: string;
+  };
 }
 
-// Presety dla montażu reklam
-const PRESET_ITEMS: Partial<InvoiceItemData>[] = [
-  { name: 'Montaż kasetonu reklamowego', quantity: 1, unitPriceNet: 500, vatRate: 23 },
-  { name: 'Montaż szyldu/tablicy', quantity: 1, unitPriceNet: 300, vatRate: 23 },
-  { name: 'Montaż banneru', quantity: 1, unitPriceNet: 200, vatRate: 23 },
-  { name: 'Oklejanie folią', quantity: 1, unitPriceNet: 120, vatRate: 23 },
-  { name: 'Montaż liter 3D', quantity: 1, unitPriceNet: 80, vatRate: 23 },
-  { name: 'Usługa transportowa', quantity: 1, unitPriceNet: 150, vatRate: 23 },
-  { name: 'Dojazd', quantity: 1, unitPriceNet: 100, vatRate: 23 },
+// Współrzędne Warszawy dla obliczania odległości
+const WARSAW_COORDS = { lat: 52.2297, lng: 21.0122 };
+const MAX_DISTANCE_KM = 100;
+
+// Domyślne pozycje dla montażu reklam
+const PRESET_ITEMS: Partial<InvoiceItem>[] = [
+  { name: 'Montaż kasetonu reklamowego', unit: 'szt.', unitPriceNet: 500, vatRate: 23 },
+  { name: 'Montaż szyldu/tablicy', unit: 'szt.', unitPriceNet: 300, vatRate: 23 },
+  { name: 'Montaż banneru', unit: 'm²', unitPriceNet: 50, vatRate: 23 },
+  { name: 'Oklejanie folią', unit: 'm²', unitPriceNet: 120, vatRate: 23 },
+  { name: 'Oklejanie witryn - folia OWV', unit: 'm²', unitPriceNet: 180, vatRate: 23 },
+  { name: 'Oklejanie witryn - folia mrożona', unit: 'm²', unitPriceNet: 150, vatRate: 23 },
+  { name: 'Montaż liter 3D', unit: 'szt.', unitPriceNet: 80, vatRate: 23 },
+  { name: 'Dojazd na montaż (do 20km)', unit: 'szt.', unitPriceNet: 350, vatRate: 23 },
+  { name: 'Dojazd - dopłata za km', unit: 'km', unitPriceNet: 6, vatRate: 23 },
+  { name: 'Pomiar', unit: 'szt.', unitPriceNet: 200, vatRate: 23 },
+  { name: 'Pomiar + gruntowanie', unit: 'szt.', unitPriceNet: 500, vatRate: 23 },
+];
+
+// Lista miast daleko od Warszawy (ostrzeżenie)
+const FAR_CITIES = [
+  'gdańsk', 'gdynia', 'sopot', 'katowice', 'kraków', 'wrocław', 'poznań', 
+  'łódź', 'szczecin', 'bydgoszcz', 'lublin', 'białystok', 'rzeszów', 
+  'olsztyn', 'kielce', 'opole', 'zielona góra', 'gorzów'
 ];
 
 const InvoiceModule: React.FC<InvoiceModuleProps> = ({
-  jobId = '',
+  jobId,
+  clientId,
   clientName,
   clientEmail,
-  installAddress,
+  installAddress, // To jest adres MONTAŻU - NIE do faktury!
   phone,
-  nip,
+  nip: initialNip,
   paymentStatus = PaymentStatus.NONE,
-  invoices: initialInvoices = [],
-  isAdmin = true,
+  totalGross = 0,
+  paidAmount = 0,
+  invoices = [],
+  isAdmin,
   onStatusChange,
   onClientDataChange,
-  billing: initialBilling
+  billing
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isEditingBilling, setIsEditingBilling] = useState(false);
-  const [items, setItems] = useState<InvoiceItemData[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLookingUp, setIsLookingUp] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
+  const [invoiceType, setInvoiceType] = useState<'proforma' | 'invoice'>('proforma');
+  const [description, setDescription] = useState('');
+  const [sendEmail, setSendEmail] = useState(true);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [distanceWarning, setDistanceWarning] = useState<string | null>(null);
   
-  // Billing state
-  const [billing, setBilling] = useState<BillingData>(() => {
-    if (initialBilling && Object.keys(initialBilling).some(k => (initialBilling as any)[k])) {
+  // Dane do FAKTURY (adres siedziby firmy - z GUS)
+  // Mapuj billing na InvoiceClientData jeśli jest przekazany
+  const [clientData, setClientData] = useState<InvoiceClientData>(() => {
+    if (billing && (billing.name || billing.nip || billing.street)) {
+      // Mapuj billing na InvoiceClientData
+      let street = billing.street || '';
+      if (billing.buildingNo) {
+        street += (street ? ' ' : '') + billing.buildingNo;
+      }
+      if (billing.apartmentNo) {
+        street += '/' + billing.apartmentNo;
+      }
       return {
-        name: initialBilling.name || clientName || '',
-        nip: initialBilling.nip || nip || '',
-        street: initialBilling.street || '',
-        buildingNo: initialBilling.buildingNo || '',
-        apartmentNo: initialBilling.apartmentNo || '',
-        postCode: initialBilling.postCode || '',
-        city: initialBilling.city || '',
-        email: initialBilling.email || clientEmail || ''
+        companyName: billing.name || clientName || '',
+        nip: billing.nip || initialNip || '',
+        email: billing.email || clientEmail || '',
+        phone: phone || '',
+        street: street,
+        city: billing.city || '',
+        postCode: billing.postCode || '',
       };
     }
     return {
-      name: clientName || '',
-      nip: nip || '',
-      street: '',
-      buildingNo: '',
-      apartmentNo: '',
-      postCode: '',
+      companyName: clientName || '',
+      nip: initialNip || '',
+      email: clientEmail || '',
+      phone: phone || '',
+      street: '',      // Adres SIEDZIBY firmy (z GUS), NIE adres montażu!
       city: '',
-      email: clientEmail || ''
+      postCode: '',
     };
   });
 
-  const lastAutoNip = useRef<string | null>(null);
-
-  // Sync invoices from props
+  // Sprawdź czy adres montażu nie jest za daleko od Warszawy
   useEffect(() => {
-    setInvoices(initialInvoices);
-  }, [initialInvoices]);
-
-  // Sync billing from props
-  useEffect(() => {
-    if (initialBilling) {
-      setBilling(prev => ({
-        ...prev,
-        name: initialBilling.name || prev.name || clientName || '',
-        nip: initialBilling.nip || prev.nip || nip || '',
-        street: initialBilling.street || prev.street || '',
-        buildingNo: initialBilling.buildingNo || prev.buildingNo || '',
-        apartmentNo: initialBilling.apartmentNo || prev.apartmentNo || '',
-        postCode: initialBilling.postCode || prev.postCode || '',
-        city: initialBilling.city || prev.city || '',
-        email: initialBilling.email || prev.email || clientEmail || ''
-      }));
+    if (installAddress) {
+      const addressLower = installAddress.toLowerCase();
+      const isFarCity = FAR_CITIES.some(city => addressLower.includes(city));
+      
+      if (isFarCity) {
+        setDistanceWarning(`⚠️ Adres montażu "${installAddress}" może być ponad ${MAX_DISTANCE_KM}km od Warszawy. Czy na pewno to poprawne zlecenie?`);
+      } else {
+        setDistanceWarning(null);
+      }
     }
-  }, [initialBilling, clientName, clientEmail, nip]);
+  }, [installAddress]);
 
-  // Fetch invoices if not provided
+  // Aktualizuj dane z propsów (ale NIE adres montażu!)
   useEffect(() => {
-    if (jobId && initialInvoices.length === 0) {
-      invoiceService.getJobInvoices(jobId).then(res => {
-        if (res.success && res.invoices) {
-          setInvoices(res.invoices);
-        }
-      }).catch(console.error);
-    }
-  }, [jobId, initialInvoices.length]);
+    setClientData(prev => ({
+      ...prev,
+      companyName: clientName || prev.companyName,
+      email: clientEmail || prev.email,
+      phone: phone || prev.phone,
+      nip: initialNip || prev.nip,
+      // NIE ustawiamy street/city/postCode z installAddress!
+      // Te pola pobieramy z GUS po NIP
+    }));
+  }, [clientName, clientEmail, phone, initialNip]);
 
-  // Calculate totals
+  // Oblicz sumy
   const calculateTotals = () => {
     let totalNet = 0;
     let totalGross = 0;
+    
     items.forEach(item => {
       const itemNet = item.quantity * item.unitPriceNet;
-      const vatMultiplier = item.vatRate >= 0 ? (1 + item.vatRate / 100) : 1;
-      totalGross += itemNet * vatMultiplier;
+      const itemGross = itemNet * (1 + item.vatRate / 100);
       totalNet += itemNet;
+      totalGross += itemGross;
     });
+    
     return { totalNet, totalGross, totalVat: totalGross - totalNet };
   };
 
-  const { totalNet, totalGross, totalVat } = calculateTotals();
+  const { totalNet, totalGross: calculatedGross, totalVat } = calculateTotals();
 
-  // Add item
-  const addItem = (preset?: Partial<InvoiceItemData>) => {
-    const newItem: InvoiceItemData = {
+  // Pobierz dane firmy po NIP (adres SIEDZIBY do faktury)
+  const handleNipLookup = async () => {
+    const nip = clientData.nip?.replace(/[^0-9]/g, '');
+    if (!nip || nip.length !== 10) {
+      setLookupError('NIP musi mieć 10 cyfr');
+      return;
+    }
+
+    setIsLookingUp(true);
+    setLookupError(null);
+
+    try {
+      const result = await invoiceService.lookupNip(nip);
+      
+      if (result.success && result.company) {
+        // WAŻNE: Aktualizuj WSZYSTKIE dane rozliczeniowe z GUS razem!
+        const company = result.company!;
+        const source = (result as any).source || 'GUS'; // KRS, CEIDG lub MF
+        
+        // Sprawdź czy nazwa nie jest pusta
+        if (!company.name || company.name.trim() === '') {
+          setLookupError(`Znaleziono firmę w ${source}, ale brak nazwy. Sprawdź dane ręcznie.`);
+          return;
+        }
+        
+        const gusData = {
+          companyName: company.name.trim(),
+          street: company.street?.trim() || '',
+          city: company.city?.trim() || '',
+          postCode: company.postCode?.trim() || '',
+          nip: company.nip || nip,
+        };
+        
+        console.log(`[GUS] Pobrano dane z ${source}:`, gusData);
+        
+        // Aktualizuj stan - wszystkie dane firmowe z GUS, zachowaj tylko email i telefon
+        setClientData(prev => ({
+          ...gusData,
+          email: prev.email,
+          phone: prev.phone,
+        }));
+        
+        // Powiadom rodzica o zmianie danych (do zapisania w zleceniu)
+        if (onClientDataChange) {
+          onClientDataChange({
+            ...gusData,
+            email: clientData.email,
+            phone: clientData.phone,
+          });
+        }
+        
+        // Pokaż info o źródle danych
+        console.log(`✅ Dane pobrane z: ${source}`);
+      } else {
+        setLookupError(result.error || 'Nie znaleziono firmy o podanym NIP');
+      }
+    } catch (error: any) {
+      setLookupError(error.message || 'Błąd podczas wyszukiwania');
+    } finally {
+      setIsLookingUp(false);
+    }
+  };
+
+  // Dodaj pozycję
+  const addItem = (preset?: Partial<InvoiceItem>) => {
+    const newItem: InvoiceItem = {
       name: preset?.name || '',
-      quantity: preset?.quantity || 1,
+      quantity: 1,
+      unit: preset?.unit || 'szt.',
       unitPriceNet: preset?.unitPriceNet || 0,
       vatRate: preset?.vatRate || 23
     };
@@ -153,179 +243,111 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
     setShowPresets(false);
   };
 
-  // Update item
-  const updateItem = (index: number, field: keyof InvoiceItemData, value: any) => {
+  // Aktualizuj pozycję
+  const updateItem = (index: number, field: keyof InvoiceItem, value: any) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
     setItems(newItems);
   };
 
-  // Remove item
+  // Usuń pozycję
   const removeItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index));
   };
 
-  // Handle billing change
-  const handleBillingChange = (field: keyof BillingData, value: string) => {
-    setBilling(prev => ({ ...prev, [field]: value }));
-  };
-
-  // GUS lookup
-  const handleGusLookup = async () => {
-    const nipStr = billing.nip?.replace(/[^\d]/g, '');
-    if (!nipStr || nipStr.length !== 10) {
-      alert('Wpisz poprawny NIP (10 cyfr)');
-      return;
-    }
-    
-    setIsProcessing(true);
-    try {
-      const res = await invoiceService.lookupNip(nipStr);
-      if (res.success && res.company) {
-        const { name, street, city, postCode } = res.company;
-        let st = street || '';
-        let bNo = '';
-        let aNo = '';
-        
-        const streetMatch = street?.match(/^(.*?)\s(\d+[a-zA-Z]?)(?:\/(\d+))?$/);
-        if (streetMatch) {
-          st = streetMatch[1];
-          bNo = streetMatch[2];
-          aNo = streetMatch[3] || '';
-        }
-
-        const newBilling = {
-          ...billing,
-          name: name || billing.name,
-          street: st,
-          buildingNo: bNo,
-          apartmentNo: aNo,
-          city: city || '',
-          postCode: postCode || ''
-        };
-        setBilling(newBilling);
-        
-        if (onClientDataChange) {
-          onClientDataChange({
-            companyName: name,
-            nip: nipStr,
-            email: billing.email,
-            phone: phone,
-            street: st,
-            city,
-            postCode,
-            buildingNo: bNo,
-            apartmentNo: aNo
-          });
-        }
-        
-        lastAutoNip.current = nipStr;
-      } else {
-        alert('Nie znaleziono firmy w GUS: ' + (res.error || 'Błąd'));
-      }
-    } catch (e) {
-      alert('Błąd połączenia z GUS');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // Create invoice
-  const handleCreateDocument = async (type: 'proforma' | 'vat') => {
+  // Wystaw dokument
+  const handleCreateInvoice = async () => {
     if (items.length === 0) {
       alert('Dodaj przynajmniej jedną pozycję');
       return;
     }
 
-    if (!billing.name) {
-      alert('Uzupełnij nazwę nabywcy (dane do faktury)');
+    if (!clientData.companyName && !clientData.email) {
+      alert('Podaj nazwę firmy/klienta lub adres email');
       return;
     }
 
-    setIsProcessing(true);
+    // Ostrzeżenie o odległości
+    if (distanceWarning) {
+      const confirmed = window.confirm(distanceWarning + '\n\nCzy kontynuować wystawianie faktury?');
+      if (!confirmed) return;
+    }
+
+    setIsLoading(true);
+    
     try {
-      const billingData = {
-        name: billing.name,
-        nip: billing.nip?.replace(/[^\d]/g, '') || '',
-        street: billing.street || '',
-        buildingNo: billing.buildingNo || '',
-        apartmentNo: billing.apartmentNo || '',
-        postCode: billing.postCode || '',
-        city: billing.city || '',
-        email: billing.email || ''
-      };
+      // Przekształć pozycje do formatu API
+      const apiItems: InvoiceItemData[] = items.map(item => ({
+        name: item.name,
+        quantity: item.quantity,
+        unitPriceNet: item.unitPriceNet,
+        vatRate: item.vatRate,
+        unit: item.unit,
+      }));
+
+      // Opis z adresem montażu (NIE adres do faktury!)
+      const fullDescription = installAddress 
+        ? `${description}\nAdres montażu: ${installAddress}`.trim()
+        : description;
 
       let result;
-      if (type === 'proforma') {
-        result = await invoiceService.createProforma(jobId, items, billingData, installAddress);
+      
+      if (invoiceType === 'proforma') {
+        result = await invoiceService.createProforma(jobId, apiItems, clientData, {
+          description: fullDescription,
+          installAddress: installAddress, // Adres montażu jako osobna informacja
+          sendEmail,
+        });
       } else {
-        result = await invoiceService.createInvoice(jobId, items, billingData, installAddress);
+        result = await invoiceService.createInvoice(jobId, apiItems, clientData, {
+          description: fullDescription,
+          installAddress: installAddress,
+          sendEmail,
+          markAsPaid: false,
+        });
       }
-
+      
       if (result.success && result.invoice) {
-        alert(`${type === 'proforma' ? 'Proforma' : 'Faktura VAT'} została wystawiona!`);
-        setInvoices(prev => [result.invoice!, ...prev]);
+        alert(`${invoiceType === 'proforma' ? 'Proforma' : 'Faktura'} ${result.invoice.number} została wystawiona!${result.invoice.emailSent ? '\n✉️ Email wysłany!' : ''}`);
         setItems([]);
-        
         if (onStatusChange) {
-          onStatusChange(type === 'proforma' ? PaymentStatus.PROFORMA : PaymentStatus.INVOICE);
+          onStatusChange(invoiceType === 'proforma' ? PaymentStatus.PROFORMA : PaymentStatus.PAID);
         }
       } else {
-        throw new Error(result.error || 'Błąd wystawiania dokumentu');
+        throw new Error(result.error || 'Nieznany błąd');
       }
     } catch (error: any) {
-      console.error('Create document error:', error);
       alert('Błąd: ' + (error.message || 'Nie udało się wystawić dokumentu'));
     } finally {
-      setIsProcessing(false);
+      setIsLoading(false);
     }
   };
 
-  // Mark as paid
-  const handleMarkPaid = async (invoiceId: number) => {
-    try {
-      const result = await invoiceService.markAsPaid(invoiceId);
-      if (result.success) {
-        setInvoices(prev => prev.map(inv => 
-          inv.id === invoiceId ? { ...inv, status: 'paid' } : inv
-        ));
-        if (onStatusChange) {
-          onStatusChange(PaymentStatus.PAID);
-        }
-      }
-    } catch (e) {
-      console.error('Mark paid error:', e);
+  // Oznacz jako barter (bez FV)
+  const handleMarkAsBarter = () => {
+    if (onStatusChange) {
+      onStatusChange(PaymentStatus.CASH);
     }
-  };
-
-  // Format address for display
-  const formatBillingAddress = () => {
-    const parts = [];
-    if (billing.street) {
-      let addr = billing.street;
-      if (billing.buildingNo) addr += ' ' + billing.buildingNo;
-      if (billing.apartmentNo) addr += '/' + billing.apartmentNo;
-      parts.push(addr);
-    }
-    if (billing.postCode || billing.city) {
-      parts.push([billing.postCode, billing.city].filter(Boolean).join(' '));
-    }
-    return parts.join(', ') || 'Brak adresu';
   };
 
   // Status badge
-  const getStatusLabel = () => {
-    if (invoices.some(i => i.status === 'paid')) return { label: 'OPŁACONE', color: 'bg-green-100 text-green-700' };
-    if (invoices.some(i => i.type === 'vat' || i.type === 'invoice')) return { label: 'FAKTURA', color: 'bg-blue-100 text-blue-700' };
-    if (invoices.some(i => i.type === 'proforma')) return { label: 'PROFORMA', color: 'bg-orange-100 text-orange-700' };
-    return { label: 'NIEOPŁACONE', color: 'bg-slate-100 text-slate-600' };
+  const getStatusBadge = () => {
+    const badges: Record<PaymentStatus, { bg: string; text: string; label: string }> = {
+      [PaymentStatus.NONE]: { bg: 'bg-slate-100', text: 'text-slate-600', label: 'Brak dokumentu' },
+      [PaymentStatus.PROFORMA]: { bg: 'bg-orange-100', text: 'text-orange-700', label: '📄 Proforma' },
+      [PaymentStatus.PARTIAL]: { bg: 'bg-purple-100', text: 'text-purple-700', label: '💸 Zaliczka' },
+      [PaymentStatus.PAID]: { bg: 'bg-green-100', text: 'text-green-700', label: '✅ Opłacone' },
+      [PaymentStatus.CASH]: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: '🤝 Barter' },
+      [PaymentStatus.OVERDUE]: { bg: 'bg-red-100', text: 'text-red-700', label: '⚠️ Przeterminowane' }
+    };
+    return badges[paymentStatus] || badges[PaymentStatus.NONE];
   };
 
-  const status = getStatusLabel();
+  const statusBadge = getStatusBadge();
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      {/* Header - rozwijany */}
+      {/* Header */}
       <div 
         className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
@@ -337,72 +359,99 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
           <div>
             <h3 className="font-bold text-slate-800">Fakturowanie</h3>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${status.color}`}>
-                {status.label}
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${statusBadge.bg} ${statusBadge.text}`}>
+                {statusBadge.label}
               </span>
               {totalGross > 0 && (
-                <span className="text-sm text-slate-500 font-semibold">
-                  {totalGross.toFixed(2)} zł
+                <span className="text-sm text-slate-500">
+                  {paidAmount > 0 ? `${paidAmount.toFixed(2)} / ` : ''}{totalGross.toFixed(2)} zł
                 </span>
               )}
             </div>
           </div>
         </div>
-        <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
-          {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+        <button className="p-2 hover:bg-slate-100 rounded-lg">
+          {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
         </button>
       </div>
 
-      {/* Rozwinięta zawartość */}
+      {/* Expanded Content */}
       {isExpanded && (
         <div className="border-t border-slate-100 p-4 space-y-4">
           
-          {/* Wystawione dokumenty */}
+          {/* Ostrzeżenie o odległości */}
+          {distanceWarning && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-amber-800">
+                <strong>Uwaga!</strong> {distanceWarning}
+              </div>
+            </div>
+          )}
+
+          {/* Adres montażu (tylko informacja) */}
+          {installAddress && (
+            <div className="bg-blue-50 rounded-xl p-3">
+              <div className="flex items-center gap-2 text-sm text-blue-700">
+                <MapPin className="w-4 h-4" />
+                <span className="font-semibold">Adres montażu:</span>
+                <span>{installAddress}</span>
+              </div>
+              <p className="text-xs text-blue-600 mt-1 ml-6">
+                (Ten adres zostanie dodany do opisu faktury, NIE jako adres nabywcy)
+              </p>
+            </div>
+          )}
+          
+          {/* Istniejące faktury */}
           {invoices.length > 0 && (
             <div className="space-y-2">
-              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Wystawione dokumenty</h4>
+              <h4 className="text-xs font-bold text-slate-500 uppercase">Wystawione dokumenty</h4>
               {invoices.map((inv) => (
-                <div key={inv.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                <div key={inv.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                   <div className="flex items-center gap-3">
                     <FileText className={`w-5 h-5 ${inv.type === 'proforma' ? 'text-orange-500' : 'text-blue-500'}`} />
                     <div>
-                      <p className="font-bold text-sm text-slate-800">
-                        {inv.infaktNumber || inv.infakt_number || `#${inv.id}`}
-                      </p>
-                      <p className="text-[10px] text-slate-400 uppercase font-bold">
-                        {inv.type === 'proforma' ? 'Proforma' : 'Faktura VAT'} • {inv.status === 'paid' ? '✅ Opłacona' : 'Oczekuje'}
+                      <p className="font-semibold text-sm">{inv.number || inv.infaktNumber || inv.infakt_number}</p>
+                      <p className="text-xs text-slate-500">
+                        {inv.totalGross?.toFixed(2) || '0.00'} zł • {inv.status === 'paid' || inv.paymentStatus === 'paid' ? '✅ Opłacona' : 'Oczekuje'}
                       </p>
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    {inv.status !== 'paid' && (
-                      <button 
-                        onClick={() => handleMarkPaid(inv.id)}
-                        className="p-2 bg-white rounded-lg border border-slate-200 hover:border-green-300 text-slate-400 hover:text-green-600 transition-colors"
-                        title="Oznacz jako opłacone"
-                      >
-                        <Check className="w-4 h-4" />
-                      </button>
-                    )}
-                    <a 
-                      href={invoiceService.getPdfUrl(inv.id)} 
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="p-2 bg-white rounded-lg border border-slate-200 hover:border-blue-300 text-slate-400 hover:text-blue-600 transition-colors"
-                      title="Pobierz PDF"
-                    >
-                      <Download className="w-4 h-4" />
-                    </a>
                     {(inv.shareLink || inv.share_link) && (
                       <a 
                         href={inv.shareLink || inv.share_link} 
                         target="_blank" 
-                        rel="noreferrer"
-                        className="p-2 bg-white rounded-lg border border-slate-200 hover:border-indigo-300 text-slate-400 hover:text-indigo-600 transition-colors"
+                        rel="noopener noreferrer"
+                        className="p-2 bg-white rounded-lg border border-slate-200 hover:border-indigo-300 text-slate-600"
                         title="Otwórz w inFakt"
                       >
                         <ExternalLink className="w-4 h-4" />
                       </a>
+                    )}
+                    <button 
+                      className="p-2 bg-white rounded-lg border border-slate-200 hover:border-indigo-300 text-slate-600"
+                      title="Pobierz PDF"
+                      onClick={() => window.open(invoiceService.getPdfUrl(inv.id), '_blank')}
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                    {(inv.status !== 'paid' && inv.paymentStatus !== 'paid') && clientData.email && (
+                      <button 
+                        className="p-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600"
+                        title="Wyślij email"
+                        onClick={async () => {
+                          try {
+                            await invoiceService.sendInvoiceEmail(inv.id, clientData.email!);
+                            alert('Email wysłany!');
+                          } catch (e) {
+                            alert('Błąd wysyłania emaila');
+                          }
+                        }}
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
                     )}
                   </div>
                 </div>
@@ -410,159 +459,181 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
             </div>
           )}
 
-          {/* Dane nabywcy - zawsze widoczne */}
+          {/* Nowa faktura - tylko dla admina */}
           {isAdmin && (
             <>
-              <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
-                <div className="flex justify-between items-start mb-3">
-                  <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-wider flex items-center gap-2">
-                    <Receipt className="w-4 h-4" /> Dane nabywcy do faktury
-                  </h4>
-                  <button
-                    onClick={() => setIsEditingBilling(!isEditingBilling)}
-                    className="text-[10px] font-bold px-2 py-1 rounded border transition-colors bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-100"
-                  >
-                    {isEditingBilling ? 'Zapisz' : 'Edytuj'}
-                  </button>
-                </div>
-
-                {isEditingBilling ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="md:col-span-2">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase">Nazwa firmy / Nabywca</label>
-                      <input 
-                        value={billing.name || ''} 
-                        onChange={(e) => handleBillingChange('name', e.target.value)}
-                        className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
-                        placeholder="Nazwa firmy lub imię i nazwisko..."
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 uppercase">NIP</label>
-                      <div className="flex gap-1 mt-1">
-                        <input 
-                          value={billing.nip || ''} 
-                          onChange={(e) => handleBillingChange('nip', e.target.value)}
-                          className="flex-1 p-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
-                          placeholder="0000000000"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleGusLookup}
-                          disabled={isProcessing}
-                          className="px-3 bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[10px] font-black hover:bg-indigo-200 transition-colors uppercase flex items-center gap-1"
-                        >
-                          <Search className="w-3 h-3" /> GUS
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 uppercase">Email do faktury</label>
-                      <input 
-                        value={billing.email || ''} 
-                        onChange={(e) => handleBillingChange('email', e.target.value)}
-                        className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
-                        placeholder="email@firma.pl"
-                      />
-                    </div>
-                    <div className="md:col-span-2 grid grid-cols-4 gap-2">
-                      <div className="col-span-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase">Ulica</label>
-                        <input 
-                          value={billing.street || ''} 
-                          onChange={(e) => handleBillingChange('street', e.target.value)}
-                          className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase">Nr</label>
-                        <input 
-                          value={billing.buildingNo || ''} 
-                          onChange={(e) => handleBillingChange('buildingNo', e.target.value)}
-                          className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-sm text-center focus:border-indigo-400 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase">Lok</label>
-                        <input 
-                          value={billing.apartmentNo || ''} 
-                          onChange={(e) => handleBillingChange('apartmentNo', e.target.value)}
-                          className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-sm text-center focus:border-indigo-400 outline-none"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 uppercase">Kod pocztowy</label>
-                      <input 
-                        value={billing.postCode || ''} 
-                        onChange={(e) => handleBillingChange('postCode', e.target.value)}
-                        className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
-                        placeholder="00-000"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 uppercase">Miasto</label>
-                      <input 
-                        value={billing.city || ''} 
-                        onChange={(e) => handleBillingChange('city', e.target.value)}
-                        className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-start gap-2">
-                      <span className="text-slate-400 w-16 flex-shrink-0">Nazwa:</span>
-                      <span className="font-semibold text-slate-800">{billing.name || <span className="text-red-400 italic">Brak</span>}</span>
-                    </div>
-                    {billing.nip && (
-                      <div className="flex items-start gap-2">
-                        <span className="text-slate-400 w-16 flex-shrink-0">NIP:</span>
-                        <span className="font-mono text-slate-700">{billing.nip}</span>
-                      </div>
-                    )}
-                    <div className="flex items-start gap-2">
-                      <span className="text-slate-400 w-16 flex-shrink-0">Adres:</span>
-                      <span className="text-slate-700">{formatBillingAddress()}</span>
-                    </div>
-                    {billing.email && (
-                      <div className="flex items-start gap-2">
-                        <span className="text-slate-400 w-16 flex-shrink-0">Email:</span>
-                        <span className="text-slate-700">{billing.email}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
+              {/* Typ dokumentu */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setInvoiceType('proforma')}
+                  className={`flex-1 py-2 px-4 rounded-lg font-bold text-sm transition-all ${
+                    invoiceType === 'proforma'
+                      ? 'bg-orange-100 text-orange-700 ring-2 ring-orange-300'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  📄 Proforma
+                </button>
+                <button
+                  onClick={() => setInvoiceType('invoice')}
+                  className={`flex-1 py-2 px-4 rounded-lg font-bold text-sm transition-all ${
+                    invoiceType === 'invoice'
+                      ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-300'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  📋 Faktura VAT
+                </button>
+                <button
+                  onClick={handleMarkAsBarter}
+                  className={`flex-1 py-2 px-4 rounded-lg font-bold text-sm transition-all ${
+                    paymentStatus === PaymentStatus.CASH
+                      ? 'bg-yellow-100 text-yellow-700 ring-2 ring-yellow-300'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  🤝 Barter
+                </button>
               </div>
 
-              {/* Pozycje faktury */}
+              {/* Dane do FAKTURY (adres siedziby firmy) */}
+              <div className="space-y-3 bg-slate-50 rounded-xl p-4">
+                <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                  <Building2 className="w-4 h-4" /> Dane nabywcy (do faktury)
+                </h4>
+                
+                {/* NIP z przyciskiem wyszukiwania */}
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      value={clientData.nip || ''}
+                      onChange={(e) => setClientData(prev => ({ ...prev, nip: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm pl-8"
+                      placeholder="NIP (10 cyfr)"
+                      maxLength={13}
+                    />
+                    <Building2 className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  </div>
+                  <button
+                    onClick={handleNipLookup}
+                    disabled={isLookingUp}
+                    className="px-4 py-2 bg-indigo-500 text-white rounded-lg font-bold text-sm hover:bg-indigo-600 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isLookingUp ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                    Pobierz z GUS
+                  </button>
+                </div>
+                
+                {lookupError && (
+                  <div className="text-red-500 text-xs flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" /> {lookupError}
+                  </div>
+                )}
+
+                {/* Nazwa firmy / klienta */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={clientData.companyName || ''}
+                    onChange={(e) => setClientData(prev => ({ ...prev, companyName: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm pl-8"
+                    placeholder="Nazwa firmy lub imię i nazwisko"
+                  />
+                  <User className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                </div>
+
+                {/* Adres SIEDZIBY firmy (do faktury) */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="col-span-2 relative">
+                    <input
+                      type="text"
+                      value={clientData.street || ''}
+                      onChange={(e) => setClientData(prev => ({ ...prev, street: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm pl-8"
+                      placeholder="Adres siedziby firmy"
+                    />
+                    <MapPin className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  </div>
+                  <input
+                    type="text"
+                    value={clientData.postCode || ''}
+                    onChange={(e) => setClientData(prev => ({ ...prev, postCode: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"
+                    placeholder="00-000"
+                    maxLength={6}
+                  />
+                </div>
+                
+                <input
+                  type="text"
+                  value={clientData.city || ''}
+                  onChange={(e) => setClientData(prev => ({ ...prev, city: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"
+                  placeholder="Miasto (siedziby)"
+                />
+
+                {/* Email i telefon */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="relative">
+                    <input
+                      type="email"
+                      value={clientData.email || ''}
+                      onChange={(e) => setClientData(prev => ({ ...prev, email: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm pl-8"
+                      placeholder="Email"
+                    />
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="tel"
+                      value={clientData.phone || ''}
+                      onChange={(e) => setClientData(prev => ({ ...prev, phone: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm pl-8"
+                      placeholder="Telefon"
+                    />
+                    <Phone className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+                
+                <p className="text-xs text-slate-500 italic">
+                  💡 Wpisz NIP i kliknij "Pobierz z GUS" - adres siedziby firmy uzupełni się automatycznie.
+                </p>
+              </div>
+
+              {/* Pozycje */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Pozycje dokumentu</h4>
+                  <h4 className="text-xs font-bold text-slate-500 uppercase">Pozycje faktury</h4>
                   <div className="relative">
                     <button
                       onClick={() => setShowPresets(!showPresets)}
-                      className="flex items-center gap-1 text-sm font-bold text-indigo-600 hover:text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+                      className="flex items-center gap-1 text-sm font-bold text-indigo-600 hover:text-indigo-700"
                     >
                       <Plus className="w-4 h-4" /> Dodaj pozycję
                     </button>
                     
                     {/* Dropdown z presetami */}
                     {showPresets && (
-                      <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-10 p-2 space-y-1 animate-in fade-in slide-in-from-top-2">
+                      <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2 space-y-1 max-h-72 overflow-y-auto">
                         {PRESET_ITEMS.map((preset, i) => (
                           <button
                             key={i}
                             onClick={() => addItem(preset)}
-                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 text-sm transition-colors"
+                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 text-sm"
                           >
-                            <span className="font-medium text-slate-700">{preset.name}</span>
-                            <span className="text-slate-400 ml-2 text-xs">
-                              ({preset.unitPriceNet} zł)
+                            <span className="font-medium">{preset.name}</span>
+                            <span className="text-slate-400 ml-2">
+                              ({preset.unitPriceNet} zł/{preset.unit})
                             </span>
                           </button>
                         ))}
-                        <hr className="my-2 border-slate-100" />
+                        <hr className="my-2" />
                         <button
                           onClick={() => addItem()}
                           className="w-full text-left px-3 py-2 rounded-lg hover:bg-indigo-50 text-sm text-indigo-600 font-medium"
@@ -588,45 +659,60 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
                             type="text"
                             value={item.name}
                             onChange={(e) => updateItem(index, 'name', e.target.value)}
-                            className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
+                            className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"
                             placeholder="Nazwa usługi..."
                           />
                           <button
                             onClick={() => removeItem(index)}
-                            className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-4 gap-2">
                           <div>
-                            <label className="text-[10px] text-slate-400 uppercase font-bold">Ilość</label>
+                            <label className="text-[10px] text-slate-400 uppercase">Ilość</label>
                             <input
                               type="number"
                               value={item.quantity}
                               onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
-                              className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
+                              className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm"
                               min="0"
                               step="0.5"
                             />
                           </div>
                           <div>
-                            <label className="text-[10px] text-slate-400 uppercase font-bold">Cena netto</label>
+                            <label className="text-[10px] text-slate-400 uppercase">Jedn.</label>
+                            <select
+                              value={item.unit}
+                              onChange={(e) => updateItem(index, 'unit', e.target.value)}
+                              className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm"
+                            >
+                              <option value="szt.">szt.</option>
+                              <option value="m²">m²</option>
+                              <option value="mb">mb</option>
+                              <option value="km">km</option>
+                              <option value="godz.">godz.</option>
+                              <option value="kpl.">kpl.</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase">Cena netto</label>
                             <input
                               type="number"
                               value={item.unitPriceNet}
                               onChange={(e) => updateItem(index, 'unitPriceNet', parseFloat(e.target.value) || 0)}
-                              className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
+                              className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm"
                               min="0"
                               step="10"
                             />
                           </div>
                           <div>
-                            <label className="text-[10px] text-slate-400 uppercase font-bold">VAT</label>
+                            <label className="text-[10px] text-slate-400 uppercase">VAT</label>
                             <select
                               value={item.vatRate}
                               onChange={(e) => updateItem(index, 'vatRate', parseInt(e.target.value))}
-                              className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
+                              className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm"
                             >
                               <option value="23">23%</option>
                               <option value="8">8%</option>
@@ -636,10 +722,10 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
                             </select>
                           </div>
                         </div>
-                        <div className="text-right text-xs">
+                        <div className="text-right text-sm">
                           <span className="text-slate-400">Wartość: </span>
                           <span className="font-bold text-slate-700">
-                            {(item.quantity * item.unitPriceNet * (item.vatRate >= 0 ? (1 + item.vatRate / 100) : 1)).toFixed(2)} zł brutto
+                            {(item.quantity * item.unitPriceNet * (1 + item.vatRate / 100)).toFixed(2)} zł brutto
                           </span>
                         </div>
                       </div>
@@ -650,55 +736,75 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
 
               {/* Podsumowanie */}
               {items.length > 0 && (
-                <>
-                  <div className="bg-indigo-50 rounded-xl p-4 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-600">Netto:</span>
-                      <span className="font-semibold">{totalNet.toFixed(2)} zł</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-600">VAT:</span>
-                      <span className="font-semibold">{totalVat.toFixed(2)} zł</span>
-                    </div>
-                    <div className="flex justify-between text-lg border-t border-indigo-200 pt-2">
-                      <span className="font-bold text-slate-800">Brutto:</span>
-                      <span className="font-black text-indigo-600">{totalGross.toFixed(2)} zł</span>
-                    </div>
+                <div className="bg-indigo-50 rounded-xl p-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Netto:</span>
+                    <span className="font-semibold">{totalNet.toFixed(2)} zł</span>
                   </div>
-
-                  {/* Przyciski wystawiania */}
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => handleCreateDocument('proforma')}
-                      disabled={isProcessing}
-                      className="flex-1 py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg shadow-orange-500/25 disabled:opacity-50"
-                    >
-                      {isProcessing ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <>
-                          <Send className="w-5 h-5" />
-                          Proforma
-                        </>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => handleCreateDocument('vat')}
-                      disabled={isProcessing}
-                      className="flex-1 py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/25 disabled:opacity-50"
-                    >
-                      {isProcessing ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <>
-                          <FileText className="w-5 h-5" />
-                          Faktura VAT
-                        </>
-                      )}
-                    </button>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">VAT:</span>
+                    <span className="font-semibold">{totalVat.toFixed(2)} zł</span>
                   </div>
-                </>
+                  <div className="flex justify-between text-lg border-t border-indigo-200 pt-2">
+                    <span className="font-bold text-slate-800">Brutto:</span>
+                    <span className="font-black text-indigo-600">{calculatedGross.toFixed(2)} zł</span>
+                  </div>
+                </div>
               )}
+
+              {/* Opis */}
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Opis (opcjonalnie)</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm"
+                  rows={2}
+                  placeholder="Dodatkowe informacje na fakturze..."
+                />
+              </div>
+
+              {/* Checkbox wysyłki email */}
+              {clientData.email && items.length > 0 && (
+                <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={sendEmail}
+                    onChange={(e) => setSendEmail(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <Mail className="w-4 h-4" />
+                  Wyślij automatycznie na: <span className="font-semibold">{clientData.email}</span>
+                </label>
+              )}
+
+              {/* Przycisk wystawienia - zawsze widoczny */}
+              <button
+                onClick={handleCreateInvoice}
+                disabled={isLoading || items.length === 0}
+                className={`w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all ${
+                  items.length === 0
+                    ? 'bg-slate-300 cursor-not-allowed'
+                    : invoiceType === 'proforma'
+                      ? 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg shadow-orange-500/25'
+                      : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/25'
+                } disabled:opacity-50`}
+              >
+                {isLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : items.length === 0 ? (
+                  <>
+                    <Plus className="w-5 h-5" />
+                    Dodaj pozycje żeby wystawić {invoiceType === 'proforma' ? 'proformę' : 'fakturę'}
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-5 h-5" />
+                    Wystaw {invoiceType === 'proforma' ? 'Proformę' : 'Fakturę VAT'}
+                    {sendEmail && clientData.email && ' i wyślij'}
+                  </>
+                )}
+              </button>
             </>
           )}
 
