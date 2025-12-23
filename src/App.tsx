@@ -42,6 +42,10 @@ const AUTO_USER: User = {
 };
 
 const App: React.FC = () => {
+  // Przywróć returnToArchive z localStorage przy inicjalizacji
+  const savedTab = localStorage.getItem('dashboard_active_tab');
+  const initialReturnToArchive = savedTab === 'ARCHIVED';
+  
   const [state, setState] = useState<AppState>({
     currentView: 'APP',
     user: AUTO_USER,
@@ -50,7 +54,8 @@ const App: React.FC = () => {
     tempJobData: null,
     selectedImages: [],
     isProcessing: false,
-    error: null
+    error: null,
+    returnToArchive: initialReturnToArchive
   });
 
   useEffect(() => {
