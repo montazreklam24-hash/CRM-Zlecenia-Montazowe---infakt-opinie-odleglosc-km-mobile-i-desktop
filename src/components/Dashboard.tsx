@@ -1978,7 +1978,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
           .sort((a, b) => new Date(b.completedAt || b.createdAt).getTime() - new Date(a.completedAt || a.createdAt).getTime())
           .reduce((acc, job) => {
             const date = new Date(job.completedAt || job.createdAt);
-            const dateKey = date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
+            // Format: "Poniedziałek, 14 grudnia"
+            const dayOfWeek = date.toLocaleDateString('pl-PL', { weekday: 'long' });
+            const dayAndMonth = date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' });
+            const dateKey = `${dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1)}, ${dayAndMonth}`;
             if (!acc[dateKey]) acc[dateKey] = [];
             acc[dateKey].push(job);
             return acc;
@@ -1993,8 +1996,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                   {dateKey}
                 </h3>
                 
-                {/* Lista zleceń z tego dnia - poziomo */}
-                <div className="flex flex-wrap gap-2">
+                {/* Lista zleceń z tego dnia - pionowo, pełna szerokość */}
+                <div className="space-y-2">
                   {dayJobs.map(job => {
                     const imgUrl = job.projectImages?.[0] || job.completionImages?.[0];
                     const reviewRequestSent = !!job.reviewRequestSentAt;
@@ -2003,7 +2006,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                     return (
                       <div 
                         key={job.id}
-                        className="theme-card flex gap-4 p-4 hover:shadow-lg transition-all group min-w-[320px] max-w-[400px] flex-1"
+                        className="theme-card flex gap-4 p-4 hover:shadow-lg transition-all group w-full"
                         style={{ borderRadius: 'var(--radius-lg)' }}
                       >
                         {/* Miniaturka kwadratowa po lewej */}
