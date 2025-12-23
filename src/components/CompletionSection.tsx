@@ -164,8 +164,11 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
         sendEmail: false,
         archiveJob: !isArchived, // Nie archiwizuj ponownie jeśli już zarchiwizowane
       });
-    } catch (err) {
-      setError('Wystąpił błąd podczas zapisywania');
+    } catch (err: any) {
+      // Wyświetl szczegóły błędu jeśli są dostępne
+      const errorMessage = err?.message || 'Wystąpił błąd podczas zapisywania';
+      console.error('Błąd zapisywania zlecenia:', err);
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -194,8 +197,11 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
         sendEmail: true,
         archiveJob: !isArchived, // Nie archiwizuj ponownie jeśli już zarchiwizowane
       });
-    } catch (err) {
-      setError('Wystąpił błąd podczas wysyłania');
+    } catch (err: any) {
+      // Wyświetl szczegóły błędu jeśli są dostępne
+      const errorMessage = err?.message || 'Wystąpił błąd podczas wysyłania';
+      console.error('Błąd zakończenia zlecenia:', err);
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

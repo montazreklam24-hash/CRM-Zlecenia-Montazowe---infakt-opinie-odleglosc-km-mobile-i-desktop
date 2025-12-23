@@ -250,14 +250,27 @@ export const jobsService = {
     let emailSent = false;
     if (data.sendEmail && data.clientEmail && data.completionImages.length > 0) {
       const job = await this.getJob(id);
-      await this.sendCompletionEmail({
-        jobId: id,
-        jobTitle: job.data.jobTitle || 'Zlecenie',
-        toEmail: data.clientEmail,
-        completionImage: data.completionImages[0],
-        completionNotes: data.completionNotes,
-      });
-      emailSent = true;
+      try {
+        const emailResult = await this.sendCompletionEmail({
+          jobId: id,
+          jobTitle: job.data.jobTitle || 'Zlecenie',
+          toEmail: data.clientEmail,
+          completionImage: data.completionImages[0],
+          completionNotes: data.completionNotes,
+        });
+        
+        // Sprawdź czy email został wysłany poprawnie
+        if (!emailResult.success) {
+          const errorMsg = emailResult.error || 'Nie udało się wysłać emaila';
+          throw new Error(errorMsg);
+        }
+        
+        emailSent = true;
+      } catch (error: any) {
+        // Jeśli błąd wysyłki emaila, rzuć go dalej z kontekstem
+        const errorMessage = error.message || 'Nie udało się wysłać emaila';
+        throw new Error(`Błąd wysyłki emaila: ${errorMessage}`);
+      }
     }
     
     const updateData: any = {
@@ -311,21 +324,37 @@ export const jobsService = {
   }): Promise<{ success: boolean; message?: string; error?: string }> {
     if (DEMO_MODE) return { success: true };
 
-    const response = await apiRequest<{ success: boolean; message?: string; error?: string }>(
-      '/send_completion_email.php',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          job_id: data.jobId,
-          job_title: data.jobTitle,
-          to_email: data.toEmail,
-          completion_image: data.completionImage,
-          completion_notes: data.completionNotes,
-        }),
-      }
-    );
+    try {
+      const response = await apiRequest<{ success: boolean; message?: string; error?: string }>(
+        '/send_completion_email.php',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            job_id: data.jobId,
+            job_title: data.jobTitle,
+            to_email: data.toEmail,
+            completion_image: data.completionImage,
+            completion_notes: data.completionNotes,
+          }),
+        }
+      );
 
-    return response;
+      // Sprawdź czy odpowiedź zawiera success: false
+      if (response && response.success === false) {
+        return {
+          success: false,
+          error: response.error || 'Nie udało się wysłać emaila',
+        };
+      }
+
+      return response || { success: true };
+    } catch (error: any) {
+      // Jeśli apiRequest rzucił błąd, zwróć go jako odpowiedź z success: false
+      return {
+        success: false,
+        error: error.message || 'Nie udało się wysłać emaila',
+      };
+    }
   },
 };
 

@@ -152,12 +152,18 @@ $result = @mail($toEmail, $subject, $body, $headersStr);
 } else {
     // Pobierz błąd
     $error = error_get_last();
-    error_log("Błąd wysyłki email: " . json_encode($error));
+    $errorDetails = $error ? $error['message'] : 'Brak szczegółów';
+    error_log("Błąd wysyłki email do $toEmail: " . json_encode($error));
+    
+    // Sprawdź czy funkcja mail() jest dostępna
+    if (!function_exists('mail')) {
+        $errorDetails = 'Funkcja mail() nie jest dostępna na serwerze. Skontaktuj się z administratorem.';
+    }
     
     jsonResponse([
         'success' => false,
-        'error' => 'Nie udało się wysłać emaila. Sprawdź konfigurację serwera.',
-        'details' => $error ? $error['message'] : 'Brak szczegółów'
+        'error' => 'Nie udało się wysłać emaila. ' . $errorDetails,
+        'details' => $errorDetails
     ], 500);
 }
 
