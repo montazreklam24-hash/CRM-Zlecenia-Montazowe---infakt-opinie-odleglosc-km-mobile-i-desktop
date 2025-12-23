@@ -68,21 +68,34 @@ async function apiRequest<T>(
   let responseText = '';
   try {
     responseText = await response.text();
+    if (endpoint.includes('send_completion_email')) {
+      console.log('🔵 apiRequest: Surowa odpowiedź dla send_completion_email:', {
+        status: response.status,
+        statusText: response.statusText,
+        contentType,
+        isJson,
+        textLength: responseText.length,
+        textPreview: responseText.substring(0, 500),
+      });
+    }
   } catch (textError) {
-    console.error('Błąd odczytu odpowiedzi:', textError);
+    console.error('🔴 Błąd odczytu odpowiedzi:', textError);
     responseText = '';
   }
   
   try {
     if (isJson && responseText) {
       data = JSON.parse(responseText);
+      if (endpoint.includes('send_completion_email')) {
+        console.log('🔵 apiRequest: Sparsowany JSON:', data);
+      }
     } else if (responseText) {
       data = { error: responseText || `HTTP ${response.status}` };
     } else {
       data = { error: `HTTP ${response.status}: ${response.statusText}` };
     }
   } catch (parseError) {
-    console.error('Błąd parsowania odpowiedzi API:', parseError, 'Response text:', responseText.substring(0, 200));
+    console.error('🔴 Błąd parsowania odpowiedzi API:', parseError, 'Response text:', responseText.substring(0, 200));
     data = { error: responseText || `Błąd parsowania odpowiedzi (HTTP ${response.status})` };
   }
   
@@ -93,6 +106,12 @@ async function apiRequest<T>(
       window.location.reload();
     }
     const errorMsg = data.error || data.message || `HTTP ${response.status}: ${response.statusText}`;
+    console.error('🔴 apiRequest: Błąd HTTP', {
+      status: response.status,
+      statusText: response.statusText,
+      error: errorMsg,
+      data,
+    });
     throw new Error(errorMsg);
   }
   
@@ -274,6 +293,7 @@ export const jobsService = {
     // Wyślij email jeśli potrzeba
     let emailSent = false;
     if (data.sendEmail && data.clientEmail && data.completionImages.length > 0) {
+      console.log('🔵 completeJob: Rozpoczynam wysyłkę emaila');
       const job = await this.getJob(id);
       try {
         const emailResult = await this.sendCompletionEmail({
@@ -284,15 +304,20 @@ export const jobsService = {
           completionNotes: data.completionNotes,
         });
         
+        console.log('🔵 completeJob: Wynik sendCompletionEmail:', emailResult);
+        
         // Sprawdź czy email został wysłany poprawnie
         if (!emailResult.success) {
           const errorMsg = emailResult.error || 'Nie udało się wysłać emaila';
+          console.error('🔴 completeJob: Błąd wysyłki emaila:', errorMsg);
           throw new Error(errorMsg);
         }
         
+        console.log('✅ completeJob: Email wysłany pomyślnie');
         emailSent = true;
       } catch (error: any) {
         // Jeśli błąd wysyłki emaila, rzuć go dalej z kontekstem
+        console.error('🔴 completeJob: Błąd w catch:', error);
         const errorMessage = error.message || 'Nie udało się wysłać emaila';
         throw new Error(`Błąd wysyłki emaila: ${errorMessage}`);
       }
@@ -349,37 +374,56 @@ export const jobsService = {
   }): Promise<{ success: boolean; message?: string; error?: string }> {
     if (DEMO_MODE) return { success: true };
 
+    console.log('🔵 sendCompletionEmail START:', {
+      jobId: data.jobId,
+      jobTitle: data.jobTitle,
+      toEmail: data.toEmail,
+      hasImage: !!data.completionImage,
+      imageLength: data.completionImage?.length || 0,
+    });
+
     try {
+      const requestBody = {
+        job_id: data.jobId,
+        job_title: data.jobTitle,
+        to_email: data.toEmail,
+        completion_image: data.completionImage,
+        completion_notes: data.completionNotes,
+      };
+      
+      console.log('🔵 Wysyłam request do /send_completion_email.php');
+      
       const response = await apiRequest<{ success: boolean; message?: string; error?: string; details?: string }>(
         '/send_completion_email.php',
         {
           method: 'POST',
-          body: JSON.stringify({
-            job_id: data.jobId,
-            job_title: data.jobTitle,
-            to_email: data.toEmail,
-            completion_image: data.completionImage,
-            completion_notes: data.completionNotes,
-          }),
+          body: JSON.stringify(requestBody),
         }
       );
 
-      console.log('Odpowiedź sendCompletionEmail:', response);
+      console.log('🟢 Odpowiedź sendCompletionEmail:', response);
 
       // Sprawdź czy odpowiedź zawiera success: false
       if (response && response.success === false) {
         const errorMsg = response.error || response.details || 'Nie udało się wysłać emaila';
-        console.error('Błąd wysyłki emaila:', errorMsg);
+        console.error('🔴 Błąd wysyłki emaila:', errorMsg, response);
         return {
           success: false,
           error: errorMsg,
         };
       }
 
+      console.log('✅ Email wysłany pomyślnie');
       return response || { success: true };
     } catch (error: any) {
       // Jeśli apiRequest rzucił błąd, zwróć go jako odpowiedź z success: false
-      console.error('Błąd w sendCompletionEmail:', error);
+      console.error('🔴 Błąd w sendCompletionEmail (catch):', {
+        error,
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name,
+        response: error?.response,
+      });
       const errorMessage = error?.message || error?.toString() || 'Nie udało się wysłać emaila';
       return {
         success: false,
