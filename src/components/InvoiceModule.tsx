@@ -276,6 +276,14 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
     setIsLoading(true);
     
     try {
+      // DEBUG: Loguj dane klienta przed wysłaniem
+      console.log('[InvoiceModule] Wysyłanie faktury:', {
+        invoiceType,
+        clientData,
+        itemsCount: items.length,
+        jobId
+      });
+      
       // Przekształć pozycje do formatu API
       const apiItems: InvoiceItemData[] = items.map(item => ({
         name: item.name,

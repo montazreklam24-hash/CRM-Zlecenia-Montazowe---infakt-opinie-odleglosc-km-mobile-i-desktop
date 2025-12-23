@@ -53,6 +53,11 @@ function handleCreateProforma() {
     $user = requireAuth();
     $input = getJsonInput();
     
+    // DEBUG: Loguj co przychodzi z frontendu
+    $logFile = __DIR__ . '/logs/invoice_debug.log';
+    $timestamp = date('Y-m-d H:i:s');
+    file_put_contents($logFile, "[$timestamp] [PROFORMA] Input data: " . json_encode($input) . "\n", FILE_APPEND);
+    
     // Walidacja
     if (empty($input['items']) || !is_array($input['items'])) {
         jsonResponse(array('error' => 'Brak pozycji na fakturze'), 400);
@@ -74,6 +79,9 @@ function handleCreateProforma() {
         'post_code' => isset($input['postCode']) ? $input['postCode'] : '',
         'payment_method' => 'transfer'
     );
+    
+    // DEBUG: Loguj przygotowane dane klienta
+    file_put_contents($logFile, "[$timestamp] [PROFORMA] Client data prepared: " . json_encode($clientData) . "\n", FILE_APPEND);
     
     // Nazwa klienta - priorytet: firma > imię+nazwisko > email
     if (empty($clientData['company_name'])) {
@@ -169,6 +177,11 @@ function handleCreateInvoice() {
     $user = requireAuth();
     $input = getJsonInput();
     
+    // DEBUG: Loguj co przychodzi z frontendu
+    $logFile = __DIR__ . '/logs/invoice_debug.log';
+    $timestamp = date('Y-m-d H:i:s');
+    file_put_contents($logFile, "[$timestamp] [INVOICE] Input data: " . json_encode($input) . "\n", FILE_APPEND);
+    
     // Walidacja
     if (empty($input['items']) || !is_array($input['items'])) {
         jsonResponse(array('error' => 'Brak pozycji na fakturze'), 400);
@@ -190,6 +203,9 @@ function handleCreateInvoice() {
         'post_code' => isset($input['postCode']) ? $input['postCode'] : '',
         'payment_method' => isset($input['paymentMethod']) ? $input['paymentMethod'] : 'transfer'
     );
+    
+    // DEBUG: Loguj przygotowane dane klienta
+    file_put_contents($logFile, "[$timestamp] [INVOICE] Client data prepared: " . json_encode($clientData) . "\n", FILE_APPEND);
     
     if (empty($clientData['company_name'])) {
         if (!empty($clientData['first_name']) || !empty($clientData['last_name'])) {

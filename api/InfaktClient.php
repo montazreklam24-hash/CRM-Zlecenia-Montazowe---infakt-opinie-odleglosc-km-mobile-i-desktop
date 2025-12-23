@@ -131,26 +131,32 @@ class InfaktClient {
         $email = isset($clientData['email']) ? $clientData['email'] : '';
         $nip = isset($clientData['nip']) ? preg_replace('/[^0-9]/', '', $clientData['nip']) : '';
         $isCompany = isset($clientData['type']) && $clientData['type'] === 'company';
+        $companyName = isset($clientData['company_name']) ? trim($clientData['company_name']) : '';
         
-        // Szukaj po NIP (firmy)
-        if (!empty($nip)) {
+        $this->log("findOrCreateClient: NIP=$nip, email=$email, company=$companyName, isCompany=" . ($isCompany ? 'yes' : 'no'));
+        
+        // WAŻNE: Szukaj TYLKO po NIP (unikalny identyfikator firmy)
+        // NIE szukaj po email - może to być email użytkownika/systemu!
+        if (!empty($nip) && strlen($nip) === 10) {
             $existing = $this->findClientByNip($nip);
             if ($existing) {
-                $this->log("Found client by NIP: " . $existing['id']);
+                $this->log("Found client by NIP: " . $existing['id'] . " (" . (isset($existing['company_name']) ? $existing['company_name'] : 'N/A') . ")");
+                // Sprawdź czy nazwa się zgadza (zabezpieczenie przed błędnym dopasowaniem)
+                if (!empty($companyName) && isset($existing['company_name'])) {
+                    $existingName = strtolower(trim($existing['company_name']));
+                    $newName = strtolower(trim($companyName));
+                    if ($existingName !== $newName && !empty($existingName)) {
+                        $this->log("WARNING: NIP matches but company name differs! Existing: '$existingName', New: '$newName' - creating new client");
+                        return $this->createClient($clientData);
+                    }
+                }
                 return $existing['id'];
             }
         }
         
-        // Szukaj po email (osoby prywatne)
-        if (!$isCompany && !empty($email)) {
-            $existing = $this->findClientByEmail($email);
-            if ($existing) {
-                $this->log("Found client by email: " . $existing['id']);
-                return $existing['id'];
-            }
-        }
-        
-        // Utwórz nowego klienta
+        // Jeśli brak NIP lub NIP nie znaleziony - ZAWSZE tworz nowego klienta
+        // NIE szukaj po email - może to być email użytkownika/systemu!
+        $this->log("Creating new client (no NIP match or no NIP provided)");
         return $this->createClient($clientData);
     }
     
