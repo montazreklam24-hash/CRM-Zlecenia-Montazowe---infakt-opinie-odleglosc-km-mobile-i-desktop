@@ -1,34 +1,48 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { 
+  FileText, Plus, Trash2, Send, Download, 
+  Receipt, Loader2, ExternalLink, 
+  ChevronDown, ChevronUp, Edit2, Check, Search
+} from 'lucide-react';
 import { PaymentStatus, Invoice } from '../types';
-import { Plus, Trash2, FileText, Send, Download, ExternalLink, Loader2, CheckCircle2, AlertCircle, X, Receipt } from 'lucide-react';
 import invoiceService, { InvoiceItemData } from '../services/invoiceService';
+
+interface BillingData {
+  name?: string;
+  nip?: string;
+  street?: string;
+  buildingNo?: string;
+  apartmentNo?: string;
+  postCode?: string;
+  city?: string;
+  email?: string;
+}
 
 interface InvoiceModuleProps {
   jobId?: string;
-  clientId?: number;
   clientName?: string;
   clientEmail?: string;
   installAddress?: string;
   phone?: string;
   nip?: string;
-  billing?: {
-    name: string | null;
-    nip: string | null;
-    street: string | null;
-    buildingNo: string | null;
-    apartmentNo: string | null;
-    postCode: string | null;
-    city: string | null;
-    email: string | null;
-  };
   paymentStatus?: PaymentStatus;
-  totalGross?: number;
-  paidAmount?: number;
   invoices?: Invoice[];
   isAdmin?: boolean;
-  onStatusChange?: (status: PaymentStatus) => Promise<void>;
-  onClientDataChange?: (billingData: any) => void;
+  onStatusChange?: (status: PaymentStatus) => void;
+  onClientDataChange?: (data: any) => void;
+  billing?: BillingData;
 }
+
+// Presety dla montażu reklam
+const PRESET_ITEMS: Partial<InvoiceItemData>[] = [
+  { name: 'Montaż kasetonu reklamowego', quantity: 1, unitPriceNet: 500, vatRate: 23 },
+  { name: 'Montaż szyldu/tablicy', quantity: 1, unitPriceNet: 300, vatRate: 23 },
+  { name: 'Montaż banneru', quantity: 1, unitPriceNet: 200, vatRate: 23 },
+  { name: 'Oklejanie folią', quantity: 1, unitPriceNet: 120, vatRate: 23 },
+  { name: 'Montaż liter 3D', quantity: 1, unitPriceNet: 80, vatRate: 23 },
+  { name: 'Usługa transportowa', quantity: 1, unitPriceNet: 150, vatRate: 23 },
+  { name: 'Dojazd', quantity: 1, unitPriceNet: 100, vatRate: 23 },
+];
 
 const InvoiceModule: React.FC<InvoiceModuleProps> = ({
   jobId = '',
@@ -37,24 +51,23 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
   installAddress,
   phone,
   nip,
-  paymentStatus,
+  paymentStatus = PaymentStatus.NONE,
   invoices: initialInvoices = [],
   isAdmin = true,
   onStatusChange,
   onClientDataChange,
   billing: initialBilling
 }) => {
-  const [items, setItems] = useState<InvoiceItemData[]>([
-    { name: 'Usługa montażowa', quantity: 1, unitPriceNet: 0, vatRate: 23 }
-  ]);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isEditingBilling, setIsEditingBilling] = useState(false);
+  const [items, setItems] = useState<InvoiceItemData[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [showBilling, setShowBilling] = useState(true); // Domyślnie widoczne
-  // Inicjalizuj billing - zawsze używaj głównych danych jako fallback
-  const getInitialBilling = () => {
-    if (initialBilling && initialBilling.name && initialBilling.name.length > 0) {
-      // Jeśli billing ma dane, użyj ich, ale uzupełnij puste pola z głównych danych
+  const [showPresets, setShowPresets] = useState(false);
+  
+  // Billing state
+  const [billing, setBilling] = useState<BillingData>(() => {
+    if (initialBilling && Object.keys(initialBilling).some(k => (initialBilling as any)[k])) {
       return {
         name: initialBilling.name || clientName || '',
         nip: initialBilling.nip || nip || '',
@@ -66,7 +79,6 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
         email: initialBilling.email || clientEmail || ''
       };
     }
-    // Jeśli billing jest pusty, użyj głównych danych zlecenia
     return {
       name: clientName || '',
       nip: nip || '',
@@ -77,104 +89,20 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
       city: '',
       email: clientEmail || ''
     };
-  };
+  });
 
-  const [billing, setBilling] = useState(getInitialBilling());
   const lastAutoNip = useRef<string | null>(null);
 
-  // Automatyczny GUS po wpisaniu NIP w module fakturowania
-  useEffect(() => {
-    const nipStr = billing.nip?.replace(/[^\d]/g, '');
-    if (showForm && nipStr && nipStr.length === 10) {
-      const isNewNip = nipStr !== lastAutoNip.current;
-      const isNameEmpty = !billing.name || billing.name.length < 3;
-
-      if (isNewNip || isNameEmpty) {
-        const timer = setTimeout(async () => {
-          lastAutoNip.current = nipStr;
-          
-          setIsProcessing(true);
-          try {
-            console.log('[GUS] Automatyczne sprawdzanie NIP (Faktura):', nipStr);
-            const res = await invoiceService.lookupNip(nipStr);
-            if (res.success && res.company) {
-              const { name, street, city, postCode } = res.company;
-              let st = street;
-              let bNo = '';
-              let aNo = '';
-              const streetMatch = street.match(/^(.*?)\s(\d+[a-zA-Z]?)(?:\/(\d+))?$/);
-              if (streetMatch) {
-                st = streetMatch[1];
-                bNo = streetMatch[2];
-                aNo = streetMatch[3] || '';
-              }
-
-              setBilling(prev => {
-                const updated = {
-                  ...prev,
-                  name,
-                  street: st,
-                  buildingNo: bNo,
-                  apartmentNo: aNo,
-                  city,
-                  postCode
-                };
-                
-                // Powiadom rodzica o zmianie
-                if (onClientDataChange) {
-                  onClientDataChange({
-                    companyName: name,
-                    nip: nipStr,
-                    email: prev.email,
-                    phone: phone,
-                    street: st,
-                    city,
-                    postCode,
-                    buildingNo: bNo,
-                    apartmentNo: aNo
-                  });
-                }
-                
-                return updated;
-              });
-            }
-          } catch (e) {
-            console.error('Auto-GUS failed:', e);
-          } finally {
-            setIsProcessing(false);
-          }
-        }, 800);
-
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [billing.nip, showForm]);
-
-  // Sync invoices if they change from props
+  // Sync invoices from props
   useEffect(() => {
     setInvoices(initialInvoices);
   }, [initialInvoices]);
 
-  // Pobierz faktury jeśli nie są przekazane w propsach
+  // Sync billing from props
   useEffect(() => {
-    if (jobId && initialInvoices.length === 0) {
-      console.log('[InvoiceModule] Pobieram faktury dla jobId:', jobId);
-      invoiceService.getJobInvoices(jobId).then(res => {
-        console.log('[InvoiceModule] Otrzymane faktury:', res);
-        if (res.success && res.invoices) {
-          setInvoices(res.invoices);
-        }
-      }).catch(err => {
-        console.error('[InvoiceModule] Failed to fetch invoices:', err);
-      });
-    }
-  }, [jobId]);
-
-  // Sync billing if it changes from props - ale tylko jeśli ma sensowne dane
-  useEffect(() => {
-    if (initialBilling && (initialBilling.name || initialBilling.nip)) {
-      // Uzupełnij puste pola z głównych danych
+    if (initialBilling) {
       setBilling(prev => ({
+        ...prev,
         name: initialBilling.name || prev.name || clientName || '',
         nip: initialBilling.nip || prev.nip || nip || '',
         street: initialBilling.street || prev.street || '',
@@ -184,503 +112,604 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
         city: initialBilling.city || prev.city || '',
         email: initialBilling.email || prev.email || clientEmail || ''
       }));
-    } else if (!initialBilling || (!initialBilling.name && !initialBilling.nip)) {
-      // Jeśli billing jest pusty, użyj głównych danych
-      setBilling({
-        name: clientName || '',
-        nip: nip || '',
-        street: '',
-        buildingNo: '',
-        apartmentNo: '',
-        postCode: '',
-        city: '',
-        email: clientEmail || ''
-      });
     }
   }, [initialBilling, clientName, clientEmail, nip]);
 
-  const handleBillingChange = (field: string, value: string) => {
-    const newBilling = { ...billing, [field]: value };
-    setBilling(newBilling);
-    if (onClientDataChange) {
-      // Przekonwertuj na format oczekiwany przez JobCard
-      onClientDataChange({
-        companyName: newBilling.name,
-        nip: newBilling.nip,
-        email: newBilling.email,
-        phone: phone,
-        street: newBilling.street,
-        city: newBilling.city,
-        postCode: newBilling.postCode,
-        buildingNo: newBilling.buildingNo,
-        apartmentNo: newBilling.apartmentNo
-      });
+  // Fetch invoices if not provided
+  useEffect(() => {
+    if (jobId && initialInvoices.length === 0) {
+      invoiceService.getJobInvoices(jobId).then(res => {
+        if (res.success && res.invoices) {
+          setInvoices(res.invoices);
+        }
+      }).catch(console.error);
     }
+  }, [jobId, initialInvoices.length]);
+
+  // Calculate totals
+  const calculateTotals = () => {
+    let totalNet = 0;
+    let totalGross = 0;
+    items.forEach(item => {
+      const itemNet = item.quantity * item.unitPriceNet;
+      const vatMultiplier = item.vatRate >= 0 ? (1 + item.vatRate / 100) : 1;
+      totalGross += itemNet * vatMultiplier;
+      totalNet += itemNet;
+    });
+    return { totalNet, totalGross, totalVat: totalGross - totalNet };
   };
 
-  if (!isAdmin) return null;
+  const { totalNet, totalGross, totalVat } = calculateTotals();
 
-  const addItem = () => {
-    setItems([...items, { name: '', quantity: 1, unitPriceNet: 0, vatRate: 23 }]);
+  // Add item
+  const addItem = (preset?: Partial<InvoiceItemData>) => {
+    const newItem: InvoiceItemData = {
+      name: preset?.name || '',
+      quantity: preset?.quantity || 1,
+      unitPriceNet: preset?.unitPriceNet || 0,
+      vatRate: preset?.vatRate || 23
+    };
+    setItems([...items, newItem]);
+    setShowPresets(false);
   };
 
-  const removeItem = (idx: number) => {
-    if (items.length <= 1) return;
-    setItems(items.filter((_, i) => i !== idx));
-  };
-
-  const updateItem = (idx: number, field: keyof InvoiceItemData, value: any) => {
+  // Update item
+  const updateItem = (index: number, field: keyof InvoiceItemData, value: any) => {
     const newItems = [...items];
-    (newItems[idx] as any)[field] = value;
+    newItems[index] = { ...newItems[index], [field]: value };
     setItems(newItems);
   };
 
-  const calculateTotals = () => {
-    const net = items.reduce((sum, item) => sum + (item.quantity * (item.unitPriceNet || 0)), 0);
-    const gross = items.reduce((sum, item) => sum + (item.quantity * (item.unitPriceNet || 0) * (1 + (item.vatRate || 0) / 100)), 0);
-    return { net, gross };
+  // Remove item
+  const removeItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
   };
 
-  const { net: totalNet, gross: totalGrossCalc } = calculateTotals();
-
-  const handleCreateProforma = async () => {
-    const billingName = billing?.name || clientName;
-    if (!billingName) return alert('Brak nazwy klienta/firmy do faktury!');
-    
-    if (items.some(i => !i.name || i.unitPriceNet <= 0)) {
-      if (!window.confirm('Niektóre pozycje mają zerową cenę lub brak nazwy. Kontynuować?')) return;
-    }
-
-    setIsProcessing(true);
-    try {
-      const res = await invoiceService.createProforma(jobId, items, {
-        companyName: billingName,
-        email: billing?.email || clientEmail,
-        nip: billing?.nip || nip,
-        phone: phone,
-        street: billing?.street ? `${billing.street} ${billing.buildingNo || ''}${billing.apartmentNo ? '/' + billing.apartmentNo : ''}`.trim() : installAddress,
-        city: billing?.city || '',
-        postCode: billing?.postCode || ''
-      }, {
-        installAddress,
-        sendEmail: true
-      });
-      
-      if (res.success && res.invoice) {
-        alert('Proforma wystawiona i wysłana!');
-        const updated = await invoiceService.getJobInvoices(jobId);
-        setInvoices(updated.invoices);
-        setShowForm(false);
-        if (onStatusChange) await onStatusChange(PaymentStatus.PROFORMA);
-      }
-    } catch (e: any) {
-      alert('Błąd: ' + e.message);
-    } finally {
-      setIsProcessing(false);
-    }
+  // Handle billing change
+  const handleBillingChange = (field: keyof BillingData, value: string) => {
+    setBilling(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleCreateInvoice = async () => {
-    const billingName = billing?.name || clientName;
-    if (!billingName) return alert('Brak nazwy klienta/firmy do faktury!');
+  // GUS lookup
+  const handleGusLookup = async () => {
+    const nipStr = billing.nip?.replace(/[^\d]/g, '');
+    if (!nipStr || nipStr.length !== 10) {
+      alert('Wpisz poprawny NIP (10 cyfr)');
+      return;
+    }
     
     setIsProcessing(true);
     try {
-      const res = await invoiceService.createInvoice(jobId, items, {
-        companyName: billingName,
-        email: billing?.email || clientEmail,
-        nip: billing?.nip || nip,
-        phone: phone,
-        street: billing?.street ? `${billing.street} ${billing.buildingNo || ''}${billing.apartmentNo ? '/' + billing.apartmentNo : ''}`.trim() : installAddress,
-        city: billing?.city || '',
-        postCode: billing?.postCode || ''
-      }, {
-        installAddress,
-        sendEmail: true,
-        markAsPaid: false
-      });
-      
-      if (res.success && res.invoice) {
-        alert('Faktura VAT wystawiona i wysłana!');
-        const updated = await invoiceService.getJobInvoices(jobId);
-        setInvoices(updated.invoices);
-        setShowForm(false);
+      const res = await invoiceService.lookupNip(nipStr);
+      if (res.success && res.company) {
+        const { name, street, city, postCode } = res.company;
+        let st = street || '';
+        let bNo = '';
+        let aNo = '';
+        
+        const streetMatch = street?.match(/^(.*?)\s(\d+[a-zA-Z]?)(?:\/(\d+))?$/);
+        if (streetMatch) {
+          st = streetMatch[1];
+          bNo = streetMatch[2];
+          aNo = streetMatch[3] || '';
+        }
+
+        const newBilling = {
+          ...billing,
+          name: name || billing.name,
+          street: st,
+          buildingNo: bNo,
+          apartmentNo: aNo,
+          city: city || '',
+          postCode: postCode || ''
+        };
+        setBilling(newBilling);
+        
+        if (onClientDataChange) {
+          onClientDataChange({
+            companyName: name,
+            nip: nipStr,
+            email: billing.email,
+            phone: phone,
+            street: st,
+            city,
+            postCode,
+            buildingNo: bNo,
+            apartmentNo: aNo
+          });
+        }
+        
+        lastAutoNip.current = nipStr;
+      } else {
+        alert('Nie znaleziono firmy w GUS: ' + (res.error || 'Błąd'));
       }
-    } catch (e: any) {
-      alert('Błąd: ' + e.message);
+    } catch (e) {
+      alert('Błąd połączenia z GUS');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleMarkPaid = async (invId: number) => {
-    if (!window.confirm('Oznaczyć tę fakturę jako opłaconą?')) return;
+  // Create invoice
+  const handleCreateDocument = async (type: 'proforma' | 'vat') => {
+    if (items.length === 0) {
+      alert('Dodaj przynajmniej jedną pozycję');
+      return;
+    }
+
+    if (!billing.name) {
+      alert('Uzupełnij nazwę nabywcy (dane do faktury)');
+      return;
+    }
+
     setIsProcessing(true);
     try {
-      await invoiceService.markAsPaid(invId);
-      const updated = await invoiceService.getJobInvoices(jobId);
-      setInvoices(updated.invoices);
-      if (onStatusChange) await onStatusChange(PaymentStatus.PAID);
-      alert('Oznaczono jako opłacone!');
-    } catch (e: any) {
-      alert('Błąd: ' + e.message);
+      const billingData = {
+        name: billing.name,
+        nip: billing.nip?.replace(/[^\d]/g, '') || '',
+        street: billing.street || '',
+        buildingNo: billing.buildingNo || '',
+        apartmentNo: billing.apartmentNo || '',
+        postCode: billing.postCode || '',
+        city: billing.city || '',
+        email: billing.email || ''
+      };
+
+      let result;
+      if (type === 'proforma') {
+        result = await invoiceService.createProforma(jobId, items, billingData, installAddress);
+      } else {
+        result = await invoiceService.createInvoice(jobId, items, billingData, installAddress);
+      }
+
+      if (result.success && result.invoice) {
+        alert(`${type === 'proforma' ? 'Proforma' : 'Faktura VAT'} została wystawiona!`);
+        setInvoices(prev => [result.invoice!, ...prev]);
+        setItems([]);
+        
+        if (onStatusChange) {
+          onStatusChange(type === 'proforma' ? PaymentStatus.PROFORMA : PaymentStatus.INVOICE);
+        }
+      } else {
+        throw new Error(result.error || 'Błąd wystawiania dokumentu');
+      }
+    } catch (error: any) {
+      console.error('Create document error:', error);
+      alert('Błąd: ' + (error.message || 'Nie udało się wystawić dokumentu'));
     } finally {
       setIsProcessing(false);
     }
   };
+
+  // Mark as paid
+  const handleMarkPaid = async (invoiceId: number) => {
+    try {
+      const result = await invoiceService.markAsPaid(invoiceId);
+      if (result.success) {
+        setInvoices(prev => prev.map(inv => 
+          inv.id === invoiceId ? { ...inv, status: 'paid' } : inv
+        ));
+        if (onStatusChange) {
+          onStatusChange(PaymentStatus.PAID);
+        }
+      }
+    } catch (e) {
+      console.error('Mark paid error:', e);
+    }
+  };
+
+  // Format address for display
+  const formatBillingAddress = () => {
+    const parts = [];
+    if (billing.street) {
+      let addr = billing.street;
+      if (billing.buildingNo) addr += ' ' + billing.buildingNo;
+      if (billing.apartmentNo) addr += '/' + billing.apartmentNo;
+      parts.push(addr);
+    }
+    if (billing.postCode || billing.city) {
+      parts.push([billing.postCode, billing.city].filter(Boolean).join(' '));
+    }
+    return parts.join(', ') || 'Brak adresu';
+  };
+
+  // Status badge
+  const getStatusLabel = () => {
+    if (invoices.some(i => i.status === 'paid')) return { label: 'OPŁACONE', color: 'bg-green-100 text-green-700' };
+    if (invoices.some(i => i.type === 'vat' || i.type === 'invoice')) return { label: 'FAKTURA', color: 'bg-blue-100 text-blue-700' };
+    if (invoices.some(i => i.type === 'proforma')) return { label: 'PROFORMA', color: 'bg-orange-100 text-orange-700' };
+    return { label: 'NIEOPŁACONE', color: 'bg-slate-100 text-slate-600' };
+  };
+
+  const status = getStatusLabel();
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6">
-      <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-        <div className="flex items-center gap-2">
-          <FileText className="w-5 h-5 text-slate-400" />
-          <h3 className="font-bold text-slate-800 uppercase tracking-tight">Fakturowanie (inFakt)</h3>
-        </div>
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* Header - rozwijany */}
+      <div 
+        className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
         <div className="flex items-center gap-3">
-          <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
-            paymentStatus === PaymentStatus.PAID ? 'bg-green-100 text-green-700 border border-green-200' :
-            paymentStatus === PaymentStatus.PROFORMA ? 'bg-orange-100 text-orange-700 border border-orange-200' :
-            'bg-slate-100 text-slate-500 border border-slate-200'
-          }`}>
-            {paymentStatus === PaymentStatus.PAID ? 'OPŁACONE' :
-             paymentStatus === PaymentStatus.PROFORMA ? 'PROFORMA' :
-             'NIEOPŁACONE'}
-          </span>
-          <button 
-            onClick={() => setShowForm(!showForm)}
-            className={`p-2 rounded-lg transition-all border ${
-              showForm ? 'bg-red-50 border-red-200 text-red-600' : 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100'
-            }`}
-          >
-            {showForm ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-          </button>
-        </div>
-      </div>
-
-      <div className="p-5">
-        {/* Lista wystawionych faktur */}
-        {invoices.length > 0 && (
-          <div className="space-y-3 mb-6">
-            {invoices.map((inv: any) => (
-              <div key={inv.id} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-white hover:border-blue-200 transition-all group shadow-sm">
-                <div className="flex items-center gap-4">
-                  <div className={`p-2 rounded-lg ${(inv.type === 'proforma') ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>
-                    <FileText className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">{inv.infaktNumber || inv.infakt_number || `#${inv.id}`}</p>
-                    <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wide">
-                      {(inv.type === 'proforma') ? 'Proforma' : 'Faktura VAT'} • {new Date(inv.createdAt || inv.created_at || Date.now()).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {(inv.status !== 'paid' && inv.paymentStatus !== 'paid') && (
-                    <button 
-                      onClick={() => handleMarkPaid(inv.id)}
-                      className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
-                      title="Oznacz jako opłacone"
-                    >
-                      <CheckCircle2 className="w-5 h-5" />
-                    </button>
-                  )}
-                  <a 
-                    href={invoiceService.getPdfUrl(inv.id)} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                    title="Pobierz PDF"
-                  >
-                    <Download className="w-5 h-5" />
-                  </a>
-                  {(inv.shareLink || inv.share_link) && (
-                    <a 
-                      href={inv.shareLink || inv.share_link} 
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                      title="Otwórz w inFakt"
-                    >
-                      <ExternalLink className="w-5 h-5" />
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
+          <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+            <Receipt className="w-5 h-5 text-indigo-600" />
           </div>
-        )}
-
-        {!showForm && invoices.length === 0 && (
-          <div className="text-center py-8 border-2 border-dashed border-slate-100 rounded-2xl mb-4">
-            <p className="text-sm text-slate-400 font-medium">Brak wystawionych dokumentów.</p>
-            <button 
-              onClick={() => setShowForm(true)}
-              className="mt-3 text-xs font-black text-blue-600 hover:text-blue-700 px-6 py-2.5 bg-blue-50 rounded-xl transition-all border border-blue-100 uppercase tracking-widest"
-            >
-              + Wystaw dokument
-            </button>
-          </div>
-        )}
-
-        {/* Formularz nowej faktury */}
-        {showForm && (
-          <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200 animate-in fade-in slide-in-from-top-4 duration-300">
-            <div className="flex justify-between items-center mb-4">
-              <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest">Nowy dokument</h4>
-              <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Sekcja danych nabywcy - ZAWSZE WIDOCZNA */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-3">
-                <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                  <Receipt className="w-4 h-4 text-blue-500" /> DANE NABYWCY DO FAKTURY
-                </h5>
-                <button 
-                  onClick={() => setShowBilling(!showBilling)}
-                  className="text-[10px] font-bold px-2 py-1 rounded border transition-colors bg-white text-blue-600 border-blue-200 hover:bg-blue-50"
-                >
-                  {showBilling ? '▼ Zwiń' : '▶ Rozwiń'}
-                </button>
-              </div>
-              
-              {showBilling && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-white rounded-xl border border-blue-100 shadow-sm">
-                <div className="md:col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Nazwa Firmy / Nabywca</label>
-                  <input 
-                    value={billing.name || ''} 
-                    onChange={(e) => handleBillingChange('name', e.target.value)}
-                    className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-400 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">NIP</label>
-                  <div className="flex gap-1 mt-1">
-                    <input 
-                      value={billing.nip || ''} 
-                      onChange={(e) => handleBillingChange('nip', e.target.value)}
-                      className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-400 outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const nipStr = billing.nip?.replace(/[^\d]/g, '');
-                        if (!nipStr || nipStr.length !== 10) {
-                          alert('Wpisz poprawny NIP (10 cyfr)');
-                          return;
-                        }
-                        setIsProcessing(true);
-                        try {
-                          const res = await invoiceService.lookupNip(nipStr);
-                          if (res.success && res.company) {
-                            const { name, street, city, postCode } = res.company;
-                            let st = street;
-                            let bNo = '';
-                            let aNo = '';
-                            const streetMatch = street.match(/^(.*?)\s(\d+[a-zA-Z]?)(?:\/(\d+))?$/);
-                            if (streetMatch) {
-                              st = streetMatch[1];
-                              bNo = streetMatch[2];
-                              aNo = streetMatch[3] || '';
-                            }
-
-                            const newBilling = {
-                              ...billing,
-                              name,
-                              street: st,
-                              buildingNo: bNo,
-                              apartmentNo: aNo,
-                              city,
-                              postCode
-                            };
-                            setBilling(newBilling);
-                            
-                            // Powiadom rodzica o zmianie
-                            if (onClientDataChange) {
-                              onClientDataChange({
-                                companyName: name,
-                                nip: nipStr,
-                                email: billing.email,
-                                phone: phone,
-                                street: st,
-                                city,
-                                postCode,
-                                buildingNo: bNo,
-                                apartmentNo: aNo
-                              });
-                            }
-                          } else {
-                            alert('Nie znaleziono firmy w GUS: ' + (res.error || 'Błąd'));
-                          }
-                        } catch (e) {
-                          alert('Błąd połączenia z GUS');
-                        } finally {
-                          setIsProcessing(false);
-                        }
-                      }}
-                      disabled={isProcessing}
-                      className="px-3 bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[10px] font-black hover:bg-blue-200 transition-colors uppercase"
-                    >
-                      GUS
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Email do faktury</label>
-                  <input 
-                    value={billing.email || ''} 
-                    onChange={(e) => handleBillingChange('email', e.target.value)}
-                    className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-400 outline-none"
-                  />
-                </div>
-                <div className="md:col-span-2 grid grid-cols-3 gap-2">
-                  <div className="col-span-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Ulica</label>
-                    <input 
-                      value={billing.street || ''} 
-                      onChange={(e) => handleBillingChange('street', e.target.value)}
-                      className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-400 outline-none"
-                    />
-                  </div>
-                  <div className="flex gap-1">
-                    <div className="flex-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Nr</label>
-                      <input 
-                        value={billing.buildingNo || ''} 
-                        onChange={(e) => handleBillingChange('buildingNo', e.target.value)}
-                        className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-center focus:border-blue-400 outline-none"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Lok</label>
-                      <input 
-                        value={billing.apartmentNo || ''} 
-                        onChange={(e) => handleBillingChange('apartmentNo', e.target.value)}
-                        className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-center focus:border-blue-400 outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Kod pocztowy</label>
-                  <input 
-                    value={billing.postCode || ''} 
-                    onChange={(e) => handleBillingChange('postCode', e.target.value)}
-                    className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-400 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Miasto</label>
-                  <input 
-                    value={billing.city || ''} 
-                    onChange={(e) => handleBillingChange('city', e.target.value)}
-                    className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-400 outline-none"
-                  />
-                </div>
-              </div>
+          <div>
+            <h3 className="font-bold text-slate-800">Fakturowanie</h3>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${status.color}`}>
+                {status.label}
+              </span>
+              {totalGross > 0 && (
+                <span className="text-sm text-slate-500 font-semibold">
+                  {totalGross.toFixed(2)} zł
+                </span>
               )}
             </div>
+          </div>
+        </div>
+        <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+          {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+        </button>
+      </div>
 
-            {/* Sekcja pozycji faktury */}
-            <div className="mb-6">
-              <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">POZYCJE FAKTURY</h5>
-              <div className="space-y-3">
-              {items.map((item, idx) => (
-                <div key={idx} className="flex flex-wrap sm:flex-nowrap gap-2 items-start">
-                  <div className="flex-1 min-w-[200px]">
-                    <input 
-                      value={item.name}
-                      onChange={(e) => updateItem(idx, 'name', e.target.value)}
-                      placeholder="Nazwa usługi..."
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm focus:border-blue-400 outline-none"
-                    />
+      {/* Rozwinięta zawartość */}
+      {isExpanded && (
+        <div className="border-t border-slate-100 p-4 space-y-4">
+          
+          {/* Wystawione dokumenty */}
+          {invoices.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Wystawione dokumenty</h4>
+              {invoices.map((inv) => (
+                <div key={inv.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <FileText className={`w-5 h-5 ${inv.type === 'proforma' ? 'text-orange-500' : 'text-blue-500'}`} />
+                    <div>
+                      <p className="font-bold text-sm text-slate-800">
+                        {inv.infaktNumber || inv.infakt_number || `#${inv.id}`}
+                      </p>
+                      <p className="text-[10px] text-slate-400 uppercase font-bold">
+                        {inv.type === 'proforma' ? 'Proforma' : 'Faktura VAT'} • {inv.status === 'paid' ? '✅ Opłacona' : 'Oczekuje'}
+                      </p>
+                    </div>
                   </div>
-                  <div className="w-16">
-                    <input 
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(idx, 'quantity', parseFloat(e.target.value))}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm text-center focus:border-blue-400 outline-none"
-                    />
-                  </div>
-                  <div className="w-28">
-                    <input 
-                      type="number"
-                      value={item.unitPriceNet}
-                      onChange={(e) => updateItem(idx, 'unitPriceNet', parseFloat(e.target.value))}
-                      placeholder="Netto"
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm text-right focus:border-blue-400 outline-none"
-                    />
-                  </div>
-                  <div className="w-20">
-                    <select
-                      value={item.vatRate}
-                      onChange={(e) => updateItem(idx, 'vatRate', parseInt(e.target.value))}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:border-blue-400 outline-none"
+                  <div className="flex gap-2">
+                    {inv.status !== 'paid' && (
+                      <button 
+                        onClick={() => handleMarkPaid(inv.id)}
+                        className="p-2 bg-white rounded-lg border border-slate-200 hover:border-green-300 text-slate-400 hover:text-green-600 transition-colors"
+                        title="Oznacz jako opłacone"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                    )}
+                    <a 
+                      href={invoiceService.getPdfUrl(inv.id)} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="p-2 bg-white rounded-lg border border-slate-200 hover:border-blue-300 text-slate-400 hover:text-blue-600 transition-colors"
+                      title="Pobierz PDF"
                     >
-                      <option value="23">23%</option>
-                      <option value="8">8%</option>
-                      <option value="5">5%</option>
-                      <option value="0">0%</option>
-                      <option value="-1">zw</option>
-                    </select>
+                      <Download className="w-4 h-4" />
+                    </a>
+                    {(inv.shareLink || inv.share_link) && (
+                      <a 
+                        href={inv.shareLink || inv.share_link} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="p-2 bg-white rounded-lg border border-slate-200 hover:border-indigo-300 text-slate-400 hover:text-indigo-600 transition-colors"
+                        title="Otwórz w inFakt"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
                   </div>
-                  <button 
-                    onClick={() => removeItem(idx)} 
-                    className="p-2 text-slate-300 hover:text-red-500 transition-colors"
-                    disabled={items.length <= 1}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 </div>
               ))}
-              
-              <button 
-                onClick={addItem}
-                className="flex items-center gap-1 text-[10px] font-black text-blue-600 uppercase tracking-wider hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-all border border-transparent hover:border-blue-100"
-              >
-                <Plus className="w-3 h-3" /> Dodaj pozycję
-              </button>
             </div>
-            </div>
+          )}
 
-            <div className="flex flex-col sm:flex-row justify-between items-center sm:items-end border-t border-slate-200 pt-4 mb-6 gap-4">
-              <div className="text-[10px] text-slate-400 font-bold uppercase space-y-1 w-full sm:w-auto text-center sm:text-left">
-                <p>Razem Netto: <span className="text-slate-600">{totalNet.toFixed(2)} zł</span></p>
-                <p className="text-sm text-slate-800">Razem Brutto: <span className="font-black text-blue-600">{totalGrossCalc.toFixed(2)} zł</span></p>
-              </div>
-              <div className="flex gap-3 w-full sm:w-auto">
-                <button 
-                  onClick={handleCreateProforma}
-                  disabled={isProcessing}
-                  className="flex-1 sm:flex-none px-6 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-slate-300 text-white text-xs font-black rounded-xl shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2 transition-all uppercase tracking-widest"
-                >
-                  {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  PROFORMA
-                </button>
-                <button 
-                  onClick={handleCreateInvoice}
-                  disabled={isProcessing}
-                  className="flex-1 sm:flex-none px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-xs font-black rounded-xl shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 transition-all uppercase tracking-widest"
-                >
-                  {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                  FAKTURA VAT
-                </button>
-              </div>
-            </div>
+          {/* Dane nabywcy - zawsze widoczne */}
+          {isAdmin && (
+            <>
+              <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+                <div className="flex justify-between items-start mb-3">
+                  <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-wider flex items-center gap-2">
+                    <Receipt className="w-4 h-4" /> Dane nabywcy do faktury
+                  </h4>
+                  <button
+                    onClick={() => setIsEditingBilling(!isEditingBilling)}
+                    className="text-[10px] font-bold px-2 py-1 rounded border transition-colors bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-100"
+                  >
+                    {isEditingBilling ? 'Zapisz' : 'Edytuj'}
+                  </button>
+                </div>
 
-            {(!billing.name || !billing.email) && (
-              <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-100 rounded-xl text-amber-700 text-[10px] font-bold uppercase leading-tight">
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <p>Brak pełnych danych nabywcy do faktury (nazwa firmy, email). Dokumenty mogą zostać wystawione błędnie w inFakt.</p>
+                {isEditingBilling ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="md:col-span-2">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Nazwa firmy / Nabywca</label>
+                      <input 
+                        value={billing.name || ''} 
+                        onChange={(e) => handleBillingChange('name', e.target.value)}
+                        className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
+                        placeholder="Nazwa firmy lub imię i nazwisko..."
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">NIP</label>
+                      <div className="flex gap-1 mt-1">
+                        <input 
+                          value={billing.nip || ''} 
+                          onChange={(e) => handleBillingChange('nip', e.target.value)}
+                          className="flex-1 p-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
+                          placeholder="0000000000"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleGusLookup}
+                          disabled={isProcessing}
+                          className="px-3 bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[10px] font-black hover:bg-indigo-200 transition-colors uppercase flex items-center gap-1"
+                        >
+                          <Search className="w-3 h-3" /> GUS
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Email do faktury</label>
+                      <input 
+                        value={billing.email || ''} 
+                        onChange={(e) => handleBillingChange('email', e.target.value)}
+                        className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
+                        placeholder="email@firma.pl"
+                      />
+                    </div>
+                    <div className="md:col-span-2 grid grid-cols-4 gap-2">
+                      <div className="col-span-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Ulica</label>
+                        <input 
+                          value={billing.street || ''} 
+                          onChange={(e) => handleBillingChange('street', e.target.value)}
+                          className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Nr</label>
+                        <input 
+                          value={billing.buildingNo || ''} 
+                          onChange={(e) => handleBillingChange('buildingNo', e.target.value)}
+                          className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-sm text-center focus:border-indigo-400 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Lok</label>
+                        <input 
+                          value={billing.apartmentNo || ''} 
+                          onChange={(e) => handleBillingChange('apartmentNo', e.target.value)}
+                          className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-sm text-center focus:border-indigo-400 outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Kod pocztowy</label>
+                      <input 
+                        value={billing.postCode || ''} 
+                        onChange={(e) => handleBillingChange('postCode', e.target.value)}
+                        className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
+                        placeholder="00-000"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Miasto</label>
+                      <input 
+                        value={billing.city || ''} 
+                        onChange={(e) => handleBillingChange('city', e.target.value)}
+                        className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-start gap-2">
+                      <span className="text-slate-400 w-16 flex-shrink-0">Nazwa:</span>
+                      <span className="font-semibold text-slate-800">{billing.name || <span className="text-red-400 italic">Brak</span>}</span>
+                    </div>
+                    {billing.nip && (
+                      <div className="flex items-start gap-2">
+                        <span className="text-slate-400 w-16 flex-shrink-0">NIP:</span>
+                        <span className="font-mono text-slate-700">{billing.nip}</span>
+                      </div>
+                    )}
+                    <div className="flex items-start gap-2">
+                      <span className="text-slate-400 w-16 flex-shrink-0">Adres:</span>
+                      <span className="text-slate-700">{formatBillingAddress()}</span>
+                    </div>
+                    {billing.email && (
+                      <div className="flex items-start gap-2">
+                        <span className="text-slate-400 w-16 flex-shrink-0">Email:</span>
+                        <span className="text-slate-700">{billing.email}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        )}
-      </div>
+
+              {/* Pozycje faktury */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Pozycje dokumentu</h4>
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowPresets(!showPresets)}
+                      className="flex items-center gap-1 text-sm font-bold text-indigo-600 hover:text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" /> Dodaj pozycję
+                    </button>
+                    
+                    {/* Dropdown z presetami */}
+                    {showPresets && (
+                      <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-10 p-2 space-y-1 animate-in fade-in slide-in-from-top-2">
+                        {PRESET_ITEMS.map((preset, i) => (
+                          <button
+                            key={i}
+                            onClick={() => addItem(preset)}
+                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 text-sm transition-colors"
+                          >
+                            <span className="font-medium text-slate-700">{preset.name}</span>
+                            <span className="text-slate-400 ml-2 text-xs">
+                              ({preset.unitPriceNet} zł)
+                            </span>
+                          </button>
+                        ))}
+                        <hr className="my-2 border-slate-100" />
+                        <button
+                          onClick={() => addItem()}
+                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-indigo-50 text-sm text-indigo-600 font-medium"
+                        >
+                          + Pusta pozycja
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Lista pozycji */}
+                {items.length === 0 ? (
+                  <div className="text-center py-6 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-xl">
+                    Kliknij "Dodaj pozycję" aby rozpocząć
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {items.map((item, index) => (
+                      <div key={index} className="p-3 bg-slate-50 rounded-xl space-y-2">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={item.name}
+                            onChange={(e) => updateItem(index, 'name', e.target.value)}
+                            className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
+                            placeholder="Nazwa usługi..."
+                          />
+                          <button
+                            onClick={() => removeItem(index)}
+                            className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase font-bold">Ilość</label>
+                            <input
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                              className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
+                              min="0"
+                              step="0.5"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase font-bold">Cena netto</label>
+                            <input
+                              type="number"
+                              value={item.unitPriceNet}
+                              onChange={(e) => updateItem(index, 'unitPriceNet', parseFloat(e.target.value) || 0)}
+                              className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
+                              min="0"
+                              step="10"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase font-bold">VAT</label>
+                            <select
+                              value={item.vatRate}
+                              onChange={(e) => updateItem(index, 'vatRate', parseInt(e.target.value))}
+                              className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-400 outline-none"
+                            >
+                              <option value="23">23%</option>
+                              <option value="8">8%</option>
+                              <option value="5">5%</option>
+                              <option value="0">0%</option>
+                              <option value="-1">zw.</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="text-right text-xs">
+                          <span className="text-slate-400">Wartość: </span>
+                          <span className="font-bold text-slate-700">
+                            {(item.quantity * item.unitPriceNet * (item.vatRate >= 0 ? (1 + item.vatRate / 100) : 1)).toFixed(2)} zł brutto
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Podsumowanie */}
+              {items.length > 0 && (
+                <>
+                  <div className="bg-indigo-50 rounded-xl p-4 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600">Netto:</span>
+                      <span className="font-semibold">{totalNet.toFixed(2)} zł</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600">VAT:</span>
+                      <span className="font-semibold">{totalVat.toFixed(2)} zł</span>
+                    </div>
+                    <div className="flex justify-between text-lg border-t border-indigo-200 pt-2">
+                      <span className="font-bold text-slate-800">Brutto:</span>
+                      <span className="font-black text-indigo-600">{totalGross.toFixed(2)} zł</span>
+                    </div>
+                  </div>
+
+                  {/* Przyciski wystawiania */}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleCreateDocument('proforma')}
+                      disabled={isProcessing}
+                      className="flex-1 py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg shadow-orange-500/25 disabled:opacity-50"
+                    >
+                      {isProcessing ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <>
+                          <Send className="w-5 h-5" />
+                          Proforma
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => handleCreateDocument('vat')}
+                      disabled={isProcessing}
+                      className="flex-1 py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/25 disabled:opacity-50"
+                    >
+                      {isProcessing ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <>
+                          <FileText className="w-5 h-5" />
+                          Faktura VAT
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {/* Dla nie-adminów - tylko podgląd */}
+          {!isAdmin && invoices.length === 0 && (
+            <div className="text-center py-4 text-slate-400 text-sm">
+              Brak dokumentów do wyświetlenia
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
