@@ -357,7 +357,7 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
             <Receipt className="w-5 h-5 text-indigo-600" />
           </div>
           <div>
-            <h3 className="font-bold text-slate-800">Fakturowanie</h3>
+            <h3 className="font-bold text-slate-800">FAKTUROWANIE (INFAKT)</h3>
             <div className="flex items-center gap-2 mt-0.5">
               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${statusBadge.bg} ${statusBadge.text}`}>
                 {statusBadge.label}
