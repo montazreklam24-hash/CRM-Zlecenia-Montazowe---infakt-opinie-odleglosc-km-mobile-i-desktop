@@ -970,6 +970,11 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   
   // Context Menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; job: Job } | null>(null);
+  
+  // Archive filters
+  const [archivePaymentFilter, setArchivePaymentFilter] = useState<PaymentStatus | 'all'>('all');
+  const [archiveReviewFilter, setArchiveReviewFilter] = useState<'all' | 'sent' | 'not_sent'>('all');
+  const [archivePaymentMenuOpen, setArchivePaymentMenuOpen] = useState<string | null>(null); // jobId dla otwartego menu płatności
 
   // Auto-Heal: Sprawdź zlecenia z adresem ale bez współrzędnych (tylko RAZ po załadowaniu)
   useEffect(() => {
@@ -1679,7 +1684,27 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       job.data.clientName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.data.address?.toLowerCase().includes(searchQuery.toLowerCase());
     
-    return matchesTab && matchesSearch;
+    // Archive filters
+    let matchesArchiveFilters = true;
+    if (activeTab === 'ARCHIVED') {
+      // Payment status filter
+      if (archivePaymentFilter !== 'all') {
+        const jobPaymentStatus = job.paymentStatus || PaymentStatus.NONE;
+        matchesArchiveFilters = matchesArchiveFilters && jobPaymentStatus === archivePaymentFilter;
+      }
+      
+      // Review status filter
+      if (archiveReviewFilter !== 'all') {
+        const reviewSent = !!job.reviewRequestSentAt;
+        if (archiveReviewFilter === 'sent') {
+          matchesArchiveFilters = matchesArchiveFilters && reviewSent;
+        } else if (archiveReviewFilter === 'not_sent') {
+          matchesArchiveFilters = matchesArchiveFilters && !reviewSent;
+        }
+      }
+    }
+    
+    return matchesTab && matchesSearch && matchesArchiveFilters;
   });
 
   const getJobsForColumn = (colId: JobColumnId) => {
@@ -1753,6 +1778,111 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             </button>
           )}
         </div>
+
+        {/* Archive Filters - Chips nad paskiem wyszukiwania */}
+        {activeTab === 'ARCHIVED' && (
+          <div className="flex flex-wrap items-center gap-2 px-1">
+            {/* Payment Status Filters */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Płatność:</span>
+              <button
+                onClick={() => setArchivePaymentFilter('all')}
+                className={`px-2.5 py-1 text-xs font-bold rounded-full transition-all ${
+                  archivePaymentFilter === 'all'
+                    ? 'bg-blue-500 text-white shadow-md'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Wszystkie
+              </button>
+              <button
+                onClick={() => setArchivePaymentFilter(PaymentStatus.PROFORMA)}
+                className={`px-2.5 py-1 text-xs font-bold rounded-full transition-all ${
+                  archivePaymentFilter === PaymentStatus.PROFORMA
+                    ? 'bg-orange-500 text-white shadow-md'
+                    : 'bg-orange-50 text-orange-600 hover:bg-orange-100'
+                }`}
+              >
+                Proforma
+              </button>
+              <button
+                onClick={() => setArchivePaymentFilter(PaymentStatus.PAID)}
+                className={`px-2.5 py-1 text-xs font-bold rounded-full transition-all ${
+                  archivePaymentFilter === PaymentStatus.PAID
+                    ? 'bg-green-500 text-white shadow-md'
+                    : 'bg-green-50 text-green-600 hover:bg-green-100'
+                }`}
+              >
+                Opłacone
+              </button>
+              <button
+                onClick={() => setArchivePaymentFilter(PaymentStatus.PARTIAL)}
+                className={`px-2.5 py-1 text-xs font-bold rounded-full transition-all ${
+                  archivePaymentFilter === PaymentStatus.PARTIAL
+                    ? 'bg-purple-500 text-white shadow-md'
+                    : 'bg-purple-50 text-purple-600 hover:bg-purple-100'
+                }`}
+              >
+                Zaliczka
+              </button>
+              <button
+                onClick={() => setArchivePaymentFilter(PaymentStatus.CASH)}
+                className={`px-2.5 py-1 text-xs font-bold rounded-full transition-all ${
+                  archivePaymentFilter === PaymentStatus.CASH
+                    ? 'bg-yellow-500 text-white shadow-md'
+                    : 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
+                }`}
+              >
+                Barter
+              </button>
+              <button
+                onClick={() => setArchivePaymentFilter(PaymentStatus.OVERDUE)}
+                className={`px-2.5 py-1 text-xs font-bold rounded-full transition-all ${
+                  archivePaymentFilter === PaymentStatus.OVERDUE
+                    ? 'bg-red-500 text-white shadow-md'
+                    : 'bg-red-50 text-red-600 hover:bg-red-100'
+                }`}
+              >
+                Przeterminowane
+              </button>
+            </div>
+            
+            {/* Review Status Filters */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-semibold ml-2" style={{ color: 'var(--text-secondary)' }}>Opinia:</span>
+              <button
+                onClick={() => setArchiveReviewFilter('all')}
+                className={`px-2.5 py-1 text-xs font-bold rounded-full transition-all ${
+                  archiveReviewFilter === 'all'
+                    ? 'bg-blue-500 text-white shadow-md'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Wszystkie
+              </button>
+              <button
+                onClick={() => setArchiveReviewFilter('sent')}
+                className={`px-2.5 py-1 text-xs font-bold rounded-full transition-all flex items-center gap-1 ${
+                  archiveReviewFilter === 'sent'
+                    ? 'bg-green-500 text-white shadow-md'
+                    : 'bg-green-50 text-green-600 hover:bg-green-100'
+                }`}
+              >
+                <ThumbsUp className="w-3 h-3" /> Wystawiona
+              </button>
+              <button
+                onClick={() => setArchiveReviewFilter('not_sent')}
+                className={`px-2.5 py-1 text-xs font-bold rounded-full transition-all flex items-center gap-1 ${
+                  archiveReviewFilter === 'not_sent'
+                    ? 'bg-red-500 text-white shadow-md'
+                    : 'bg-red-50 text-red-600 hover:bg-red-100'
+                }`}
+              >
+                <ThumbsDown className="w-3 h-3" /> Nie wystawiona
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Row 2: Search & Actions */}
         <div className="flex items-center gap-2 overflow-x-auto">
@@ -1863,8 +1993,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                   {dateKey}
                 </h3>
                 
-                {/* Lista zleceń z tego dnia */}
-                <div className="space-y-2">
+                {/* Lista zleceń z tego dnia - poziomo */}
+                <div className="flex flex-wrap gap-2">
                   {dayJobs.map(job => {
                     const imgUrl = job.projectImages?.[0] || job.completionImages?.[0];
                     const reviewRequestSent = !!job.reviewRequestSentAt;
@@ -1873,7 +2003,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                     return (
                       <div 
                         key={job.id}
-                        className="theme-card flex gap-4 p-4 hover:shadow-lg transition-all group"
+                        className="theme-card flex gap-4 p-4 hover:shadow-lg transition-all group min-w-[320px] max-w-[400px] flex-1"
                         style={{ borderRadius: 'var(--radius-lg)' }}
                       >
                         {/* Miniaturka kwadratowa po lewej */}
@@ -1908,28 +2038,66 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                         </div>
                         
                         {/* Przyciski po prawej */}
-                        <div className="flex items-center gap-3 flex-shrink-0">
+                        <div className="flex items-center gap-2 flex-shrink-0">
                           {/* Kciuk w górę/dół - status opinii */}
                           <button
-                            onClick={(e) => handleToggleReviewRequest(e, job.id)}
+                            onClick={(e) => { e.stopPropagation(); handleToggleReviewRequest(e, job.id); }}
                             className={`p-2 rounded-lg transition-all hover:scale-110 ${
                               reviewRequestSent 
                                 ? 'bg-green-100 text-green-600 hover:bg-green-200' 
-                                : 'bg-orange-100 text-blue-600 hover:bg-orange-200'
+                                : 'bg-red-100 text-red-600 hover:bg-red-200'
                             }`}
                             title={reviewRequestSent ? 'Prośba o opinię wysłana (kliknij aby odznaczyć)' : 'Prośba o opinię nie wysłana (kliknij aby oznaczyć)'}
                           >
                             {reviewRequestSent ? (
                               <ThumbsUp className="w-5 h-5 fill-current" />
                             ) : (
-                              <ThumbsDown className="w-5 h-5 fill-current" />
+                              <ThumbsDown className="w-5 h-5 fill-current text-red-600" />
                             )}
                           </button>
                           
-                          {/* Status opłacenia */}
-                          <div className="flex flex-col items-end">
-                            <PaymentStatusBadge status={paymentStatus} size="sm" />
+                          {/* Status płatności - klikalny przycisk z menu */}
+                          <div className="relative">
+                            <button
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setArchivePaymentMenuOpen(archivePaymentMenuOpen === job.id ? null : job.id);
+                              }}
+                              className="transition-all hover:scale-105"
+                            >
+                              <PaymentStatusBadge status={paymentStatus} size="sm" />
+                            </button>
+                            
+                            {/* Menu zmiany statusu płatności */}
+                            {archivePaymentMenuOpen === job.id && (
+                              <PaymentStatusMiniMenu
+                                currentStatus={paymentStatus}
+                                onSelect={async (newStatus) => {
+                                  await handlePaymentStatusChange(job.id, newStatus);
+                                  setArchivePaymentMenuOpen(null);
+                                }}
+                                onClose={() => setArchivePaymentMenuOpen(null)}
+                                position="bottom"
+                              />
+                            )}
                           </div>
+                          
+                          {/* Ikona kosza - trwałe usunięcie */}
+                          {isAdmin && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const jobName = job.data.jobTitle || job.friendlyId || 'to zlecenie';
+                                if (window.confirm(`🗑️ Czy na pewno chcesz TRWALE USUNĄĆ zlecenie z archiwum?\n\n"${jobName}"\n\nTej operacji nie można cofnąć!`)) {
+                                  handleDelete(job.id, e);
+                                }
+                              }}
+                              className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all hover:scale-110"
+                              title="Trwale usuń z archiwum"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
