@@ -79,7 +79,7 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
   onClientDataChange,
   billing
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLookingUp, setIsLookingUp] = useState(false);
