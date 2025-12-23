@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import ThemeSwitcher from './ThemeSwitcher';
@@ -23,6 +23,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
   const { isMobile } = useDeviceType();
   const urlParams = new URLSearchParams(window.location.search);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const sidebarCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const userRoleName = user?.role ? ROLE_NAMES[user.role] : 'Użytkownik';
 
@@ -185,11 +186,29 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{ background: 'var(--bg-surface)' }}
+        onMouseLeave={() => {
+          // Auto-zamknij po 2-3 sekundach gdy kursor opuści menu
+          if (sidebarCloseTimeoutRef.current) {
+            clearTimeout(sidebarCloseTimeoutRef.current);
+          }
+          sidebarCloseTimeoutRef.current = setTimeout(() => {
+            setIsSidebarOpen(false);
+            sidebarCloseTimeoutRef.current = null;
+          }, 2500);
+        }}
+        onMouseEnter={() => {
+          // Anuluj timeout jeśli kursor wróci
+          if (sidebarCloseTimeoutRef.current) {
+            clearTimeout(sidebarCloseTimeoutRef.current);
+            sidebarCloseTimeoutRef.current = null;
+          }
+        }}
       >
         <Sidebar 
           onLogout={onLogout} 
           showLogo={false} 
-          className="h-full border-none shadow-none w-full" 
+          className="h-full border-none shadow-none w-full"
+          onNavigate={() => setIsSidebarOpen(false)}
         />
       </div>
 

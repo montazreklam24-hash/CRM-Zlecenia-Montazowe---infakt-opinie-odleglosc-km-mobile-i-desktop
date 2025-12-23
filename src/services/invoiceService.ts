@@ -242,6 +242,21 @@ export const invoiceService = {
       method: 'GET',
     });
   },
+
+  /**
+   * Synchronizuj status wszystkich faktur z inFakt
+   */
+  async syncStatus(): Promise<{
+    success: boolean;
+    total: number;
+    updated: number;
+    errors: number;
+    message: string;
+  }> {
+    return apiRequest<any>('/invoices/sync-status', {
+      method: 'POST',
+    });
+  },
 };
 
 export default invoiceService;

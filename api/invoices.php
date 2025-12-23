@@ -491,6 +491,78 @@ function handleCheckStatus($invoiceId) {
 }
 
 /**
+ * POST /api/invoices/sync-status
+ * Synchronizuj status wszystkich faktur z inFakt
+ * Sprawdza status płatności w inFakt i aktualizuje lokalną bazę danych
+ */
+function handleSyncStatus() {
+    $user = requireAuth();
+    
+    try {
+        $pdo = getDB();
+        createInvoicesTable($pdo);
+        
+        // Pobierz wszystkie faktury z infakt_id
+        $stmt = $pdo->prepare("
+            SELECT id, infakt_id, status 
+            FROM invoices 
+            WHERE infakt_id IS NOT NULL AND infakt_id > 0
+            ORDER BY created_at DESC
+        ");
+        $stmt->execute();
+        $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $infakt = getInfaktClient();
+        $updated = 0;
+        $errors = 0;
+        
+        foreach ($invoices as $inv) {
+            try {
+                $infaktInvoice = $infakt->getInvoice($inv['infakt_id']);
+                
+                if (!$infaktInvoice) {
+                    $errors++;
+                    continue;
+                }
+                
+                // Mapuj status z inFakt na lokalny status
+                $paymentStatus = isset($infaktInvoice['payment_status']) ? $infaktInvoice['payment_status'] : 'unpaid';
+                $localStatus = 'pending';
+                
+                if ($paymentStatus === 'paid') {
+                    $localStatus = 'paid';
+                } elseif ($paymentStatus === 'partially_paid') {
+                    $localStatus = 'pending'; // Częściowo opłacone = nadal oczekuje
+                }
+                
+                // Aktualizuj tylko jeśli status się zmienił
+                if ($inv['status'] !== $localStatus) {
+                    $updateStmt = $pdo->prepare("UPDATE invoices SET status = ? WHERE id = ?");
+                    $updateStmt->execute(array($localStatus, $inv['id']));
+                    $updated++;
+                }
+                
+            } catch (Exception $e) {
+                error_log("Sync status error for invoice {$inv['id']}: " . $e->getMessage());
+                $errors++;
+            }
+        }
+        
+        jsonResponse(array(
+            'success' => true,
+            'total' => count($invoices),
+            'updated' => $updated,
+            'errors' => $errors,
+            'message' => "Zsynchronizowano {$updated} faktur"
+        ));
+        
+    } catch (Exception $e) {
+        error_log('Sync status error: ' . $e->getMessage());
+        jsonResponse(array('error' => 'Błąd synchronizacji: ' . $e->getMessage()), 500);
+    }
+}
+
+/**
  * Pobierz faktury dla zlecenia
  */
 function handleGetJobInvoices($jobId) {
@@ -661,6 +733,9 @@ function handleInvoices($method, $id = null) {
             case 'mark-paid':
                 handleMarkAsPaid();
                 break;
+            case 'sync-status':
+                handleSyncStatus();
+                break;
             default:
                 // Domyślnie POST bez akcji = proforma
                 handleCreateProforma();
@@ -710,6 +785,8 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'invoices.php') {
             handleSendInvoice();
         } elseif ($uri === 'mark-paid' || $uri === 'invoices/mark-paid') {
             handleMarkAsPaid();
+        } elseif ($uri === 'sync-status' || $uri === 'invoices/sync-status') {
+            handleSyncStatus();
         } else {
             handleCreateProforma();
         }

@@ -1,17 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, ExternalLink, Loader2, CheckCircle2, Search, Filter, ArrowUpRight } from 'lucide-react';
+import { FileText, Download, ExternalLink, Loader2, CheckCircle2, Search, Filter, ArrowUpRight, RefreshCw } from 'lucide-react';
 import invoiceService from '../services/invoiceService';
 import { Invoice } from '../types';
 
 const InvoicingPage: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [filterType, setTypeFilter] = useState<'all' | 'proforma' | 'vat'>('all');
   const [search, setSearch] = useState('');
 
   useEffect(() => {
     fetchInvoices();
+    // Automatyczna synchronizacja przy pierwszym załadowaniu
+    syncStatus();
   }, [filterType]);
+
+  const syncStatus = async () => {
+    setSyncing(true);
+    try {
+      const result = await invoiceService.syncStatus();
+      if (result.success) {
+        // Odśwież listę faktur po synchronizacji
+        await fetchInvoices();
+        if (result.updated > 0) {
+          alert(`Zsynchronizowano ${result.updated} faktur z inFakt`);
+        }
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const fetchInvoices = async () => {
     setLoading(true);
@@ -46,12 +67,23 @@ const InvoicingPage: React.FC = () => {
     inv.jobFriendlyId?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const proformas = filteredInvoices.filter(inv => inv.type === 'proforma');
-  const vatInvoices = filteredInvoices.filter(inv => inv.type === 'invoice');
+  // Filtruj według wybranego typu widoku
+  const displayedInvoices = filterType === 'all' 
+    ? filteredInvoices 
+    : filteredInvoices.filter(inv => 
+        filterType === 'proforma' ? inv.type === 'proforma' : inv.type === 'invoice'
+      );
+
+  // Sortowanie: najnowsze na górze
+  const sortedInvoices = [...displayedInvoices].sort((a, b) => {
+    const dateA = new Date(a.createdAt).getTime();
+    const dateB = new Date(b.createdAt).getTime();
+    return dateB - dateA;
+  });
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Fakturowanie</h1>
           <p className="text-slate-500 text-sm">Zarządzaj proformami i fakturami VAT z inFakt</p>
@@ -68,16 +100,50 @@ const InvoicingPage: React.FC = () => {
               className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:border-blue-500 outline-none transition-all shadow-sm"
             />
           </div>
-          
-          <select 
-            value={filterType}
-            onChange={(e) => setTypeFilter(e.target.value as any)}
-            className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none shadow-sm"
+          <button
+            onClick={syncStatus}
+            disabled={syncing || loading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <option value="all">Wszystkie typy</option>
-            <option value="proforma">Tylko Proformy</option>
-            <option value="vat">Tylko Faktury VAT</option>
-          </select>
+            <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
+            {syncing ? 'Synchronizacja...' : 'Odśwież status'}
+          </button>
+        </div>
+      </div>
+
+      {/* Przełącznik widoku Proformy / Faktury VAT */}
+      <div className="mb-6">
+        <div className="inline-flex rounded-lg p-1 bg-slate-100 border border-slate-200">
+          <button
+            onClick={() => setTypeFilter('proforma')}
+            className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${
+              filterType === 'proforma'
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-800'
+            }`}
+          >
+            Proformy
+          </button>
+          <button
+            onClick={() => setTypeFilter('vat')}
+            className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${
+              filterType === 'vat'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-800'
+            }`}
+          >
+            Faktury VAT
+          </button>
+          <button
+            onClick={() => setTypeFilter('all')}
+            className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${
+              filterType === 'all'
+                ? 'bg-slate-700 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-800'
+            }`}
+          >
+            Wszystkie
+          </button>
         </div>
       </div>
 
@@ -87,126 +153,137 @@ const InvoicingPage: React.FC = () => {
           <p className="text-slate-500 font-medium">Pobieram dokumenty...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* PROFORMY */}
-          <section>
-            <div className="flex items-center justify-between mb-4 px-2">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-6 bg-orange-500 rounded-full"></div>
-                <h2 className="font-black text-slate-800 uppercase tracking-wider">Proformy ({proformas.length})</h2>
-              </div>
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+          {/* Nagłówek listy */}
+          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+            <div className="grid grid-cols-12 gap-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
+              <div className="col-span-3">Numer</div>
+              <div className="col-span-3">Zlecenie</div>
+              <div className="col-span-2">Data</div>
+              <div className="col-span-2 text-right">Kwota</div>
+              <div className="col-span-2 text-right">Status</div>
             </div>
-            
-            <div className="space-y-3">
-              {proformas.length > 0 ? proformas.map(inv => (
-                <InvoiceCard key={inv.id} inv={inv} onMarkPaid={handleMarkPaid} />
-              )) : (
-                <div className="p-8 text-center bg-white rounded-2xl border-2 border-dashed border-slate-100 text-slate-400 text-sm">
-                  Brak proform pasujących do filtrów.
-                </div>
-              )}
-            </div>
-          </section>
+          </div>
 
-          {/* FAKTURY VAT */}
-          <section>
-            <div className="flex items-center justify-between mb-4 px-2">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-6 bg-blue-600 rounded-full"></div>
-                <h2 className="font-black text-slate-800 uppercase tracking-wider">Faktury VAT ({vatInvoices.length})</h2>
+          {/* Lista faktur */}
+          <div className="divide-y divide-slate-100">
+            {sortedInvoices.length > 0 ? (
+              sortedInvoices.map(inv => (
+                <InvoiceRow key={inv.id} inv={inv} onMarkPaid={handleMarkPaid} />
+              ))
+            ) : (
+              <div className="p-12 text-center text-slate-400 text-sm">
+                Brak dokumentów pasujących do filtrów.
               </div>
-            </div>
-            
-            <div className="space-y-3">
-              {vatInvoices.length > 0 ? vatInvoices.map(inv => (
-                <InvoiceCard key={inv.id} inv={inv} onMarkPaid={handleMarkPaid} />
-              )) : (
-                <div className="p-8 text-center bg-white rounded-2xl border-2 border-dashed border-slate-100 text-slate-400 text-sm">
-                  Brak faktur VAT pasujących do filtrów.
-                </div>
-              )}
-            </div>
-          </section>
+            )}
+          </div>
         </div>
       )}
     </div>
   );
 };
 
-const InvoiceCard = ({ inv, onMarkPaid }: { inv: any, onMarkPaid: (id: number) => void }) => (
-  <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all group">
-    <div className="flex justify-between items-start mb-3">
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-xl ${inv.type === 'proforma' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>
-          <FileText size={20} />
-        </div>
-        <div>
-          <h3 className="font-black text-slate-800">{inv.infaktNumber || `#${inv.id}`}</h3>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-            {new Date(inv.createdAt).toLocaleDateString()} • {inv.totalGross.toFixed(2)} zł
-          </p>
-        </div>
-      </div>
-      
-      <div className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-tighter border ${
-        inv.status === 'paid' 
-          ? 'bg-green-50 text-green-600 border-green-100' 
-          : 'bg-slate-50 text-slate-500 border-slate-100'
-      }`}>
-        {inv.status === 'paid' ? 'Opłacona' : 'Oczekuje'}
-      </div>
-    </div>
-
-    <div className="mb-4 p-3 bg-slate-50 rounded-xl border border-slate-100/50">
-      <div className="flex items-center justify-between text-xs mb-1">
-        <span className="text-slate-400 font-bold uppercase tracking-tighter">Zlecenie</span>
-        <span className="text-blue-600 font-bold">{inv.jobFriendlyId}</span>
-      </div>
-      <p className="text-sm font-semibold text-slate-700 truncate">{inv.jobTitle}</p>
-    </div>
-
-    <div className="flex items-center gap-2 pt-2 border-t border-slate-50">
-      {inv.status !== 'paid' && (
-        <button 
-          onClick={() => onMarkPaid(inv.id)}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-black text-green-600 hover:bg-green-50 rounded-lg transition-all uppercase tracking-widest"
-        >
-          <CheckCircle2 size={14} /> Opłacona
-        </button>
-      )}
-      <a 
-        href={invoiceService.getPdfUrl(inv.id)} 
-        target="_blank" 
-        rel="noreferrer"
-        className="flex items-center justify-center gap-1.5 p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-        title="Pobierz PDF"
+const InvoiceRow = ({ inv, onMarkPaid }: { inv: any, onMarkPaid: (id: number) => void }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  return (
+    <div className="hover:bg-slate-50 transition-colors">
+      <div 
+        className="px-6 py-4 grid grid-cols-12 gap-4 items-center cursor-pointer"
+        onClick={() => setIsExpanded(!isExpanded)}
       >
-        <Download size={18} />
-      </a>
-      {inv.shareLink && (
-        <a 
-          href={inv.shareLink} 
-          target="_blank" 
-          rel="noreferrer"
-          className="flex items-center justify-center gap-1.5 p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-          title="Otwórz w inFakt"
-        >
-          <ExternalLink size={18} />
-        </a>
+        {/* Numer */}
+        <div className="col-span-3 flex items-center gap-3">
+          <div className={`p-1.5 rounded-lg ${inv.type === 'proforma' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>
+            <FileText size={16} />
+          </div>
+          <div>
+            <div className="font-bold text-slate-800">{inv.infaktNumber || `#${inv.id}`}</div>
+            <div className="text-xs text-slate-400 uppercase tracking-tighter">
+              {inv.type === 'proforma' ? 'Proforma' : 'Faktura VAT'}
+            </div>
+          </div>
+        </div>
+
+        {/* Zlecenie */}
+        <div className="col-span-3">
+          <div className="text-sm font-semibold text-slate-800 truncate">{inv.jobTitle || '-'}</div>
+          <div className="text-xs text-blue-600 font-bold">{inv.jobFriendlyId || '-'}</div>
+        </div>
+
+        {/* Data */}
+        <div className="col-span-2">
+          <div className="text-sm text-slate-600">{new Date(inv.createdAt).toLocaleDateString('pl-PL')}</div>
+        </div>
+
+        {/* Kwota */}
+        <div className="col-span-2 text-right">
+          <div className="font-bold text-slate-800">{inv.totalGross?.toFixed(2) || '0.00'} zł</div>
+        </div>
+
+        {/* Status */}
+        <div className="col-span-2 text-right">
+          <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
+            inv.status === 'paid' 
+              ? 'bg-green-50 text-green-600' 
+              : 'bg-slate-100 text-slate-600'
+          }`}>
+            {inv.status === 'paid' && <CheckCircle2 size={12} />}
+            {inv.status === 'paid' ? 'Opłacona' : 'Oczekuje'}
+          </div>
+        </div>
+      </div>
+
+      {/* Rozwinięte szczegóły */}
+      {isExpanded && (
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
+          <div className="flex items-center gap-3 flex-wrap">
+            {inv.status !== 'paid' && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMarkPaid(inv.id);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-colors"
+              >
+                <CheckCircle2 size={16} /> Oznacz jako opłaconą
+              </button>
+            )}
+            <a 
+              href={invoiceService.getPdfUrl(inv.id)} 
+              target="_blank" 
+              rel="noreferrer"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Download size={16} /> Pobierz PDF
+            </a>
+            {inv.shareLink && (
+              <a 
+                href={inv.shareLink} 
+                target="_blank" 
+                rel="noreferrer"
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <ExternalLink size={16} /> Otwórz w inFakt
+              </a>
+            )}
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                window.location.href = `/?job=${inv.jobId}`;
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors"
+            >
+              <ArrowUpRight size={16} /> Idź do zlecenia
+            </button>
+          </div>
+        </div>
       )}
-      <button 
-        onClick={() => {
-          // TODO: Nawiguj do zlecenia
-          window.location.href = `/?job=${inv.jobId}`;
-        }}
-        className="flex items-center justify-center gap-1.5 p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-        title="Idź do zlecenia"
-      >
-        <ArrowUpRight size={18} />
-      </button>
     </div>
-  </div>
-);
+  );
+};
 
 export default InvoicingPage;
 

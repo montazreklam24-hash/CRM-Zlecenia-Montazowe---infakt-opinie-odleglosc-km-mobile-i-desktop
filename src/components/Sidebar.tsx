@@ -6,6 +6,7 @@ interface SidebarProps {
   onLogout?: () => void;
   className?: string;
   showLogo?: boolean;
+  onNavigate?: () => void; // Callback gdy użytkownik kliknie link nawigacyjny
 }
 
 interface NavSection {
@@ -18,7 +19,7 @@ interface NavSection {
   }[];
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex', showLogo = true }) => {
+const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex', showLogo = true, onNavigate }) => {
   // Mapowanie polskich nazw sekcji na klucze
   const getSectionKey = (title: string): string => {
     const mapping: Record<string, string> = {
@@ -122,6 +123,12 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
                     <NavLink
                       key={item.to}
                       to={item.to}
+                      onClick={() => {
+                        // Zamknij menu natychmiast po kliknięciu linku
+                        if (onNavigate) {
+                          onNavigate();
+                        }
+                      }}
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                           isActive ? 'shadow-sm font-medium' : 'hover:opacity-80'
