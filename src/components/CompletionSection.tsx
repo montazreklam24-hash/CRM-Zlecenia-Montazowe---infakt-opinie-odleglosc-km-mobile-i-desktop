@@ -96,8 +96,6 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
       }
     }, 100);
     
-    return () => clearTimeout(timeoutId);
-    
     const handlePaste = (e: ClipboardEvent) => {
       const activeElement = document.activeElement;
       
@@ -154,7 +152,10 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
     };
 
     document.addEventListener('paste', handlePaste, true); // capture phase
-    return () => document.removeEventListener('paste', handlePaste, true);
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('paste', handlePaste, true);
+    };
   }, [processFiles, isExpanded]);
 
   // Drag and drop handlers

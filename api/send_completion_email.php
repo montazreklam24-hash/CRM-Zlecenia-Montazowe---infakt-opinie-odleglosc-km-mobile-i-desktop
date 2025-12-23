@@ -19,9 +19,16 @@
 
 // Wyłącz wyświetlanie błędów HTML - zawsze zwracaj JSON
 ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
 // Włącz logowanie błędów do error_log
 error_reporting(E_ALL);
 ini_set('log_errors', 1);
+
+// Wyłącz output buffering i wyczyść wszelki output
+if (ob_get_level()) {
+    ob_end_clean();
+}
+ob_start();
 
 // Ustaw header JSON od razu
 header('Content-Type: application/json; charset=utf-8');
@@ -139,6 +146,11 @@ if ($phpmailerLoaded) {
         $result = $mail->send();
         error_log("PHPMailer: Email wysłany pomyślnie do $toEmail");
         
+        // Wyczyść output buffer przed zwróceniem JSON
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        
     } catch (Exception $e) {
         error_log("PHPMailer Error: " . $mail->ErrorInfo);
         jsonResponse([
@@ -230,6 +242,11 @@ if (isset($result) && $result) {
     } catch (Exception $e) {
         // Loguj błąd ale nie przerywaj - mail został wysłany
         error_log("Błąd zapisu review_request: " . $e->getMessage());
+    }
+    
+    // Wyczyść output buffer przed zwróceniem JSON
+    if (ob_get_level()) {
+        ob_end_clean();
     }
     
     jsonResponse([
