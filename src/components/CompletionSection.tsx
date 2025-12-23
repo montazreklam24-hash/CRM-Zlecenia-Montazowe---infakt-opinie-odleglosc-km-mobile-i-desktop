@@ -80,62 +80,14 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
   useEffect(() => {
     if (!isExpanded) return; // Nie aktywuj paste gdy sekcja jest zwinięta
     
-    // Ustaw focus na dropZoneRef po rozwinięciu, żeby Ctrl+V działało od razu
-    // Używamy setTimeout żeby upewnić się że sekcja jest już wyrenderowana
-    const timeoutId = setTimeout(() => {
-      if (dropZoneRef.current) {
-        const activeElement = document.activeElement;
-        // Ustaw focus tylko jeśli nie ma już focusu na polu tekstowym
-        if (!activeElement || (
-          activeElement.tagName !== 'TEXTAREA' && 
-          activeElement.tagName !== 'INPUT' &&
-          activeElement.getAttribute('contenteditable') !== 'true'
-        )) {
-          dropZoneRef.current.focus();
-        }
-      }
-    }, 100);
-    
     const handlePaste = (e: ClipboardEvent) => {
-      const activeElement = document.activeElement;
+      // Sprawdź czy sekcja completion jest widoczna
+      if (!dropZoneRef.current) return;
       
-      // Jeśli użytkownik jest w polu tekstowym POZA sekcją completion, nie przechwytuj paste
-      if (activeElement && (
-        activeElement.tagName === 'TEXTAREA' || 
-        activeElement.tagName === 'INPUT' ||
-        activeElement.getAttribute('contenteditable') === 'true'
-      )) {
-        // Sprawdź czy to pole tekstowe jest w sekcji completion
-        if (dropZoneRef.current && dropZoneRef.current.contains(activeElement as Node)) {
-          // Jeśli to pole tekstowe w sekcji completion (np. uwagi), sprawdź czy są zdjęcia
-          const items = e.clipboardData?.items;
-          if (!items) return;
-
-          const imageFiles: File[] = [];
-          for (let i = 0; i < items.length; i++) {
-            if (items[i].type.startsWith('image/')) {
-              const file = items[i].getAsFile();
-              if (file) imageFiles.push(file);
-            }
-          }
-
-          // Jeśli są zdjęcia, przechwytuj paste nawet w polu tekstowym w sekcji completion
-          if (imageFiles.length > 0) {
-            e.preventDefault();
-            e.stopPropagation();
-            processFiles(imageFiles);
-          }
-          return; // Jeśli nie ma zdjęć, pozwól na normalne paste tekstu
-        }
-        // Jeśli pole tekstowe jest POZA sekcją completion, nie przechwytuj paste
-        return;
-      }
-      
-      // Jeśli sekcja jest rozwinięta i użytkownik nie jest w polu tekstowym, przechwytuj paste
-      // (nie sprawdzamy czy focus jest w dropZoneRef - działa zawsze gdy sekcja rozwinięta)
       const items = e.clipboardData?.items;
       if (!items) return;
 
+      // Sprawdź czy są zdjęcia w schowku
       const imageFiles: File[] = [];
       for (let i = 0; i < items.length; i++) {
         if (items[i].type.startsWith('image/')) {
@@ -144,16 +96,33 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
         }
       }
 
+      // Jeśli są zdjęcia, sprawdź czy użytkownik jest w sekcji completion
       if (imageFiles.length > 0) {
+        const activeElement = document.activeElement;
+        
+        // Jeśli użytkownik jest w polu tekstowym POZA sekcją completion, nie przechwytuj
+        if (activeElement && (
+          activeElement.tagName === 'TEXTAREA' || 
+          activeElement.tagName === 'INPUT' ||
+          activeElement.getAttribute('contenteditable') === 'true'
+        )) {
+          // Sprawdź czy pole tekstowe jest w sekcji completion
+          if (!dropZoneRef.current.contains(activeElement as Node)) {
+            return; // Pole tekstowe jest POZA sekcją completion - nie przechwytuj
+          }
+        }
+        
+        // Przechwytuj paste dla zdjęć w sekcji completion
         e.preventDefault();
         e.stopPropagation();
         processFiles(imageFiles);
       }
     };
 
-    document.addEventListener('paste', handlePaste, true); // capture phase
+    // Dodaj listener na całym dokumencie w capture phase (działa niezależnie od focusu)
+    document.addEventListener('paste', handlePaste, true);
+    
     return () => {
-      clearTimeout(timeoutId);
       document.removeEventListener('paste', handlePaste, true);
     };
   }, [processFiles, isExpanded]);

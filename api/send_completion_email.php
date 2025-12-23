@@ -51,15 +51,12 @@ require_once __DIR__ . '/config.php';
 // Załaduj PHPMailer jeśli jest dostępny
 $phpmailerLoaded = false;
 if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
-    require_once __DIR__ . '/../vendor/autoload.php';
-    $phpmailerLoaded = true;
+    @require_once __DIR__ . '/../vendor/autoload.php';
+    $phpmailerLoaded = class_exists('PHPMailer\PHPMailer\PHPMailer');
 } elseif (file_exists(__DIR__ . '/vendor/autoload.php')) {
-    require_once __DIR__ . '/vendor/autoload.php';
-    $phpmailerLoaded = true;
+    @require_once __DIR__ . '/vendor/autoload.php';
+    $phpmailerLoaded = class_exists('PHPMailer\PHPMailer\PHPMailer');
 }
-
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
 
 handleCORS();
 
@@ -108,7 +105,7 @@ error_log("PHPMailer dostępny: " . ($phpmailerLoaded ? 'TAK' : 'NIE'));
 // Użyj PHPMailer jeśli jest dostępny, w przeciwnym razie fallback do mail()
 if ($phpmailerLoaded) {
     try {
-        $mail = new PHPMailer(true);
+        $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
         
         // Konfiguracja SMTP
         $mail->isSMTP();
@@ -151,7 +148,11 @@ if ($phpmailerLoaded) {
             ob_end_clean();
         }
         
-    } catch (Exception $e) {
+    } catch (\Exception $e) {
+        // Wyczyść output buffer przed zwróceniem błędu
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
         error_log("PHPMailer Error: " . $mail->ErrorInfo);
         jsonResponse([
             'success' => false,
