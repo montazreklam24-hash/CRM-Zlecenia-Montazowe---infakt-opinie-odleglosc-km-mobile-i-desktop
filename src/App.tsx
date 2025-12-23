@@ -56,16 +56,26 @@ const App: React.FC = () => {
   useEffect(() => {
     // Obsługa przycisku wstecz w przeglądarce
     const handlePopState = (e: PopStateEvent) => {
-      // Jeśli wracamy z modala, zamknij go
-      if (state.activeModal !== 'NONE') {
-        setState(prev => ({
-          ...prev,
-          activeModal: 'NONE',
-          selectedJob: null,
-          tempJobData: null,
-          selectedImages: [],
-          error: null
-        }));
+      // Sprawdź czy w URL jest jobId
+      const params = new URLSearchParams(window.location.search);
+      const jobId = params.get('job');
+      
+      // Jeśli nie ma jobId w URL, zamknij modal (użytkownik kliknął wstecz)
+      if (!jobId) {
+        setState(prev => {
+          // Zamknij modal tylko jeśli był otwarty
+          if (prev.activeModal !== 'NONE') {
+            return {
+              ...prev,
+              activeModal: 'NONE',
+              selectedJob: null,
+              tempJobData: null,
+              selectedImages: [],
+              error: null
+            };
+          }
+          return prev;
+        });
         setDashboardRefreshTrigger(prev => prev + 1);
       }
     };
@@ -104,9 +114,9 @@ const App: React.FC = () => {
       return () => window.removeEventListener('popstate', handlePopState);
     }
     
-    // Oryginalny kod dla jobId z URL
+    // Oryginalny kod dla jobId z URL - tylko jeśli nie ma już otwartego modala
     const jobId = params.get('job');
-    if (jobId && state.user) {
+    if (jobId && state.user && state.activeModal === 'NONE') {
       // Sprawdź czy zlecenie jest z archiwum
       jobsService.getJob(jobId).then(job => {
         if (job) {
@@ -138,19 +148,11 @@ const App: React.FC = () => {
   };
 
   const closeModal = () => {
-    // Jeśli był otwarty modal, usuń go z historii przeglądarki (cofnij o 1)
-    if (state.activeModal !== 'NONE') {
-      // Sprawdź czy w historii jest wpis dla modala
-      const currentState = window.history.state;
-      if (currentState && currentState.modal) {
-        window.history.back();
-      } else {
-        // Jeśli nie ma wpisu w historii, usuń z URL jeśli był jobId
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('job')) {
-          window.history.replaceState({}, '', window.location.pathname);
-        }
-      }
+    // Usuń jobId z URL jeśli jest
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('job')) {
+      // Usuń jobId z URL bez zmiany historii (replaceState)
+      window.history.replaceState({}, '', window.location.pathname);
     }
     
     setState(prev => ({
