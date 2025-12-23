@@ -122,7 +122,13 @@ if ($completionImage && strpos($completionImage, 'data:image') === 0) {
 
 // Wyślij email
 $headersStr = implode("\r\n", $headers);
+
+// Loguj próbę wysyłki (bez wrażliwych danych)
+error_log("Próba wysyłki email do: $toEmail, temat: $jobTitle");
+
 $result = @mail($toEmail, $subject, $body, $headersStr);
+
+error_log("Wynik funkcji mail(): " . ($result ? 'SUCCESS' : 'FAILED'));
 
     if ($result) {
     // Zapisz info do bazy (opcjonalnie)

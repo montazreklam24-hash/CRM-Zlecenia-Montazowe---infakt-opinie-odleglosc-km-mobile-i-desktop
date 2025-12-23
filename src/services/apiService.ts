@@ -59,8 +59,32 @@ async function apiRequest<T>(
     headers,
   });
   
-  // Parsuj odpowiedź
-  const data = await response.json();
+  // Parsuj odpowiedź - bezpiecznie
+  let data: any;
+  const contentType = response.headers.get('content-type');
+  const isJson = contentType && contentType.includes('application/json');
+  
+  // Odczytaj tekst odpowiedzi tylko raz
+  let responseText = '';
+  try {
+    responseText = await response.text();
+  } catch (textError) {
+    console.error('Błąd odczytu odpowiedzi:', textError);
+    responseText = '';
+  }
+  
+  try {
+    if (isJson && responseText) {
+      data = JSON.parse(responseText);
+    } else if (responseText) {
+      data = { error: responseText || `HTTP ${response.status}` };
+    } else {
+      data = { error: `HTTP ${response.status}: ${response.statusText}` };
+    }
+  } catch (parseError) {
+    console.error('Błąd parsowania odpowiedzi API:', parseError, 'Response text:', responseText.substring(0, 200));
+    data = { error: responseText || `Błąd parsowania odpowiedzi (HTTP ${response.status})` };
+  }
   
   // Obsługa błędów
   if (!response.ok) {
@@ -68,7 +92,8 @@ async function apiRequest<T>(
       clearToken();
       window.location.reload();
     }
-    throw new Error(data.error || data.message || 'Wystąpił błąd');
+    const errorMsg = data.error || data.message || `HTTP ${response.status}: ${response.statusText}`;
+    throw new Error(errorMsg);
   }
   
   return data;
@@ -325,7 +350,7 @@ export const jobsService = {
     if (DEMO_MODE) return { success: true };
 
     try {
-      const response = await apiRequest<{ success: boolean; message?: string; error?: string }>(
+      const response = await apiRequest<{ success: boolean; message?: string; error?: string; details?: string }>(
         '/send_completion_email.php',
         {
           method: 'POST',
@@ -339,20 +364,26 @@ export const jobsService = {
         }
       );
 
+      console.log('Odpowiedź sendCompletionEmail:', response);
+
       // Sprawdź czy odpowiedź zawiera success: false
       if (response && response.success === false) {
+        const errorMsg = response.error || response.details || 'Nie udało się wysłać emaila';
+        console.error('Błąd wysyłki emaila:', errorMsg);
         return {
           success: false,
-          error: response.error || 'Nie udało się wysłać emaila',
+          error: errorMsg,
         };
       }
 
       return response || { success: true };
     } catch (error: any) {
       // Jeśli apiRequest rzucił błąd, zwróć go jako odpowiedź z success: false
+      console.error('Błąd w sendCompletionEmail:', error);
+      const errorMessage = error?.message || error?.toString() || 'Nie udało się wysłać emaila';
       return {
         success: false,
-        error: error.message || 'Nie udało się wysłać emaila',
+        error: errorMessage,
       };
     }
   },

@@ -190,6 +190,12 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
     setError(null);
 
     try {
+      console.log('Rozpoczynam zakończenie zlecenia z emailem:', {
+        jobId: job.id,
+        clientEmail,
+        imagesCount: completionImages.length,
+      });
+      
       await onComplete({
         completionImages,
         completionNotes,
@@ -197,10 +203,18 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
         sendEmail: true,
         archiveJob: !isArchived, // Nie archiwizuj ponownie jeśli już zarchiwizowane
       });
+      
+      console.log('Zakończenie zlecenia zakończone sukcesem');
     } catch (err: any) {
       // Wyświetl szczegóły błędu jeśli są dostępne
+      console.error('Błąd zakończenia zlecenia:', {
+        error: err,
+        message: err?.message,
+        stack: err?.stack,
+        response: err?.response,
+      });
+      
       const errorMessage = err?.message || 'Wystąpił błąd podczas wysyłania';
-      console.error('Błąd zakończenia zlecenia:', err);
       setError(errorMessage);
     } finally {
       setIsSubmitting(false);
