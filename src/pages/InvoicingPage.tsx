@@ -47,7 +47,7 @@ const InvoicingPage: React.FC = () => {
   );
 
   const proformas = filteredInvoices.filter(inv => inv.type === 'proforma');
-  const vatInvoices = filteredInvoices.filter(inv => inv.type === 'vat');
+  const vatInvoices = filteredInvoices.filter(inv => inv.type === 'invoice');
 
   return (
     <div className="p-6 max-w-7xl mx-auto">

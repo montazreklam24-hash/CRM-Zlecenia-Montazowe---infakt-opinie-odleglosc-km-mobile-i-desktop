@@ -412,16 +412,16 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
                   <div className="flex items-center gap-3">
                     <FileText className={`w-5 h-5 ${inv.type === 'proforma' ? 'text-orange-500' : 'text-blue-500'}`} />
                     <div>
-                      <p className="font-semibold text-sm">{inv.number || inv.infaktNumber || inv.infakt_number}</p>
+                      <p className="font-semibold text-sm">{inv.number || inv.infaktNumber}</p>
                       <p className="text-xs text-slate-500">
-                        {inv.totalGross?.toFixed(2) || '0.00'} zł • {inv.status === 'paid' || inv.paymentStatus === 'paid' ? '✅ Opłacona' : 'Oczekuje'}
+                        {inv.totalGross?.toFixed(2) || '0.00'} zł • {inv.paymentStatus === 'paid' ? '✅ Opłacona' : 'Oczekuje'}
                       </p>
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    {(inv.shareLink || inv.share_link) && (
+                    {inv.infaktLink && (
                       <a 
-                        href={inv.shareLink || inv.share_link} 
+                        href={inv.infaktLink} 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="p-2 bg-white rounded-lg border border-slate-200 hover:border-indigo-300 text-slate-600"
@@ -437,7 +437,7 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
                     >
                       <Download className="w-4 h-4" />
                     </button>
-                    {(inv.status !== 'paid' && inv.paymentStatus !== 'paid') && clientData.email && (
+                    {inv.paymentStatus !== 'paid' && clientData.email && (
                       <button 
                         className="p-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600"
                         title="Wyślij email"

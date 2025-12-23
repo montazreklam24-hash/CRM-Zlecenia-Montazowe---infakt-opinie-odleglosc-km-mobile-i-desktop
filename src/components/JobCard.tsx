@@ -252,13 +252,14 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
               setEditedData(prev => ({
                 ...prev,
                 billing: {
-                  ...(prev.billing || {}),
-                  name,
-                  street: st,
-                  buildingNo: bNo,
-                  apartmentNo: aNo,
-                  city,
-                  postCode
+                  name: name || null,
+                  nip: prev.billing?.nip ?? null,
+                  street: st || null,
+                  buildingNo: bNo || null,
+                  apartmentNo: aNo || null,
+                  city: city || null,
+                  postCode: postCode || null,
+                  email: prev.billing?.email ?? null
                 }
               }));
               console.log('[GUS] Dane billing wypełnione dla:', name);
@@ -1139,7 +1140,16 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
               installAddress={editedData.address}
               phone={editedData.phoneNumber}
               nip={editedData.nip}
-              billing={editedData.billing}
+              billing={editedData.billing ? {
+                name: editedData.billing.name || undefined,
+                nip: editedData.billing.nip || undefined,
+                street: editedData.billing.street || undefined,
+                buildingNo: editedData.billing.buildingNo || undefined,
+                apartmentNo: editedData.billing.apartmentNo || undefined,
+                postCode: editedData.billing.postCode || undefined,
+                city: editedData.billing.city || undefined,
+                email: editedData.billing.email || undefined
+              } : undefined}
               paymentStatus={job.paymentStatus || PaymentStatus.NONE}
               totalGross={job.totalGross || 0}
               paidAmount={job.paidAmount || 0}
@@ -1159,14 +1169,14 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
                   ...prev,
                   billing: {
                     ...(prev.billing || {}),
-                    name: billingData.companyName || prev.billing?.name || '',
-                    nip: billingData.nip || prev.billing?.nip || '',
-                    email: billingData.email || prev.billing?.email || '',
-                    street: billingData.street || prev.billing?.street || '',
-                    buildingNo: billingData.buildingNo || prev.billing?.buildingNo || '',
-                    apartmentNo: billingData.apartmentNo || prev.billing?.apartmentNo || '',
-                    city: billingData.city || prev.billing?.city || '',
-                    postCode: billingData.postCode || prev.billing?.postCode || ''
+                    name: billingData.companyName || prev.billing?.name || null,
+                    nip: billingData.nip || prev.billing?.nip || null,
+                    email: billingData.email || prev.billing?.email || null,
+                    street: billingData.street || prev.billing?.street || null,
+                    buildingNo: prev.billing?.buildingNo || null,
+                    apartmentNo: prev.billing?.apartmentNo || null,
+                    city: billingData.city || prev.billing?.city || null,
+                    postCode: billingData.postCode || prev.billing?.postCode || null
                   }
                 }));
               }}
