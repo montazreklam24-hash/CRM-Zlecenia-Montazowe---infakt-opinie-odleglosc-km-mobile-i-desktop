@@ -374,32 +374,11 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           )}
         {/* PAYMENT STATUS BAR - na samej górze kafelka, kliknięcie otwiera mini-menu */}
         <div className="relative">
-          {job.paymentStatus && job.paymentStatus !== PaymentStatus.NONE ? (
-            <div 
-              className="flex items-center justify-center cursor-pointer hover:brightness-110 transition-all rounded-t-xl"
-              style={{ 
-                height: '18px',
-                background: paymentColor,
-                color: 'white',
-                fontSize: '9px',
-                fontWeight: 700,
-                letterSpacing: '0.5px'
-              }}
-              onClick={(e) => { e.stopPropagation(); setShowPaymentMenu(!showPaymentMenu); }}
-              title="Kliknij aby zmienić status płatności"
-            >
-              {paymentLabel}
-            </div>
-          ) : (
-            <div 
-              className="flex items-center justify-center cursor-pointer bg-slate-400 hover:bg-slate-500 transition-all rounded-t-xl"
-              style={{ height: '18px', fontSize: '9px', fontWeight: 700, color: 'white', letterSpacing: '0.5px' }}
-              onClick={(e) => { e.stopPropagation(); setShowPaymentMenu(!showPaymentMenu); }}
-              title="Kliknij aby ustawić status płatności"
-            >
-              BRAK
-            </div>
-          )}
+          <PaymentStatusBar
+            status={job.paymentStatus || PaymentStatus.NONE}
+            onClick={(e) => { e.stopPropagation(); setShowPaymentMenu(!showPaymentMenu); }}
+            showLabel={true}
+          />
           
           {/* Mini-menu statusu płatności */}
           {showPaymentMenu && (
@@ -767,32 +746,11 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
         >
         {/* PAYMENT STATUS BAR - na samej górze, kliknięcie otwiera mini-menu */}
         <div className="relative">
-          {job.paymentStatus && job.paymentStatus !== PaymentStatus.NONE ? (
-            <div 
-              className="flex items-center justify-center cursor-pointer hover:brightness-110 transition-all rounded-t-xl"
-              style={{ 
-                height: '14px',
-                background: paymentColor,
-                color: 'white',
-                fontSize: '7px',
-                fontWeight: 700,
-                letterSpacing: '0.3px'
-              }}
-              onClick={(e) => { e.stopPropagation(); setShowPaymentMenu(!showPaymentMenu); }}
-              title="Kliknij aby zmienić status płatności"
-            >
-              {paymentLabel}
-            </div>
-          ) : (
-            <div 
-              className="flex items-center justify-center cursor-pointer bg-slate-400 hover:bg-slate-500 transition-all rounded-t-xl"
-              style={{ height: '14px', fontSize: '7px', fontWeight: 700, color: 'white', letterSpacing: '0.3px' }}
-              onClick={(e) => { e.stopPropagation(); setShowPaymentMenu(!showPaymentMenu); }}
-              title="Kliknij aby ustawić status płatności"
-            >
-              BRAK
-            </div>
-          )}
+          <PaymentStatusBar
+            status={job.paymentStatus || PaymentStatus.NONE}
+            onClick={(e) => { e.stopPropagation(); setShowPaymentMenu(!showPaymentMenu); }}
+            showLabel={true}
+          />
           
           {/* Mini-menu statusu płatności */}
           {showPaymentMenu && (
