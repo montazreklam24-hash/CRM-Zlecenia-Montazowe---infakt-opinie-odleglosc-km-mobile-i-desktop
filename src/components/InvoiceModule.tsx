@@ -3,7 +3,7 @@ import {
   FileText, Plus, Trash2, Send, Download, 
   Receipt, Loader2, ExternalLink, Search, Building2,
   AlertTriangle, ChevronDown, ChevronUp, User, Mail, Phone, MapPin,
-  AlertCircle
+  AlertCircle, Link as LinkIcon
 } from 'lucide-react';
 import { Invoice, InvoiceItem, PaymentStatus } from '../types';
 import { invoiceService, InvoiceItemData, InvoiceClientData } from '../services/invoiceService';
@@ -411,6 +411,20 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
             </div>
           )}
           
+          {/* Przycisk podpięcia faktury ręcznie */}
+          {isAdmin && (
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+              <AttachInvoiceButton 
+                jobId={jobId} 
+                clientId={clientId}
+                onInvoiceAttached={() => {
+                  // Odśwież listę faktur - trzeba będzie przekazać callback
+                  window.location.reload();
+                }}
+              />
+            </div>
+          )}
+
           {/* Istniejące faktury */}
           {invoices.length > 0 && (
             <div className="space-y-2">
@@ -824,6 +838,131 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
           )}
         </div>
       )}
+    </div>
+  );
+};
+
+// Komponent do podpinania faktury ręcznie
+const AttachInvoiceButton: React.FC<{
+  jobId: string;
+  clientId?: number;
+  onInvoiceAttached?: () => void;
+}> = ({ jobId, clientId, onInvoiceAttached }) => {
+  const [showDialog, setShowDialog] = useState(false);
+  const [infaktId, setInfaktId] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleAttach = async () => {
+    if (!infaktId || !/^\d+$/.test(infaktId)) {
+      setError('Podaj prawidłowe ID faktury z inFakt (tylko cyfry)');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await invoiceService.attachInvoice(jobId, parseInt(infaktId), clientId);
+      
+      if (result.success) {
+        alert(`Faktura ${result.invoice?.number || infaktId} została podpięta do zlecenia!`);
+        setShowDialog(false);
+        setInfaktId('');
+        if (onInvoiceAttached) {
+          onInvoiceAttached();
+        }
+      } else {
+        setError(result.error || 'Nie udało się podpiąć faktury');
+      }
+    } catch (e: any) {
+      setError(e.message || 'Błąd podpinania faktury');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!showDialog) {
+    return (
+      <button
+        onClick={() => setShowDialog(true)}
+        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg border border-indigo-200 transition-colors text-sm font-semibold"
+      >
+        <LinkIcon size={16} />
+        Podepnij fakturę z inFakt
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h5 className="text-sm font-bold text-slate-700">Podepnij fakturę z inFakt</h5>
+        <button
+          onClick={() => {
+            setShowDialog(false);
+            setInfaktId('');
+            setError(null);
+          }}
+          className="text-slate-400 hover:text-slate-600"
+        >
+          ✕
+        </button>
+      </div>
+      
+      <div className="space-y-2">
+        <label className="text-xs font-semibold text-slate-600">
+          ID faktury z inFakt:
+        </label>
+        <input
+          type="text"
+          value={infaktId}
+          onChange={(e) => {
+            setInfaktId(e.target.value);
+            setError(null);
+          }}
+          placeholder="np. 12345"
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+          disabled={isLoading}
+        />
+        <p className="text-xs text-slate-500">
+          ID znajdziesz w URL faktury w inFakt: <code className="bg-slate-100 px-1 rounded">/invoices/12345</code>
+        </p>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          onClick={handleAttach}
+          disabled={isLoading || !infaktId}
+          className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 size={14} className="animate-spin inline mr-2" />
+              Podpinanie...
+            </>
+          ) : (
+            'Podepnij'
+          )}
+        </button>
+        <button
+          onClick={() => {
+            setShowDialog(false);
+            setInfaktId('');
+            setError(null);
+          }}
+          className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-300 transition-colors"
+          disabled={isLoading}
+        >
+          Anuluj
+        </button>
+      </div>
     </div>
   );
 };

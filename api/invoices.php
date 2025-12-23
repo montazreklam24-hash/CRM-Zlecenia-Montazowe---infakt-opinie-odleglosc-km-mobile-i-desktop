@@ -491,6 +491,122 @@ function handleCheckStatus($invoiceId) {
 }
 
 /**
+ * POST /api/invoices/attach
+ * Podepnij istniejącą fakturę z inFakt do zlecenia
+ */
+function handleAttachInvoice() {
+    $user = requireAuth();
+    $input = getJsonInput();
+    
+    if (empty($input['infaktId'])) {
+        jsonResponse(array('error' => 'Brak ID faktury z inFakt'), 400);
+    }
+    
+    if (empty($input['jobId'])) {
+        jsonResponse(array('error' => 'Brak ID zlecenia'), 400);
+    }
+    
+    $infakt = getInfaktClient();
+    
+    try {
+        // Pobierz fakturę z inFakt
+        $invoice = $infakt->getInvoice($input['infaktId']);
+        
+        if (!$invoice) {
+            jsonResponse(array('error' => 'Nie znaleziono faktury w inFakt'), 404);
+        }
+        
+        // Sprawdź czy faktura już nie jest podpięta
+        $pdo = getDB();
+        createInvoicesTable($pdo);
+        
+        $checkStmt = $pdo->prepare("SELECT id FROM invoices WHERE infakt_id = ?");
+        $checkStmt->execute(array($input['infaktId']));
+        if ($checkStmt->fetch()) {
+            jsonResponse(array('error' => 'Ta faktura jest już podpięta do innego zlecenia'), 400);
+        }
+        
+        // Określ typ faktury
+        $invoiceType = isset($invoice['kind']) && $invoice['kind'] === 'proforma' ? 'proforma' : 'vat';
+        
+        // Określ status płatności
+        $paymentStatus = isset($invoice['payment_status']) ? $invoice['payment_status'] : 'unpaid';
+        $localStatus = 'pending';
+        if ($paymentStatus === 'paid') {
+            $localStatus = 'paid';
+        } elseif ($paymentStatus === 'partially_paid') {
+            $localStatus = 'pending';
+        }
+        
+        // Utwórz link do udostępniania
+        $shareLink = $infakt->createShareLink($input['infaktId']);
+        
+        // Zapisz w bazie
+        $clientId = isset($input['clientId']) ? intval($input['clientId']) : null;
+        
+        $stmt = $pdo->prepare("
+            INSERT INTO invoices (
+                job_id, infakt_id, infakt_number, type, client_id, 
+                total_net, total_gross, status, share_link, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        ");
+        
+        $totalNet = isset($invoice['net_price']) ? floatval($invoice['net_price']) / 100 : 0;
+        $totalGross = isset($invoice['gross_price']) ? floatval($invoice['gross_price']) / 100 : 0;
+        
+        $stmt->execute(array(
+            $input['jobId'],
+            intval($input['infaktId']),
+            isset($invoice['number']) ? $invoice['number'] : null,
+            $invoiceType,
+            $clientId,
+            $totalNet,
+            $totalGross,
+            $localStatus,
+            $shareLink
+        ));
+        
+        $invoiceDbId = $pdo->lastInsertId();
+        
+        // Aktualizuj status zlecenia jeśli faktura jest opłacona
+        if ($localStatus === 'paid') {
+            try {
+                $updateJobStmt = $pdo->prepare("UPDATE jobs_ai SET payment_status = 'paid' WHERE id = ?");
+                $updateJobStmt->execute(array($input['jobId']));
+            } catch (Exception $e) {
+                error_log("Failed to update job payment status: " . $e->getMessage());
+            }
+        } elseif ($invoiceType === 'proforma') {
+            try {
+                $updateJobStmt = $pdo->prepare("UPDATE jobs_ai SET payment_status = 'proforma' WHERE id = ?");
+                $updateJobStmt->execute(array($input['jobId']));
+            } catch (Exception $e) {
+                error_log("Failed to update job payment status: " . $e->getMessage());
+            }
+        }
+        
+        jsonResponse(array(
+            'success' => true,
+            'invoice' => array(
+                'id' => $invoiceDbId,
+                'infaktId' => intval($input['infaktId']),
+                'number' => isset($invoice['number']) ? $invoice['number'] : null,
+                'type' => $invoiceType,
+                'status' => $localStatus,
+                'totalGross' => $totalGross,
+                'shareLink' => $shareLink
+            ),
+            'message' => 'Faktura została podpięta do zlecenia'
+        ));
+        
+    } catch (Exception $e) {
+        error_log('Attach invoice error: ' . $e->getMessage());
+        jsonResponse(array('error' => 'Błąd podpinania faktury: ' . $e->getMessage()), 500);
+    }
+}
+
+/**
  * POST /api/invoices/sync-status
  * Synchronizuj status wszystkich faktur z inFakt
  * Sprawdza status płatności w inFakt i aktualizuje lokalną bazę danych
@@ -736,6 +852,9 @@ function handleInvoices($method, $id = null) {
             case 'sync-status':
                 handleSyncStatus();
                 break;
+            case 'attach':
+                handleAttachInvoice();
+                break;
             default:
                 // Domyślnie POST bez akcji = proforma
                 handleCreateProforma();
@@ -787,6 +906,8 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'invoices.php') {
             handleMarkAsPaid();
         } elseif ($uri === 'sync-status' || $uri === 'invoices/sync-status') {
             handleSyncStatus();
+        } elseif ($uri === 'attach' || $uri === 'invoices/attach') {
+            handleAttachInvoice();
         } else {
             handleCreateProforma();
         }

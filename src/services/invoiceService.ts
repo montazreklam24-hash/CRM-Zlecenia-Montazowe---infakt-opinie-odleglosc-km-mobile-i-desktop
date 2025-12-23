@@ -257,6 +257,37 @@ export const invoiceService = {
       method: 'POST',
     });
   },
+
+  /**
+   * Podepnij istniejącą fakturę z inFakt do zlecenia
+   */
+  async attachInvoice(
+    jobId: string,
+    infaktId: number,
+    clientId?: number
+  ): Promise<{
+    success: boolean;
+    invoice?: {
+      id: number;
+      infaktId: number;
+      number: string;
+      type: 'proforma' | 'vat';
+      status: string;
+      totalGross: number;
+      shareLink?: string;
+    };
+    message?: string;
+    error?: string;
+  }> {
+    return apiRequest<any>('/invoices/attach', {
+      method: 'POST',
+      body: JSON.stringify({
+        jobId,
+        infaktId,
+        clientId,
+      }),
+    });
+  },
 };
 
 export default invoiceService;
