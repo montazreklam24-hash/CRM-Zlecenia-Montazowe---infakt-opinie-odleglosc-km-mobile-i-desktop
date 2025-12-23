@@ -136,8 +136,8 @@ export const PaymentStatusBar: React.FC<{
     <div 
       className={`${cfg.bg} flex items-center justify-center cursor-pointer hover:brightness-110 transition-all`}
       style={{ 
-        height: showLabel ? '16px' : '4px',
-        minHeight: showLabel ? '14px' : '4px'
+        height: showLabel ? '32px' : '4px',
+        minHeight: showLabel ? '32px' : '4px'
       }}
       onClick={onClick}
       title="Kliknij aby zmienić status płatności"
@@ -145,7 +145,7 @@ export const PaymentStatusBar: React.FC<{
       {showLabel && (
         <span 
           className={`font-bold uppercase tracking-wide ${status === PaymentStatus.NONE ? 'text-slate-600' : 'text-white'}`}
-          style={{ fontSize: '8px', letterSpacing: '0.5px' }}
+          style={{ fontSize: '16px', letterSpacing: '0.5px' }}
         >
           {cfg.label}
         </span>
