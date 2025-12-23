@@ -81,12 +81,42 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
     if (!isExpanded) return; // Nie aktywuj paste gdy sekcja jest zwinięta
     
     const handlePaste = (e: ClipboardEvent) => {
-      // Sprawdź czy focus jest w sekcji completion
       const activeElement = document.activeElement;
-      if (!dropZoneRef.current || !dropZoneRef.current.contains(activeElement as Node)) {
-        return; // Paste nie jest dla tej sekcji
+      
+      // Jeśli użytkownik jest w polu tekstowym POZA sekcją completion, nie przechwytuj paste
+      if (activeElement && (
+        activeElement.tagName === 'TEXTAREA' || 
+        activeElement.tagName === 'INPUT' ||
+        activeElement.getAttribute('contenteditable') === 'true'
+      )) {
+        // Sprawdź czy to pole tekstowe jest w sekcji completion
+        if (dropZoneRef.current && dropZoneRef.current.contains(activeElement as Node)) {
+          // Jeśli to pole tekstowe w sekcji completion (np. uwagi), sprawdź czy są zdjęcia
+          const items = e.clipboardData?.items;
+          if (!items) return;
+
+          const imageFiles: File[] = [];
+          for (let i = 0; i < items.length; i++) {
+            if (items[i].type.startsWith('image/')) {
+              const file = items[i].getAsFile();
+              if (file) imageFiles.push(file);
+            }
+          }
+
+          // Jeśli są zdjęcia, przechwytuj paste nawet w polu tekstowym w sekcji completion
+          if (imageFiles.length > 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            processFiles(imageFiles);
+          }
+          return; // Jeśli nie ma zdjęć, pozwól na normalne paste tekstu
+        }
+        // Jeśli pole tekstowe jest POZA sekcją completion, nie przechwytuj paste
+        return;
       }
       
+      // Jeśli sekcja jest rozwinięta i użytkownik nie jest w polu tekstowym, przechwytuj paste
+      // (nie sprawdzamy czy focus jest w dropZoneRef - działa zawsze gdy sekcja rozwinięta)
       const items = e.clipboardData?.items;
       if (!items) return;
 
@@ -100,7 +130,7 @@ const CompletionSection: React.FC<CompletionSectionProps> = ({
 
       if (imageFiles.length > 0) {
         e.preventDefault();
-        e.stopPropagation(); // Zatrzymaj propagację
+        e.stopPropagation();
         processFiles(imageFiles);
       }
     };
@@ -316,6 +346,13 @@ Montaż Reklam 24`;
               onDragLeave={handleDragLeave}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
+              tabIndex={0}
+              onFocus={(e) => {
+                // Ustaw focus na drop zone po rozwinięciu, żeby paste działał od razu
+                if (isExpanded && completionImages.length === 0) {
+                  e.currentTarget.focus();
+                }
+              }}
               className={`relative border-2 border-dashed rounded-xl p-3 transition-all ${
                 isDragging 
                   ? 'border-emerald-500 bg-emerald-100' 
