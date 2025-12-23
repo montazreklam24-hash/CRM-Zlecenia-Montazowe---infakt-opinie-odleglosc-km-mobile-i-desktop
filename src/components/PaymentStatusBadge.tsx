@@ -75,16 +75,24 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
 
   const cfg = config[status] || config[PaymentStatus.NONE];
 
-  // Nie pokazuj nic dla NONE
-  if (status === PaymentStatus.NONE) {
-    return null;
-  }
-
   const sizeClasses = {
     sm: 'text-[10px] px-1.5 py-0.5',
     md: 'text-xs px-2 py-1',
     lg: 'text-sm px-3 py-1.5'
   };
+
+  // Dla NONE pokaż "Nie wybrano"
+  if (status === PaymentStatus.NONE) {
+    return (
+      <div className={`
+        inline-flex items-center gap-1 rounded-full font-bold uppercase tracking-wide
+        bg-slate-100 text-slate-500 border border-slate-200
+        ${sizeClasses[size]}
+      `}>
+        <span>Nie wybrano</span>
+      </div>
+    );
+  }
 
   return (
     <div className={`
@@ -114,7 +122,7 @@ export const PaymentStatusBar: React.FC<{
   showLabel?: boolean;
 }> = ({ status, onClick, showLabel = true }) => {
   const config: Record<PaymentStatus, { bg: string; label: string }> = {
-    [PaymentStatus.NONE]: { bg: '', label: '' },
+    [PaymentStatus.NONE]: { bg: 'bg-gradient-to-r from-slate-300 to-slate-400', label: 'NIE WYBRANO' },
     [PaymentStatus.PROFORMA]: { bg: 'bg-gradient-to-r from-blue-600 to-blue-700', label: 'PROFORMA' },
     [PaymentStatus.PARTIAL]: { bg: 'bg-gradient-to-r from-purple-400 to-purple-500', label: 'ZALICZKA' },
     [PaymentStatus.PAID]: { bg: 'bg-gradient-to-r from-green-400 to-green-500', label: 'OPŁACONE' },
@@ -123,10 +131,6 @@ export const PaymentStatusBar: React.FC<{
   };
 
   const cfg = config[status] || config[PaymentStatus.NONE];
-
-  if (status === PaymentStatus.NONE) {
-    return null;
-  }
 
   return (
     <div 
@@ -140,7 +144,7 @@ export const PaymentStatusBar: React.FC<{
     >
       {showLabel && (
         <span 
-          className="text-white font-bold uppercase tracking-wide"
+          className={`font-bold uppercase tracking-wide ${status === PaymentStatus.NONE ? 'text-slate-600' : 'text-white'}`}
           style={{ fontSize: '8px', letterSpacing: '0.5px' }}
         >
           {cfg.label}
