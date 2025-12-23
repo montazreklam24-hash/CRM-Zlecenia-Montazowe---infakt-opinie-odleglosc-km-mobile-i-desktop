@@ -17,7 +17,7 @@
   --bg-page: url('https://images.unsplash.com/photo-1534430480872-3498386e7856?w=1920&q=80') center/cover fixed;
   --bg-card: rgba(255, 255, 255, 0.50);
   --bg-card-hover: rgba(255, 255, 255, 0.65);
-  --bg-surface: rgba(255, 255, 255, 0.10);
+  --bg-surface: rgba(255, 255, 255, 0.05);
   --bg-input: rgba(255, 255, 255, 0.80);
   --bg-header: rgba(255, 255, 255, 0.60);
   
@@ -362,14 +362,14 @@ body[data-theme="glass"] {
   position: relative;
 }
 
-/* Przyciemnienie dla czytelności - delikatne 10-15% */
+/* Przyciemnienie dla czytelności - bardzo delikatne 3-5% */
 :root body::before,
 [data-theme="glass"] body::before,
 body[data-theme="glass"]::before {
   content: '';
   position: fixed;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.1) 100%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.03) 100%);
   pointer-events: none;
   z-index: 0;
 }
