@@ -2454,13 +2454,16 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                         Przeciągnij tutaj zlecenie
                       </div>
                     ) : (
-                      rowJobs.map(job => {
+                      rowJobs.map((job, idx) => {
                         const { canMoveLeft, canMoveRight, canMoveUp, canMoveDown } = getJobMoveLeftRightInfo(job.id);
                         const matchesFilter = jobMatchesPaymentFilter(job);
+                        // Dla PREPARE: użyj CSS order aby zapewnić poprawną kolejność wizualną w gridzie
+                        const orderValue = row.id === 'PREPARE' ? (job.order ?? job.columnOrder ?? idx) : undefined;
                         return (
                           <div 
                             key={job.id}
                             className={matchesFilter ? '' : 'opacity-50 brightness-75 transition-opacity'}
+                            style={orderValue !== undefined ? { order: orderValue } : undefined}
                           >
                             <DraggableJobCard
                               job={job}
@@ -2632,12 +2635,14 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                     <span className="bg-white/20 px-2.5 py-1 text-xs font-bold" style={{ borderRadius: 'var(--radius-md)' }}>{rowJobs.length}</span>
                   </div>
                   <DroppableRow id={row.id} activeId={activeId}>
-                    {rowJobs.map(job => {
+                    {rowJobs.map((job, idx) => {
                       const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
+                      // Dla PREPARE: użyj CSS order aby zapewnić poprawną kolejność wizualną w gridzie
+                      const orderValue = row.id === 'PREPARE' ? (job.order ?? job.columnOrder ?? idx) : undefined;
                       return (
-                        <DraggableJobCard
-                          key={job.id}
-                          job={job}
+                        <div key={job.id} style={orderValue !== undefined ? { order: orderValue } : undefined}>
+                          <DraggableJobCard
+                            job={job}
                           isAdmin={isAdmin}
                           onSelectJob={onSelectJob}
                           onDelete={handleDelete}
@@ -2716,12 +2721,14 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                         Przeciągnij tutaj zlecenie
                       </div>
                     ) : (
-                      rowJobs.map(job => {
+                      rowJobs.map((job, idx) => {
                         const { canMoveLeft, canMoveRight, canMoveUp, canMoveDown } = getJobMoveLeftRightInfo(job.id);
+                        // Dla PREPARE: użyj CSS order aby zapewnić poprawną kolejność wizualną w gridzie
+                        const orderValue = row.id === 'PREPARE' ? (job.order ?? job.columnOrder ?? idx) : undefined;
                         return (
-                          <DraggableJobCard
-                            key={job.id}
-                            job={job}
+                          <div key={job.id} style={orderValue !== undefined ? { order: orderValue } : undefined}>
+                            <DraggableJobCard
+                              job={job}
                             isAdmin={isAdmin}
                             onSelectJob={onSelectJob}
                             onDelete={handleDelete}
@@ -2739,6 +2746,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             canMoveDown={job.columnId === 'PREPARE' ? canMoveDown : undefined}
                             onContextMenu={handleContextMenu}
                           />
+                          </div>
                         );
                       })
                     )}
