@@ -111,6 +111,13 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
     const geocodeJobs = async () => {
       const newCoords = new Map(jobsWithCoords);
       let needsUpdate = false;
+      let geocodedCount = 0;
+      let skippedCount = 0;
+
+      console.log('🌍 MapBoardOSM: Rozpoczynam geokodowanie', {
+        totalJobs: jobs.length,
+        currentCacheSize: jobsWithCoords.size
+      });
 
       for (const job of jobs) {
         if (job.data.coordinates) {
@@ -118,13 +125,30 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
           if (!newCoords.has(job.id)) {
             newCoords.set(job.id, job.data.coordinates);
             needsUpdate = true;
+            console.log('✅ MapBoardOSM: Użyto współrzędnych z job.data', {
+              jobId: job.id,
+              friendlyId: job.friendlyId,
+              coords: job.data.coordinates
+            });
           }
         } else if (job.data.address && !newCoords.has(job.id)) {
           // Brak współrzędnych - geokoduj
+          console.log('🔍 MapBoardOSM: Geokoduję adres', {
+            jobId: job.id,
+            friendlyId: job.friendlyId,
+            address: job.data.address
+          });
+          
           const coords = await geocodeWithNominatim(job.data.address);
           if (coords) {
             newCoords.set(job.id, coords);
             needsUpdate = true;
+            geocodedCount++;
+            console.log('✅ MapBoardOSM: Geokodowanie sukces', {
+              jobId: job.id,
+              friendlyId: job.friendlyId,
+              coords
+            });
             
             // Zapisz do API (opcjonalnie - cache w DB)
             try {
@@ -138,11 +162,26 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
                 })
               });
             } catch (e) {
-              console.error('Failed to save coordinates:', e);
+              console.error('❌ MapBoardOSM: Failed to save coordinates:', e);
             }
+          } else {
+            skippedCount++;
+            console.warn('⚠️ MapBoardOSM: Geokodowanie nie powiodło się', {
+              jobId: job.id,
+              friendlyId: job.friendlyId,
+              address: job.data.address
+            });
           }
+        } else {
+          skippedCount++;
         }
       }
+
+      console.log('📊 MapBoardOSM: Geokodowanie zakończone', {
+        geocoded: geocodedCount,
+        skipped: skippedCount,
+        needsUpdate
+      });
 
       if (needsUpdate) {
         setJobsWithCoords(newCoords);
@@ -158,10 +197,28 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
     markersLayerRef.current.clearLayers();
     const bounds = L.latLngBounds([]);
 
+    console.log('🗺️ MapBoardOSM: Renderowanie markerów', {
+      totalJobs: jobs.length,
+      jobsWithCoords: jobsWithCoords.size,
+      jobsWithDataCoords: jobs.filter(j => j.data.coordinates).length
+    });
+
+    let markersAdded = 0;
     jobs.forEach(job => {
       // Użyj współrzędnych z cache lub z job.data
       const coords = job.data.coordinates || jobsWithCoords.get(job.id);
-      if (!coords) return;
+      if (!coords) {
+        console.log('⚠️ MapBoardOSM: Pomijam zlecenie bez współrzędnych', {
+          jobId: job.id,
+          friendlyId: job.friendlyId,
+          address: job.data.address,
+          hasDataCoords: !!job.data.coordinates,
+          hasCachedCoords: jobsWithCoords.has(job.id)
+        });
+        return;
+      }
+      
+      markersAdded++;
       
       const { lat, lng } = coords;
       const color = COLUMN_COLORS[job.columnId || 'PREPARE'] || '#475569';
@@ -235,8 +292,12 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
       bounds.extend([lat, lng]);
     });
 
-      if (bounds.isValid()) {
+    console.log('✅ MapBoardOSM: Dodano markerów', markersAdded);
+
+    if (bounds.isValid()) {
       mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+    } else {
+      console.warn('⚠️ MapBoardOSM: Brak prawidłowych granic - nie można ustawić widoku');
     }
   }, [jobs, jobsWithCoords]);
 
