@@ -1503,14 +1503,19 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const order1 = sortedJobs[index].normalizedOrder;
     const order2 = otherJob.normalizedOrder;
     
-    console.log('🔄 handleMoveRightInPrepare:', {
+    console.log('🔄 handleMoveRightInPrepare PRZED:', {
       jobId,
       jobTitle: job.data.jobTitle?.substring(0, 30),
       index,
+      currentOrder: job.order,
+      currentColumnOrder: job.columnOrder,
       order1,
-      order2,
       otherJobId: otherJob.id,
-      otherJobTitle: otherJob.data.jobTitle?.substring(0, 30)
+      otherJobTitle: otherJob.data.jobTitle?.substring(0, 30),
+      otherCurrentOrder: otherJob.order,
+      otherCurrentColumnOrder: otherJob.columnOrder,
+      order2,
+      allOrders: sortedJobs.map(j => ({ id: j.id, title: j.data.jobTitle?.substring(0, 20), order: j.order, columnOrder: j.columnOrder, normalized: j.normalizedOrder }))
     });
     
     // Zamiana orderów
@@ -1526,7 +1531,13 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
         jobsService.updateJob(otherJob.id, { order: order1 })
       ]);
       broadcastChange();
-      console.log('✅ handleMoveRightInPrepare: Sukces');
+      
+      // Sprawdź po aktualizacji
+      const afterSorted = getPrepareJobsSorted();
+      console.log('✅ handleMoveRightInPrepare PO:', {
+        success: true,
+        newOrders: afterSorted.map(j => ({ id: j.id, title: j.data.jobTitle?.substring(0, 20), order: j.order, columnOrder: j.columnOrder, normalized: j.normalizedOrder }))
+      });
     } catch (err) {
       console.error('❌ Move right in PREPARE failed', err);
       loadJobs();
