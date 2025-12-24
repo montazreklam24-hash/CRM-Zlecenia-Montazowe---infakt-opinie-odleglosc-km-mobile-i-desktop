@@ -1224,7 +1224,11 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const columnId = job.columnId || 'PREPARE';
     const columnJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === columnId)
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
+      .sort((a, b) => {
+        const orderA = a.order ?? a.columnOrder ?? 0;
+        const orderB = b.order ?? b.columnOrder ?? 0;
+        return orderA - orderB;
+      });
     
     const currentIndex = columnJobs.findIndex(j => j.id === jobId);
     if (currentIndex <= 0) return; // Already at top
@@ -1259,7 +1263,11 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const columnId = job.columnId || 'PREPARE';
     const columnJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === columnId)
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
+      .sort((a, b) => {
+        const orderA = a.order ?? a.columnOrder ?? 0;
+        const orderB = b.order ?? b.columnOrder ?? 0;
+        return orderA - orderB;
+      });
     
     const currentIndex = columnJobs.findIndex(j => j.id === jobId);
     if (currentIndex >= columnJobs.length - 1) return; // Already at bottom
@@ -1294,7 +1302,11 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const columnId = job.columnId || 'PREPARE';
     const columnJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === columnId)
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
+      .sort((a, b) => {
+        const orderA = a.order ?? a.columnOrder ?? 0;
+        const orderB = b.order ?? b.columnOrder ?? 0;
+        return orderA - orderB;
+      });
     
     const currentIndex = columnJobs.findIndex(j => j.id === jobId);
     
@@ -1324,7 +1336,11 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     if (columnId === 'PREPARE') {
         const colJobs = jobs
             .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
-            .sort((a, b) => (a.order || 0) - (b.order || 0));
+            .sort((a, b) => {
+        const orderA = a.order ?? a.columnOrder ?? 0;
+        const orderB = b.order ?? b.columnOrder ?? 0;
+        return orderA - orderB;
+      });
         const index = colJobs.findIndex(j => j.id === jobId);
         // Can move left (up) if not first, can move right (down) if not last
         // Can move up (jump to start) if not first, can move down (jump to end) if not last
@@ -1361,7 +1377,12 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     
     const colJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
+      .sort((a, b) => {
+        // Użyj order lub columnOrder, jeśli order nie istnieje
+        const orderA = a.order ?? a.columnOrder ?? 0;
+        const orderB = b.order ?? b.columnOrder ?? 0;
+        return orderA - orderB;
+      });
     
     const index = colJobs.findIndex(j => j.id === jobId);
     if (index === -1 || index === 0) return; // Już na początku
@@ -1402,7 +1423,12 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     
     const colJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
+      .sort((a, b) => {
+        // Użyj order lub columnOrder, jeśli order nie istnieje
+        const orderA = a.order ?? a.columnOrder ?? 0;
+        const orderB = b.order ?? b.columnOrder ?? 0;
+        return orderA - orderB;
+      });
     
     const index = colJobs.findIndex(j => j.id === jobId);
     if (index === -1 || index === colJobs.length - 1) return; // Już na końcu
@@ -1434,7 +1460,12 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     
     const colJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
+      .sort((a, b) => {
+        // Użyj order lub columnOrder, jeśli order nie istnieje
+        const orderA = a.order ?? a.columnOrder ?? 0;
+        const orderB = b.order ?? b.columnOrder ?? 0;
+        return orderA - orderB;
+      });
     
     const index = colJobs.findIndex(j => j.id === jobId);
     if (index === -1 || index === 0) {
@@ -1444,24 +1475,29 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     
     const otherJob = colJobs[index - 1];
     
-    // Użyj rzeczywistych orderów z bazy, jeśli są, w przeciwnym razie użyj index
-    const order1 = job.order !== null && job.order !== undefined ? job.order : index;
-    const order2 = otherJob.order !== null && otherJob.order !== undefined ? otherJob.order : (index - 1);
+    // Normalizuj order - użyj rzeczywistych wartości z bazy (order lub columnOrder)
+    // Jeśli nie ma, użyj index jako order
+    const order1 = job.order ?? job.columnOrder ?? index;
+    const order2 = otherJob.order ?? otherJob.columnOrder ?? (index - 1);
     
     console.log('🔄 handleMoveLeftInPrepare:', {
       jobId,
       jobTitle: job.data.jobTitle?.substring(0, 30),
       index,
+      jobOrder: job.order,
+      jobColumnOrder: job.columnOrder,
       order1,
-      order2,
       otherJobId: otherJob.id,
-      otherJobTitle: otherJob.data.jobTitle?.substring(0, 30)
+      otherJobTitle: otherJob.data.jobTitle?.substring(0, 30),
+      otherJobOrder: otherJob.order,
+      otherJobColumnOrder: otherJob.columnOrder,
+      order2
     });
     
     // Zamiana orderów
     setJobs(prev => prev.map(j => {
-      if (j.id === jobId) return { ...j, order: order2 };
-      if (j.id === otherJob.id) return { ...j, order: order1 };
+      if (j.id === jobId) return { ...j, order: order2, columnOrder: order2 };
+      if (j.id === otherJob.id) return { ...j, order: order1, columnOrder: order1 };
       return j;
     }));
     
@@ -1488,7 +1524,12 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     
     const colJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
+      .sort((a, b) => {
+        // Użyj order lub columnOrder, jeśli order nie istnieje
+        const orderA = a.order ?? a.columnOrder ?? 0;
+        const orderB = b.order ?? b.columnOrder ?? 0;
+        return orderA - orderB;
+      });
     
     const index = colJobs.findIndex(j => j.id === jobId);
     if (index === -1 || index === colJobs.length - 1) {
@@ -1498,25 +1539,29 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     
     const otherJob = colJobs[index + 1];
     
-    // Użyj rzeczywistych orderów z bazy, jeśli są, w przeciwnym razie użyj index
-    // WAŻNE: Musimy użyć rzeczywistych wartości order, nie index!
-    const order1 = job.order !== null && job.order !== undefined ? job.order : index;
-    const order2 = otherJob.order !== null && otherJob.order !== undefined ? otherJob.order : (index + 1);
+    // Normalizuj order - użyj rzeczywistych wartości z bazy (order lub columnOrder)
+    // Jeśli nie ma, użyj index jako order
+    const order1 = job.order ?? job.columnOrder ?? index;
+    const order2 = otherJob.order ?? otherJob.columnOrder ?? (index + 1);
     
     console.log('🔄 handleMoveRightInPrepare:', {
       jobId,
       jobTitle: job.data.jobTitle?.substring(0, 30),
       index,
+      jobOrder: job.order,
+      jobColumnOrder: job.columnOrder,
       order1,
-      order2,
       otherJobId: otherJob.id,
-      otherJobTitle: otherJob.data.jobTitle?.substring(0, 30)
+      otherJobTitle: otherJob.data.jobTitle?.substring(0, 30),
+      otherJobOrder: otherJob.order,
+      otherJobColumnOrder: otherJob.columnOrder,
+      order2
     });
     
     // Zamiana orderów
     setJobs(prev => prev.map(j => {
-      if (j.id === jobId) return { ...j, order: order2 };
-      if (j.id === otherJob.id) return { ...j, order: order1 };
+      if (j.id === jobId) return { ...j, order: order2, columnOrder: order2 };
+      if (j.id === otherJob.id) return { ...j, order: order1, columnOrder: order1 };
       return j;
     }));
     
@@ -1782,7 +1827,11 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     // Get jobs in target column (excluding the dragged item)
     const targetColumnJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === targetColumn && j.id !== draggedId)
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
+      .sort((a, b) => {
+        const orderA = a.order ?? a.columnOrder ?? 0;
+        const orderB = b.order ?? b.columnOrder ?? 0;
+        return orderA - orderB;
+      });
     
     // Calculate new order
     let newOrder: number;
@@ -1802,7 +1851,11 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     if (sourceColumn === targetColumn) {
       const sourceJobs = jobs
         .filter(j => (j.columnId || 'PREPARE') === sourceColumn)
-        .sort((a, b) => (a.order || 0) - (b.order || 0));
+        .sort((a, b) => {
+        const orderA = a.order ?? a.columnOrder ?? 0;
+        const orderB = b.order ?? b.columnOrder ?? 0;
+        return orderA - orderB;
+      });
       
       // Build array of IDs
       const jobIds = sourceJobs.map(j => j.id);
@@ -1893,7 +1946,12 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   const getJobsForColumn = (colId: JobColumnId) => {
     const result = filteredJobs
       .filter(j => (j.columnId || 'PREPARE') === colId)
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
+      .sort((a, b) => {
+        // Użyj order lub columnOrder, jeśli order nie istnieje
+        const orderA = a.order ?? a.columnOrder ?? 0;
+        const orderB = b.order ?? b.columnOrder ?? 0;
+        return orderA - orderB;
+      });
     // Debug: log when rendering WED column
     if (colId === 'WED' && result.length > 0) {
       console.log('🟠 RENDER WED:', result.map(j => ({ title: j.data.jobTitle?.substring(0,15), order: j.order })));

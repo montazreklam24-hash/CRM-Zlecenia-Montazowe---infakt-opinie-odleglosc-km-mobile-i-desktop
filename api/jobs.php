@@ -358,9 +358,13 @@ function updateJob($id) {
             $updates[] = "column_id = ?";
             $params[] = $input['columnId'];
         }
+        // Akceptuj zarówno columnOrder jak i order (dla kompatybilności)
         if (isset($input['columnOrder'])) {
             $updates[] = "column_order = ?";
             $params[] = $input['columnOrder'];
+        } elseif (isset($input['order'])) {
+            $updates[] = "column_order = ?";
+            $params[] = $input['order'];
         }
         
         // Współrzędne
