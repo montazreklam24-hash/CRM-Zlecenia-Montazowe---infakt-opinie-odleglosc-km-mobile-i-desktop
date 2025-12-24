@@ -99,6 +99,18 @@ function getJobs() {
     $user = requireAuth();
     $pdo = getDB();
     
+    // AUTOMATYCZNA MIGRACJA: Dodaj sort_order jeśli nie istnieje
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM jobs_ai LIKE 'sort_order'");
+        if (!$stmt->fetch()) {
+            $pdo->exec("ALTER TABLE jobs_ai ADD COLUMN sort_order INT DEFAULT NULL AFTER column_order");
+            // Zainicjuj sort_order na podstawie starego column_order, żeby nie rozwalić widoku
+            $pdo->exec("UPDATE jobs_ai SET sort_order = column_order * 10 WHERE column_order > 0");
+        }
+    } catch (Exception $e) {
+        error_log("Migration failed: " . $e->getMessage());
+    }
+    
     // Pobieramy wszystko z jobs_ai (teraz jedyne źródło)
     // Sortowanie: najpierw sort_order (jeśli nie NULL), potem created_at (fallback)
     $sql = "SELECT * FROM jobs_ai ORDER BY sort_order IS NULL, sort_order ASC, created_at ASC";
