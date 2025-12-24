@@ -36,23 +36,35 @@ const COLUMN_NAMES: Record<string, string> = {
 // Geokodowanie przez Nominatim (OSM)
 const geocodeWithNominatim = async (address: string): Promise<{ lat: number; lng: number } | null> => {
   try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Polska')}&limit=1`,
-      {
-        headers: {
-          'User-Agent': 'CRM-MontazReklam24'
-        }
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Polska')}&limit=1`;
+    console.log('🌍 Nominatim request:', url);
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'CRM-MontazReklam24'
       }
-    );
+    });
+    
+    if (!response.ok) {
+      console.error('❌ Nominatim HTTP error:', response.status, response.statusText);
+      return null;
+    }
+    
     const data = await response.json();
+    console.log('📥 Nominatim response:', { address, dataLength: data?.length, firstResult: data?.[0] });
+    
     if (data && data.length > 0) {
-      return {
+      const coords = {
         lat: parseFloat(data[0].lat),
         lng: parseFloat(data[0].lon)
       };
+      console.log('✅ Nominatim success:', { address, coords });
+      return coords;
+    } else {
+      console.warn('⚠️ Nominatim: Brak wyników dla', address);
     }
   } catch (error) {
-    console.error('Nominatim geocoding error:', error);
+    console.error('❌ Nominatim geocoding error:', error);
   }
   return null;
 };
