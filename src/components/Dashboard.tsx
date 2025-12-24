@@ -1376,10 +1376,20 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
       .map((job, idx) => {
         // Normalizuj order - jeśli nie ma, użyj index
+        // Używamy idx jako fallback tylko gdy order/columnOrder są null/undefined
         const normalizedOrder = job.order ?? job.columnOrder ?? idx;
         return { ...job, normalizedOrder };
       })
-      .sort((a, b) => a.normalizedOrder - b.normalizedOrder);
+      .sort((a, b) => {
+        // Sortuj po normalizedOrder, ale jeśli są równe, użyj idx jako tie-breaker
+        if (a.normalizedOrder === b.normalizedOrder) {
+          // Znajdź oryginalny index w tablicy jobs
+          const idxA = jobs.findIndex(j => j.id === a.id);
+          const idxB = jobs.findIndex(j => j.id === b.id);
+          return idxA - idxB;
+        }
+        return a.normalizedOrder - b.normalizedOrder;
+      });
     
     return prepareJobs;
   };
@@ -1456,8 +1466,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     if (index === -1 || index === 0) return;
     
     const otherJob = sortedJobs[index - 1];
-    const order1 = sortedJobs[index].normalizedOrder;
-    const order2 = otherJob.normalizedOrder;
+    
+    // Użyj index jako order - to zapewni unikalne wartości
+    const order1 = index; // Aktualna pozycja
+    const order2 = index - 1; // Pozycja poprzedniego
     
     console.log('🔄 handleMoveLeftInPrepare:', {
       jobId,
@@ -1502,8 +1514,11 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     }
     
     const otherJob = sortedJobs[index + 1];
-    const order1 = sortedJobs[index].normalizedOrder;
-    const order2 = otherJob.normalizedOrder;
+    
+    // Użyj index jako order - to zapewni unikalne wartości
+    // Jeśli wszystkie mają order: 0, to zamieniamy index zamiast order
+    const order1 = index; // Aktualna pozycja
+    const order2 = index + 1; // Pozycja następnego
     
     console.log('🔄 handleMoveRightInPrepare PRZED:', {
       jobId,
@@ -1520,7 +1535,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       allOrders: sortedJobs.map(j => ({ id: j.id, title: j.data.jobTitle?.substring(0, 20), order: j.order, columnOrder: j.columnOrder, normalized: j.normalizedOrder }))
     });
     
-    // Zamiana orderów
+    // Zamiana orderów - używamy index jako order
     setJobs(prev => prev.map(j => {
       if (j.id === jobId) return { ...j, order: order2, columnOrder: order2 };
       if (j.id === otherJob.id) return { ...j, order: order1, columnOrder: order1 };
@@ -1528,11 +1543,24 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     }));
     
     try {
+      console.log('💾 handleMoveRightInPrepare: Zapisuję do API...', {
+        jobId,
+        order2,
+        otherJobId: otherJob.id,
+        order1
+      });
+      
       await Promise.all([
         jobsService.updateJob(jobId, { order: order2 }),
         jobsService.updateJob(otherJob.id, { order: order1 })
       ]);
+      
+      console.log('✅ handleMoveRightInPrepare: API zapisane, wywołuję broadcastChange');
       broadcastChange();
+      
+      // NIE odświeżaj - używamy optymistycznej aktualizacji
+      // loadJobs() wywoła się automatycznie przez storage event listener w innych oknach
+      // ale w tym oknie już mamy zaktualizowany stan lokalny
       
       // Sprawdź po aktualizacji
       const afterSorted = getPrepareJobsSorted();
