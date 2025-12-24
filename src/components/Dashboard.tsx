@@ -1922,14 +1922,14 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     }
     
     // Dla innych kolumn: standardowe sortowanie
-    return filtered.sort((a, b) => {
+    const result = filtered.sort((a, b) => {
       const orderA = a.order ?? a.columnOrder ?? 0;
       const orderB = b.order ?? b.columnOrder ?? 0;
       return orderA - orderB;
     });
     // Debug: log when rendering WED column
     if (colId === 'WED' && result.length > 0) {
-      console.log('🟠 RENDER WED:', result.map(j => ({ title: j.data.jobTitle?.substring(0,15), order: j.order })));
+      console.log('🟠 RENDER WED:', result.map((j: Job) => ({ title: j.data.jobTitle?.substring(0,15), order: j.order })));
     }
     return result;
   };
@@ -2464,7 +2464,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                         Przeciągnij tutaj zlecenie
                       </div>
                     ) : (
-                      rowJobs.map((job, idx) => {
+                      rowJobs.map((job: Job, idx: number) => {
                         const { canMoveLeft, canMoveRight, canMoveUp, canMoveDown } = getJobMoveLeftRightInfo(job.id);
                         const matchesFilter = jobMatchesPaymentFilter(job);
                         return (
@@ -2727,7 +2727,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                         Przeciągnij tutaj zlecenie
                       </div>
                     ) : (
-                      rowJobs.map((job, idx) => {
+                      rowJobs.map((job: Job, idx: number) => {
                         const { canMoveLeft, canMoveRight, canMoveUp, canMoveDown } = getJobMoveLeftRightInfo(job.id);
                         return (
                           <div key={job.id}>
