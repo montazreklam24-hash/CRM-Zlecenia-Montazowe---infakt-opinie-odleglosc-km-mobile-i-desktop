@@ -324,22 +324,23 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
         onMouseLeave={() => setShowArrows(false)}
       >
         {/* LEFT arrow - dla PREPARE przesuwa o jedną pozycję w lewo, dla innych kolumn przenosi między kolumnami */}
-        {/* LEFT/RIGHT arrows - TYMCZASOWO WYŁĄCZONE DLA PREPARE */}
-        {showArrows && canMoveLeft && currentColumnId !== 'PREPARE' && (
+        {/* LEFT arrow - dla PREPARE przesuwa o jedną pozycję w lewo, dla innych kolumn przenosi między kolumnami */}
+        {showArrows && canMoveLeft && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveLeft?.(job.id); }}
             className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń w lewo"
+            title={currentColumnId === 'PREPARE' ? "Przesuń o jedną pozycję w lewo" : "Przesuń w lewo"}
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
         )}
         
-        {showArrows && canMoveRight && currentColumnId !== 'PREPARE' && (
+        {/* RIGHT arrow - dla PREPARE przesuwa o jedną pozycję w prawo, dla innych kolumn przenosi między kolumnami */}
+        {showArrows && canMoveRight && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveRight?.(job.id); }}
             className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń w prawo"
+            title={currentColumnId === 'PREPARE' ? "Przesuń o jedną pozycję w prawo" : "Przesuń w prawo"}
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -738,22 +739,23 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
         )}
         
         {/* LEFT arrow - dla PREPARE przesuwa o jedną pozycję w lewo, dla innych kolumn przenosi między kolumnami */}
-        {/* LEFT/RIGHT arrows - TYMCZASOWO WYŁĄCZONE DLA PREPARE */}
-        {showArrows && canMoveLeft && currentColumnId !== 'PREPARE' && (
+        {/* LEFT arrow - dla PREPARE przesuwa o jedną pozycję w lewo, dla innych kolumn przenosi między kolumnami */}
+        {showArrows && canMoveLeft && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveLeft?.(job.id); }}
             className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń w lewo"
+            title={currentColumnId === 'PREPARE' ? "Przesuń o jedną pozycję w lewo" : "Przesuń w lewo"}
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
         )}
         
-        {showArrows && canMoveRight && currentColumnId !== 'PREPARE' && (
+        {/* RIGHT arrow - dla PREPARE przesuwa o jedną pozycję w prawo, dla innych kolumn przenosi między kolumnami */}
+        {showArrows && canMoveRight && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveRight?.(job.id); }}
             className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń w prawo"
+            title={currentColumnId === 'PREPARE' ? "Przesuń o jedną pozycję w prawo" : "Przesuń w prawo"}
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -1332,7 +1334,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
 
     const columnId = job.columnId || 'PREPARE';
     
-    // Special handling for PREPARE - TYMCZASOWO WYŁĄCZONE STRZAŁKI LEFT/RIGHT
+    // Special handling for PREPARE - arrows allow reordering
     if (columnId === 'PREPARE') {
         const colJobs = jobs
             .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
@@ -1342,10 +1344,11 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
         return orderA - orderB;
       });
         const index = colJobs.findIndex(j => j.id === jobId);
-        // TYMCZASOWO WYŁĄCZONE: canMoveLeft i canMoveRight zawsze false dla PREPARE
+        if (index === -1) return { canMoveLeft: false, canMoveRight: false };
+        
         return {
-            canMoveLeft: false, // TYMCZASOWO WYŁĄCZONE
-            canMoveRight: false, // TYMCZASOWO WYŁĄCZONE
+            canMoveLeft: index > 0,
+            canMoveRight: index < colJobs.length - 1,
             canMoveUp: index > 0,
             canMoveDown: index < colJobs.length - 1
         };
