@@ -323,8 +323,8 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
         onMouseEnter={() => setShowArrows(true)}
         onMouseLeave={() => setShowArrows(false)}
       >
-        {/* LEFT arrow - appears on hover at left */}
-        {showArrows && canMoveLeft && (
+        {/* LEFT arrow - appears on hover at left (ukryte dla PREPARE - używamy UP/DOWN) */}
+        {showArrows && canMoveLeft && currentColumnId !== 'PREPARE' && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveLeft?.(job.id); }}
             className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
@@ -334,8 +334,8 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           </button>
         )}
         
-        {/* RIGHT arrow - appears on hover at right */}
-        {showArrows && canMoveRight && (
+        {/* RIGHT arrow - appears on hover at right (ukryte dla PREPARE - używamy UP/DOWN) */}
+        {showArrows && canMoveRight && currentColumnId !== 'PREPARE' && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveRight?.(job.id); }}
             className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
@@ -737,8 +737,8 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
           </button>
         )}
         
-        {/* LEFT arrow - appears on hover at left */}
-        {showArrows && canMoveLeft && (
+        {/* LEFT arrow - appears on hover at left (ukryte dla PREPARE - używamy UP/DOWN) */}
+        {showArrows && canMoveLeft && currentColumnId !== 'PREPARE' && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveLeft?.(job.id); }}
             className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
@@ -748,8 +748,8 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
           </button>
         )}
         
-        {/* RIGHT arrow - appears on hover at right */}
-        {showArrows && canMoveRight && (
+        {/* RIGHT arrow - appears on hover at right (ukryte dla PREPARE - używamy UP/DOWN) */}
+        {showArrows && canMoveRight && currentColumnId !== 'PREPARE' && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveRight?.(job.id); }}
             className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
@@ -1362,28 +1362,25 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const index = colJobs.findIndex(j => j.id === jobId);
     if (index === -1 || index === 0) return; // Już na początku
     
-    // Przesuń wszystkie zlecenia o 1 w górę
-    const newOrder = 0;
+    // Przesuń wszystkie zlecenia przed aktualnym o 1 w dół (zwiększ order)
     const jobsToUpdate = colJobs.slice(0, index).map(j => ({
       id: j.id,
-      currentOrder: j.order || colJobs.indexOf(j)
+      newOrder: (j.order || 0) + 1
     }));
     
     // Optymistyczna aktualizacja
     setJobs(prev => prev.map(j => {
-      if (j.id === jobId) return { ...j, order: newOrder };
-      if (jobsToUpdate.some(u => u.id === j.id)) {
-        const jobUpdate = jobsToUpdate.find(u => u.id === j.id);
-        return { ...j, order: (jobUpdate?.currentOrder || 0) + 1 };
-      }
+      if (j.id === jobId) return { ...j, order: 0 };
+      const update = jobsToUpdate.find(u => u.id === j.id);
+      if (update) return { ...j, order: update.newOrder };
       return j;
     }));
     
     try {
-      await jobsService.updateJob(jobId, { order: newOrder });
+      await jobsService.updateJob(jobId, { order: 0 });
       // Zaktualizuj pozostałe zlecenia
       await Promise.all(jobsToUpdate.map(u => 
-        jobsService.updateJob(u.id, { order: (u.currentOrder || 0) + 1 })
+        jobsService.updateJob(u.id, { order: u.newOrder })
       ));
       broadcastChange();
     } catch (err) {
@@ -1425,7 +1422,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     }
   };
 
-  // Helper for reordering in PREPARE
+  // Helper for reordering in PREPARE - przesuwa o jedną pozycję
   const handleReorder = async (jobId: string, direction: 'up' | 'down') => {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
@@ -1446,17 +1443,13 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     
     const otherJob = colJobs[swapIndex];
     
-    // Optimistic update - swap orders
-    const order1 = job.order || 0;
-    const order2 = otherJob.order || 0;
+    // Zamień order między dwoma zleceniami
+    const order1 = job.order ?? index;
+    const order2 = otherJob.order ?? swapIndex;
     
-    // Ensure orders are distinct enough to swap, otherwise use index
-    let newOrder1 = order2;
-    let newOrder2 = order1;
-    if (order1 === order2) {
-       newOrder1 = index; 
-       newOrder2 = swapIndex;
-    }
+    // Prosta zamiana orderów
+    const newOrder1 = order2;
+    const newOrder2 = order1;
 
     setJobs(prev => prev.map(j => {
         if (j.id === jobId) return { ...j, order: newOrder2 };
