@@ -6,7 +6,7 @@ import {
   Download, Copy, RefreshCw, Search, StretchHorizontal, ExternalLink,
   ChevronUp, ChevronDown, Map as MapIcon, Layers, LayoutDashboard,
   ChevronLeft, ChevronRight, Archive, Calendar, Star, MessageSquare, 
-  CreditCard, Image as ImageIcon, ThumbsUp, ThumbsDown
+  CreditCard, Image as ImageIcon, ThumbsUp, ThumbsDown, Radio
 } from 'lucide-react';
 import MapBoardGoogle from './MapBoardGoogle';
 import MapBoardOSM from './MapBoardOSM';
@@ -229,7 +229,8 @@ const MOVE_COLUMNS: { id: JobColumnId; label: string; shortLabel: string; icon: 
 
 const DraggableJobCard: React.FC<DraggableJobCardProps> = ({ 
   job, isAdmin, onSelectJob, onDelete, onDuplicate, onArchive,
-  onMoveLeft, onMoveRight, canMoveLeft, canMoveRight, onPaymentStatusChange, onMoveToColumn, onContextMenu
+  onMoveLeft, onMoveRight, onMoveUp, onMoveDown, canMoveLeft, canMoveRight, canMoveUp, canMoveDown,
+  onPaymentStatusChange, onMoveToColumn, onContextMenu
 }) => {
   // Unikalne ID dla DnD - kombinacja id + createdAt zabezpiecza przed duplikatami
   const uniqueDragId = `${job.id}-${job.createdAt}`;
@@ -341,6 +342,28 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
             title="Przesuń w prawo"
           >
             <ChevronRight className="w-5 h-5" />
+          </button>
+        )}
+
+        {/* UP arrow (jump to start) - tylko dla PREPARE, pojawia się na górze */}
+        {showArrows && currentColumnId === 'PREPARE' && canMoveUp && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onMoveUp?.(job.id); }}
+            className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 p-0.5 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg hover:scale-110 transition-all"
+            title="Na początek"
+          >
+            <ChevronUp className="w-5 h-5" />
+          </button>
+        )}
+
+        {/* DOWN arrow (jump to end) - tylko dla PREPARE, pojawia się na dole */}
+        {showArrows && currentColumnId === 'PREPARE' && canMoveDown && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onMoveDown?.(job.id); }}
+            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-20 p-0.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:scale-110 transition-all"
+            title="Na koniec"
+          >
+            <ChevronDown className="w-5 h-5" />
           </button>
         )}
 
@@ -940,9 +963,15 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   const [searchQuery, setSearchQuery] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
-  const [showWeekend, setShowWeekend] = useState(false); // New state for weekend visibility
+  // Weekend - automatyczne rozwijanie w piątek/sobota/niedziela
+  const [showWeekend, setShowWeekend] = useState(() => {
+    const today = new Date().getDay(); // 0 = niedziela, 5 = piątek, 6 = sobota
+    return today === 5 || today === 6 || today === 0; // Piątek, sobota lub niedziela
+  });
   const [showTypeModal, setShowTypeModal] = useState(false);
   const healingDoneRef = useRef(false); // Zapobiega wielokrotnemu uruchamianiu healJobs
+  const [liveRefresh, setLiveRefresh] = useState(false); // Live refresh toggle
+  const [paymentFilter, setPaymentFilter] = useState<PaymentStatus | 'ALL'>('ALL'); // Payment filter dla aktywnego widoku
   
   // Context Menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; job: Job } | null>(null);
@@ -1045,6 +1074,38 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     }
   }, [refreshTrigger]);
 
+  // Broadcast zmian przez localStorage
+  const broadcastChange = () => {
+    localStorage.setItem('crm_last_change', Date.now().toString());
+  };
+
+  // Nasłuchuj zmian z innych okien
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'crm_last_change' && e.newValue) {
+        // Inne okno zmieniło dane - odśwież
+        loadJobs(true); // Silent refresh
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Live refresh polling
+  useEffect(() => {
+    if (!liveRefresh) return;
+
+    const interval = setInterval(() => {
+      // Odświeżaj tylko gdy karta jest widoczna
+      if (document.visibilityState === 'visible') {
+        loadJobs(true); // Silent refresh
+      }
+    }, 12000); // Co 12 sekund
+
+    return () => clearInterval(interval);
+  }, [liveRefresh]);
+
   const loadJobs = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -1092,6 +1153,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       
       try {
         await jobsService.deleteJob(id);
+        broadcastChange();
         console.log('✅ Zlecenie usunięte:', id);
       } catch (err) {
         console.error('❌ Błąd usuwania zlecenia:', err);
@@ -1106,6 +1168,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     e.stopPropagation();
     if (window.confirm('Zduplikować to zlecenie?')) {
       await jobsService.duplicateJob(id);
+      broadcastChange();
       loadJobs();
     }
   };
@@ -1117,6 +1180,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     if (window.confirm(`📦 Czy na pewno chcesz zarchiwizować zlecenie?\n\n"${jobName}"`)) {
       try {
         await jobsService.updateJob(id, { status: JobStatus.ARCHIVED });
+        broadcastChange();
         loadJobs();
         console.log('✅ Zlecenie zarchiwizowane:', id);
       } catch (err) {
@@ -1263,9 +1327,12 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             .sort((a, b) => (a.order || 0) - (b.order || 0));
         const index = colJobs.findIndex(j => j.id === jobId);
         // Can move left (up) if not first, can move right (down) if not last
+        // Can move up (jump to start) if not first, can move down (jump to end) if not last
         return {
             canMoveLeft: index > 0,
-            canMoveRight: index < colJobs.length - 1
+            canMoveRight: index < colJobs.length - 1,
+            canMoveUp: index > 0,
+            canMoveDown: index < colJobs.length - 1
         };
     }
 
@@ -1278,6 +1345,162 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       canMoveLeft: currentIndex > 0,
       canMoveRight: currentIndex < order.length - 1
     };
+  };
+
+  // Jump to start (początek - order = 0)
+  const handleJumpToStart = async (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    
+    const colId = job.columnId || 'PREPARE';
+    if (colId !== 'PREPARE') return; // Tylko dla PREPARE
+    
+    const colJobs = jobs
+      .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+    
+    const index = colJobs.findIndex(j => j.id === jobId);
+    if (index === -1 || index === 0) return; // Już na początku
+    
+    // Przesuń wszystkie zlecenia o 1 w górę
+    const newOrder = 0;
+    const jobsToUpdate = colJobs.slice(0, index).map(j => ({
+      id: j.id,
+      currentOrder: j.order || colJobs.indexOf(j)
+    }));
+    
+    // Optymistyczna aktualizacja
+    setJobs(prev => prev.map(j => {
+      if (j.id === jobId) return { ...j, order: newOrder };
+      if (jobsToUpdate.some(u => u.id === j.id)) {
+        const jobUpdate = jobsToUpdate.find(u => u.id === j.id);
+        return { ...j, order: (jobUpdate?.currentOrder || 0) + 1 };
+      }
+      return j;
+    }));
+    
+    try {
+      await jobsService.updateJob(jobId, { order: newOrder });
+      // Zaktualizuj pozostałe zlecenia
+      await Promise.all(jobsToUpdate.map(u => 
+        jobsService.updateJob(u.id, { order: (u.currentOrder || 0) + 1 })
+      ));
+      broadcastChange();
+    } catch (err) {
+      console.error('Jump to start failed', err);
+      loadJobs();
+    }
+  };
+
+  // Jump to end (koniec - order = max + 1)
+  const handleJumpToEnd = async (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    
+    const colId = job.columnId || 'PREPARE';
+    if (colId !== 'PREPARE') return; // Tylko dla PREPARE
+    
+    const colJobs = jobs
+      .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+    
+    const index = colJobs.findIndex(j => j.id === jobId);
+    if (index === -1 || index === colJobs.length - 1) return; // Już na końcu
+    
+    // Oblicz nowy order (max + 1)
+    const maxOrder = Math.max(...colJobs.map(j => j.order || 0));
+    const newOrder = maxOrder + 1;
+    
+    // Optymistyczna aktualizacja
+    setJobs(prev => prev.map(j => 
+      j.id === jobId ? { ...j, order: newOrder } : j
+    ));
+    
+    try {
+      await jobsService.updateJob(jobId, { order: newOrder });
+      broadcastChange();
+    } catch (err) {
+      console.error('Jump to end failed', err);
+      loadJobs();
+    }
+  };
+
+  // Jump to start (początek - order = 0) - tylko dla PREPARE
+  const handleJumpToStart = async (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    
+    const colId = job.columnId || 'PREPARE';
+    if (colId !== 'PREPARE') return; // Tylko dla PREPARE
+    
+    const colJobs = jobs
+      .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+    
+    const index = colJobs.findIndex(j => j.id === jobId);
+    if (index === -1 || index === 0) return; // Już na początku
+    
+    // Przesuń wszystkie zlecenia o 1 w górę
+    const newOrder = 0;
+    const jobsToUpdate = colJobs.slice(0, index).map(j => ({
+      id: j.id,
+      currentOrder: j.order || colJobs.indexOf(j)
+    }));
+    
+    // Optymistyczna aktualizacja
+    setJobs(prev => prev.map(j => {
+      if (j.id === jobId) return { ...j, order: newOrder };
+      if (jobsToUpdate.some(u => u.id === j.id)) {
+        const jobUpdate = jobsToUpdate.find(u => u.id === j.id);
+        return { ...j, order: (jobUpdate?.currentOrder || 0) + 1 };
+      }
+      return j;
+    }));
+    
+    try {
+      await jobsService.updateJob(jobId, { order: newOrder });
+      // Zaktualizuj pozostałe zlecenia
+      await Promise.all(jobsToUpdate.map(u => 
+        jobsService.updateJob(u.id, { order: (u.currentOrder || 0) + 1 })
+      ));
+      broadcastChange();
+    } catch (err) {
+      console.error('Jump to start failed', err);
+      loadJobs();
+    }
+  };
+
+  // Jump to end (koniec - order = max + 1) - tylko dla PREPARE
+  const handleJumpToEnd = async (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    
+    const colId = job.columnId || 'PREPARE';
+    if (colId !== 'PREPARE') return; // Tylko dla PREPARE
+    
+    const colJobs = jobs
+      .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+    
+    const index = colJobs.findIndex(j => j.id === jobId);
+    if (index === -1 || index === colJobs.length - 1) return; // Już na końcu
+    
+    // Oblicz nowy order (max + 1)
+    const maxOrder = Math.max(...colJobs.map(j => j.order || 0));
+    const newOrder = maxOrder + 1;
+    
+    // Optymistyczna aktualizacja
+    setJobs(prev => prev.map(j => 
+      j.id === jobId ? { ...j, order: newOrder } : j
+    ));
+    
+    try {
+      await jobsService.updateJob(jobId, { order: newOrder });
+      broadcastChange();
+    } catch (err) {
+      console.error('Jump to end failed', err);
+      loadJobs();
+    }
   };
 
   // Helper for reordering in PREPARE
@@ -1324,6 +1547,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             jobsService.updateJob(jobId, { order: newOrder2 }),
             jobsService.updateJob(otherJob.id, { order: newOrder1 })
         ]);
+        broadcastChange();
     } catch (err) {
         console.error('Reorder failed', err);
         loadJobs();
@@ -1404,6 +1628,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     // Zapisz do backendu
     try {
       await jobsService.updateJob(jobId, { paymentStatus: newStatus });
+      broadcastChange();
     } catch (err) {
       console.error('Failed to update payment status:', err);
       loadJobs(); // Reload on error
@@ -1446,6 +1671,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     // Zapisz do backendu z prawidłowym order
     try {
       await jobsService.updateJobColumn(jobId, targetColumnId, maxOrder);
+      broadcastChange();
       console.log('✅ handleMoveToColumn: zapisano pomyślnie');
     } catch (err) {
       console.error('❌ Failed to move job to column:', err);
@@ -1694,6 +1920,13 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     return result;
   };
 
+  // Helper do sprawdzania czy karta pasuje do filtra płatności
+  const jobMatchesPaymentFilter = (job: Job): boolean => {
+    if (activeTab !== 'ACTIVE' || paymentFilter === 'ALL') return true;
+    const jobPaymentStatus = job.paymentStatus || PaymentStatus.NONE;
+    return jobPaymentStatus === paymentFilter;
+  };
+
   const isAdmin = role === UserRole.ADMIN;
 
   if (loading) {
@@ -1744,22 +1977,115 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             </button>
           </div>
           
-          {isAdmin && (
-            <button 
-              onClick={onCreateNew}
-              className="px-3 sm:px-5 py-2.5 font-bold flex items-center gap-2 transition-all active:scale-95 flex-shrink-0"
-              style={{ 
-                background: 'var(--accent-orange)', 
-                color: 'var(--text-inverse)',
-                borderRadius: 'var(--radius-lg)',
-                boxShadow: 'var(--shadow-md)'
-              }}
+          <div className="flex items-center gap-2">
+            {/* Live Refresh Toggle */}
+            <button
+              onClick={() => setLiveRefresh(!liveRefresh)}
+              className={`px-3 py-2 font-bold flex items-center gap-2 transition-all rounded-lg ${
+                liveRefresh 
+                  ? 'bg-green-500 text-white shadow-md' 
+                  : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+              }`}
+              title={liveRefresh ? 'Wyłącz live odświeżanie' : 'Włącz live odświeżanie'}
             >
-              <Plus className="w-5 h-5" /> 
-              <span className="hidden sm:inline">NOWE ZLECENIE</span>
+              <Radio className={`w-4 h-4 ${liveRefresh ? 'fill-white' : ''}`} />
+              <span className="hidden sm:inline text-xs">LIVE</span>
             </button>
-          )}
+
+            {/* Refresh Button */}
+            <button
+              onClick={() => loadJobs()}
+              className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 font-bold flex items-center gap-2 transition-all rounded-lg border border-slate-300 shadow-sm"
+              title="Odśwież ręcznie"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span className="hidden sm:inline text-xs">Odśwież</span>
+            </button>
+
+            {isAdmin && (
+              <button 
+                onClick={onCreateNew}
+                className="px-3 sm:px-5 py-2.5 font-bold flex items-center gap-2 transition-all active:scale-95 flex-shrink-0"
+                style={{ 
+                  background: 'var(--accent-orange)', 
+                  color: 'var(--text-inverse)',
+                  borderRadius: 'var(--radius-lg)',
+                  boxShadow: 'var(--shadow-md)'
+                }}
+              >
+                <Plus className="w-5 h-5" /> 
+                <span className="hidden sm:inline">NOWE ZLECENIE</span>
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Payment Filters - Chips dla aktywnego widoku */}
+        {activeTab === 'ACTIVE' && (
+          <div className="flex flex-wrap items-center gap-2 px-1">
+            <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Płatność:</span>
+            <button
+              onClick={() => setPaymentFilter('ALL')}
+              className={`px-2.5 py-1 text-xs font-bold rounded-full transition-all ${
+                paymentFilter === 'ALL'
+                  ? 'bg-blue-500 text-white shadow-md'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Wszystkie
+            </button>
+            <button
+              onClick={() => setPaymentFilter(PaymentStatus.PROFORMA)}
+              className={`px-2.5 py-1 text-xs font-bold rounded-full transition-all ${
+                paymentFilter === PaymentStatus.PROFORMA
+                  ? 'bg-orange-500 text-white shadow-md'
+                  : 'bg-orange-50 text-orange-600 hover:bg-orange-100'
+              }`}
+            >
+              Proforma
+            </button>
+            <button
+              onClick={() => setPaymentFilter(PaymentStatus.PAID)}
+              className={`px-2.5 py-1 text-xs font-bold rounded-full transition-all ${
+                paymentFilter === PaymentStatus.PAID
+                  ? 'bg-green-500 text-white shadow-md'
+                  : 'bg-green-50 text-green-600 hover:bg-green-100'
+              }`}
+            >
+              Opłacone
+            </button>
+            <button
+              onClick={() => setPaymentFilter(PaymentStatus.CASH)}
+              className={`px-2.5 py-1 text-xs font-bold rounded-full transition-all ${
+                paymentFilter === PaymentStatus.CASH
+                  ? 'bg-yellow-500 text-white shadow-md'
+                  : 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
+              }`}
+            >
+              Gotówka
+            </button>
+            <button
+              onClick={() => setPaymentFilter(PaymentStatus.OVERDUE)}
+              className={`px-2.5 py-1 text-xs font-bold rounded-full transition-all ${
+                paymentFilter === PaymentStatus.OVERDUE
+                  ? 'bg-red-500 text-white shadow-md'
+                  : 'bg-red-50 text-red-600 hover:bg-red-100'
+              }`}
+            >
+              Przeterminowane
+            </button>
+            <button
+              onClick={() => setPaymentFilter(PaymentStatus.PARTIAL)}
+              className={`px-2.5 py-1 text-xs font-bold rounded-full transition-all ${
+                paymentFilter === PaymentStatus.PARTIAL
+                  ? 'bg-purple-500 text-white shadow-md'
+                  : 'bg-purple-50 text-purple-600 hover:bg-purple-100'
+              }`}
+            >
+              Częściowe
+            </button>
+          </div>
+        )}
 
         {/* Archive Filters - Chips nad paskiem wyszukiwania */}
         {activeTab === 'ARCHIVED' && (
@@ -2125,24 +2451,33 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                       </div>
                     ) : (
                       rowJobs.map(job => {
-                        const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
+                        const { canMoveLeft, canMoveRight, canMoveUp, canMoveDown } = getJobMoveLeftRightInfo(job.id);
+                        const matchesFilter = jobMatchesPaymentFilter(job);
                         return (
-                          <DraggableJobCard
+                          <div 
                             key={job.id}
-                            job={job}
-                            isAdmin={isAdmin}
-                            onSelectJob={onSelectJob}
-                            onDelete={handleDelete}
-                            onDuplicate={handleDuplicate}
-                            onArchive={handleArchive}
-                            onPaymentStatusChange={handlePaymentStatusChange}
-                            onMoveToColumn={handleMoveToColumn}
-                            onMoveLeft={handleMoveLeft}
-                            onMoveRight={handleMoveRight}
-                            canMoveLeft={canMoveLeft}
-                            canMoveRight={canMoveRight}
-                            onContextMenu={handleContextMenu}
-                          />
+                            className={matchesFilter ? '' : 'opacity-50 brightness-75 transition-opacity'}
+                          >
+                            <DraggableJobCard
+                              job={job}
+                              isAdmin={isAdmin}
+                              onSelectJob={onSelectJob}
+                              onDelete={handleDelete}
+                              onDuplicate={handleDuplicate}
+                              onArchive={handleArchive}
+                              onPaymentStatusChange={handlePaymentStatusChange}
+                              onMoveToColumn={handleMoveToColumn}
+                              onMoveLeft={handleMoveLeft}
+                              onMoveRight={handleMoveRight}
+                              onMoveUp={handleJumpToStart}
+                              onMoveDown={handleJumpToEnd}
+                              canMoveLeft={canMoveLeft}
+                              canMoveRight={canMoveRight}
+                              canMoveUp={canMoveUp}
+                              canMoveDown={canMoveDown}
+                              onContextMenu={handleContextMenu}
+                            />
+                          </div>
                         );
                       })
                     )}
@@ -2273,7 +2608,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                 ) : (
                   <MapBoardOSM 
                     jobs={filteredJobs} 
-                    onSelectJob={onSelectJob} 
+                    onSelectJob={onSelectJob}
+                    onJobsUpdated={loadJobs}
                   />
                 )}
               </div>
@@ -2377,7 +2713,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                       </div>
                     ) : (
                       rowJobs.map(job => {
-                        const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
+                        const { canMoveLeft, canMoveRight, canMoveUp, canMoveDown } = getJobMoveLeftRightInfo(job.id);
                         return (
                           <DraggableJobCard
                             key={job.id}
@@ -2391,8 +2727,12 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             onMoveToColumn={handleMoveToColumn}
                             onMoveLeft={handleMoveLeft}
                             onMoveRight={handleMoveRight}
+                            onMoveUp={job.columnId === 'PREPARE' ? handleJumpToStart : undefined}
+                            onMoveDown={job.columnId === 'PREPARE' ? handleJumpToEnd : undefined}
                             canMoveLeft={canMoveLeft}
                             canMoveRight={canMoveRight}
+                            canMoveUp={job.columnId === 'PREPARE' ? canMoveUp : undefined}
+                            canMoveDown={job.columnId === 'PREPARE' ? canMoveDown : undefined}
                             onContextMenu={handleContextMenu}
                           />
                         );
@@ -2477,7 +2817,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             ) : (
               <MapBoardOSM 
                 jobs={filteredJobs} 
-                onSelectJob={onSelectJob} 
+                onSelectJob={onSelectJob}
+                onJobsUpdated={loadJobs}
               />
             )}
           </div>
@@ -2622,7 +2963,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             ) : (
               <MapBoardOSM 
                 jobs={filteredJobs} 
-                onSelectJob={onSelectJob} 
+                onSelectJob={onSelectJob}
+                onJobsUpdated={loadJobs}
               />
             )}
           </div>

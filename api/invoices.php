@@ -129,6 +129,16 @@ function handleCreateProforma() {
             throw new Exception('Nie udało się utworzyć proformy');
         }
         
+        // WAŻNE: Pobierz szczegóły faktury z API, żeby mieć poprawne kwoty
+        $invoiceDetails = $infakt->getInvoice($invoice['id']);
+        if (!$invoiceDetails) {
+            throw new Exception('Nie udało się pobrać szczegółów proformy');
+        }
+        
+        // Wyciągnij kwoty z odpowiedzi API (są w groszach)
+        $netPrice = isset($invoiceDetails['net_price']) ? floatval($invoiceDetails['net_price']) : 0;
+        $grossPrice = isset($invoiceDetails['gross_price']) ? floatval($invoiceDetails['gross_price']) : 0;
+        
         // Utwórz link do udostępniania
         $shareLink = $infakt->createShareLink($invoice['id']);
         
@@ -138,16 +148,16 @@ function handleCreateProforma() {
             $emailSent = $infakt->sendInvoiceByEmail($invoice['id'], $input['email']);
         }
         
-        // Zapisz w bazie (opcjonalnie)
+        // Zapisz w bazie (opcjonalnie) - użyj kwot z getInvoice
         $jobId = isset($input['jobId']) ? $input['jobId'] : null;
         if ($jobId) {
             $pdo = getDB();
             createInvoicesTable($pdo);
             saveInvoiceToDb($jobId, array(
                 'id' => $invoice['id'],
-                'number' => $invoice['number'],
-                'total_net' => isset($invoice['net_price']) ? $invoice['net_price'] / 100 : 0,
-                'total_gross' => isset($invoice['gross_price']) ? $invoice['gross_price'] / 100 : 0,
+                'number' => isset($invoiceDetails['number']) ? $invoiceDetails['number'] : $invoice['number'],
+                'total_net' => $netPrice / 100, // Konwersja z groszy na złote
+                'total_gross' => $grossPrice / 100, // Konwersja z groszy na złote
                 'share_link' => $shareLink
             ), 'proforma', $clientId);
         }
@@ -254,6 +264,16 @@ function handleCreateInvoice() {
             throw new Exception('Nie udało się utworzyć faktury');
         }
         
+        // WAŻNE: Pobierz szczegóły faktury z API, żeby mieć poprawne kwoty
+        $invoiceDetails = $infakt->getInvoice($invoice['id']);
+        if (!$invoiceDetails) {
+            throw new Exception('Nie udało się pobrać szczegółów faktury');
+        }
+        
+        // Wyciągnij kwoty z odpowiedzi API (są w groszach)
+        $netPrice = isset($invoiceDetails['net_price']) ? floatval($invoiceDetails['net_price']) : 0;
+        $grossPrice = isset($invoiceDetails['gross_price']) ? floatval($invoiceDetails['gross_price']) : 0;
+        
         // Link do udostępniania
         $shareLink = $infakt->createShareLink($invoice['id']);
         
@@ -263,16 +283,16 @@ function handleCreateInvoice() {
             $emailSent = $infakt->sendInvoiceByEmail($invoice['id'], $input['email']);
         }
         
-        // Zapisz w bazie
+        // Zapisz w bazie - użyj kwot z getInvoice
         $jobId = isset($input['jobId']) ? $input['jobId'] : null;
         if ($jobId) {
             $pdo = getDB();
             createInvoicesTable($pdo);
             saveInvoiceToDb($jobId, array(
                 'id' => $invoice['id'],
-                'number' => $invoice['number'],
-                'total_net' => isset($invoice['net_price']) ? $invoice['net_price'] / 100 : 0,
-                'total_gross' => isset($invoice['gross_price']) ? $invoice['gross_price'] / 100 : 0,
+                'number' => isset($invoiceDetails['number']) ? $invoiceDetails['number'] : $invoice['number'],
+                'total_net' => $netPrice / 100, // Konwersja z groszy na złote
+                'total_gross' => $grossPrice / 100, // Konwersja z groszy na złote
                 'share_link' => $shareLink,
                 'status' => $markPaid ? 'paid' : 'pending'
             ), 'vat', $clientId);

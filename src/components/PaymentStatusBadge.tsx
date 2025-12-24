@@ -81,7 +81,7 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
     lg: 'text-sm px-3 py-1.5'
   };
 
-  // Dla NONE pokaż "Nie wybrano"
+  // Dla NONE pokaż "Brak"
   if (status === PaymentStatus.NONE) {
     return (
       <div className={`
@@ -89,7 +89,7 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
         bg-slate-100 text-slate-500 border border-slate-200
         ${sizeClasses[size]}
       `}>
-        <span>Nie wybrano</span>
+        <span>Brak</span>
       </div>
     );
   }
@@ -122,7 +122,7 @@ export const PaymentStatusBar: React.FC<{
   showLabel?: boolean;
 }> = ({ status, onClick, showLabel = true }) => {
   const config: Record<PaymentStatus, { bg: string; label: string }> = {
-    [PaymentStatus.NONE]: { bg: 'bg-gradient-to-r from-slate-300 to-slate-400', label: 'NIE WYBRANO' },
+    [PaymentStatus.NONE]: { bg: 'bg-gradient-to-r from-slate-300 to-slate-400', label: 'BRAK' },
     [PaymentStatus.PROFORMA]: { bg: 'bg-gradient-to-r from-blue-600 to-blue-700', label: 'PROFORMA' },
     [PaymentStatus.PARTIAL]: { bg: 'bg-gradient-to-r from-purple-400 to-purple-500', label: 'ZALICZKA' },
     [PaymentStatus.PAID]: { bg: 'bg-gradient-to-r from-green-400 to-green-500', label: 'OPŁACONE' },
@@ -136,8 +136,8 @@ export const PaymentStatusBar: React.FC<{
     <div 
       className={`${cfg.bg} flex items-center justify-center cursor-pointer hover:brightness-110 transition-all`}
       style={{ 
-        height: showLabel ? '32px' : '4px',
-        minHeight: showLabel ? '32px' : '4px'
+        height: showLabel ? '25px' : '4px',
+        minHeight: showLabel ? '25px' : '4px'
       }}
       onClick={onClick}
       title="Kliknij aby zmienić status płatności"
@@ -145,7 +145,7 @@ export const PaymentStatusBar: React.FC<{
       {showLabel && (
         <span 
           className={`font-bold uppercase tracking-wide ${status === PaymentStatus.NONE ? 'text-slate-600' : 'text-white'}`}
-          style={{ fontSize: '16px', letterSpacing: '0.5px' }}
+          style={{ fontSize: '10px', letterSpacing: '0.5px' }}
         >
           {cfg.label}
         </span>
