@@ -1437,11 +1437,26 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       .sort((a, b) => (a.order || 0) - (b.order || 0));
     
     const index = colJobs.findIndex(j => j.id === jobId);
-    if (index === -1 || index === 0) return; // Już na początku
+    if (index === -1 || index === 0) {
+      console.log('⚠️ handleMoveLeftInPrepare: Już na początku lub nie znaleziono', { index });
+      return; // Już na początku
+    }
     
     const otherJob = colJobs[index - 1];
-    const order1 = job.order ?? index;
-    const order2 = otherJob.order ?? (index - 1);
+    
+    // Użyj rzeczywistych orderów z bazy, jeśli są, w przeciwnym razie użyj index
+    const order1 = job.order !== null && job.order !== undefined ? job.order : index;
+    const order2 = otherJob.order !== null && otherJob.order !== undefined ? otherJob.order : (index - 1);
+    
+    console.log('🔄 handleMoveLeftInPrepare:', {
+      jobId,
+      jobTitle: job.data.jobTitle?.substring(0, 30),
+      index,
+      order1,
+      order2,
+      otherJobId: otherJob.id,
+      otherJobTitle: otherJob.data.jobTitle?.substring(0, 30)
+    });
     
     // Zamiana orderów
     setJobs(prev => prev.map(j => {
@@ -1456,8 +1471,9 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
         jobsService.updateJob(otherJob.id, { order: order1 })
       ]);
       broadcastChange();
+      console.log('✅ handleMoveLeftInPrepare: Sukces');
     } catch (err) {
-      console.error('Move left in PREPARE failed', err);
+      console.error('❌ Move left in PREPARE failed', err);
       loadJobs();
     }
   };
@@ -1475,11 +1491,27 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       .sort((a, b) => (a.order || 0) - (b.order || 0));
     
     const index = colJobs.findIndex(j => j.id === jobId);
-    if (index === -1 || index === colJobs.length - 1) return; // Już na końcu
+    if (index === -1 || index === colJobs.length - 1) {
+      console.log('⚠️ handleMoveRightInPrepare: Już na końcu lub nie znaleziono', { index, total: colJobs.length });
+      return; // Już na końcu
+    }
     
     const otherJob = colJobs[index + 1];
-    const order1 = job.order ?? index;
-    const order2 = otherJob.order ?? (index + 1);
+    
+    // Użyj rzeczywistych orderów z bazy, jeśli są, w przeciwnym razie użyj index
+    // WAŻNE: Musimy użyć rzeczywistych wartości order, nie index!
+    const order1 = job.order !== null && job.order !== undefined ? job.order : index;
+    const order2 = otherJob.order !== null && otherJob.order !== undefined ? otherJob.order : (index + 1);
+    
+    console.log('🔄 handleMoveRightInPrepare:', {
+      jobId,
+      jobTitle: job.data.jobTitle?.substring(0, 30),
+      index,
+      order1,
+      order2,
+      otherJobId: otherJob.id,
+      otherJobTitle: otherJob.data.jobTitle?.substring(0, 30)
+    });
     
     // Zamiana orderów
     setJobs(prev => prev.map(j => {
@@ -1494,8 +1526,9 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
         jobsService.updateJob(otherJob.id, { order: order1 })
       ]);
       broadcastChange();
+      console.log('✅ handleMoveRightInPrepare: Sukces');
     } catch (err) {
-      console.error('Move right in PREPARE failed', err);
+      console.error('❌ Move right in PREPARE failed', err);
       loadJobs();
     }
   };
