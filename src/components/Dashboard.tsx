@@ -32,6 +32,13 @@ import {
   CollisionDetection,
 } from '@dnd-kit/core';
 
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
+
 // Custom collision detection: prioritize cards over columns
 const cardFirstCollision: CollisionDetection = (args) => {
   // First, check for card collisions using pointerWithin
@@ -232,34 +239,26 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
   onMoveLeft, onMoveRight, onMoveUp, onMoveDown, canMoveLeft, canMoveRight, canMoveUp, canMoveDown,
   onPaymentStatusChange, onMoveToColumn, onContextMenu
 }) => {
-  // Unikalne ID dla DnD - kombinacja id + createdAt zabezpiecza przed duplikatami
   const uniqueDragId = `${job.id}-${job.createdAt}`;
   
-  // Draggable
-  const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({
     id: uniqueDragId,
-    data: { jobId: job.id } // Prawdziwe ID do operacji
+    data: { jobId: job.id }
   });
-  
-  // Also droppable (for dropping other cards on this one)
-  const { setNodeRef: setDropRef, isOver: isDropOver } = useDroppable({
-    id: `card-${uniqueDragId}`,
-    data: { type: 'card', jobId: job.id }
-  });
-
-  // Combine refs
-  const setNodeRef = (node: HTMLElement | null) => {
-    setDragRef(node);
-    setDropRef(node);
-  };
 
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
+    transition,
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 9999 : 'auto',
   };
-
-  const showDropIndicator = isDropOver && !isDragging;
 
   const paymentColor = getPaymentStatusColor(job.paymentStatus || PaymentStatus.NONE);
   const paymentLabel = getPaymentStatusLabel(job.paymentStatus || PaymentStatus.NONE);
@@ -308,21 +307,11 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
   const currentColumnId = job.columnId || 'PREPARE';
 
   return (
-    <>
-      {/* Drop indicator - pokazuje gdzie wpadnie kafelek - renderowany jako osobny element w gridzie */}
-      {showDropIndicator && (
-        <div 
-          className="min-w-[160px] w-full h-full min-h-[280px] rounded-lg border-dashed animate-pulse flex items-center justify-center"
-          style={{ borderColor: '#3b82f6', background: 'rgba(59, 130, 246, 0.2)', borderWidth: '3px' }}
-        >
-          <span className="text-xs text-blue-500 font-bold">↓ TUTAJ ↓</span>
-        </div>
-      )}
-      <div 
-        className="relative group h-full"
-        onMouseEnter={() => setShowArrows(true)}
-        onMouseLeave={() => setShowArrows(false)}
-      >
+    <div 
+      className="relative group h-full"
+      onMouseEnter={() => setShowArrows(true)}
+      onMouseLeave={() => setShowArrows(false)}
+    >
         {/* LEFT arrow - WYŁĄCZONE DLA PREPARE (używaj drag & drop) */}
         {showArrows && canMoveLeft && currentColumnId !== 'PREPARE' && (
           <button
@@ -379,7 +368,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
             e.stopPropagation();
             onContextMenu?.(e, job);
           }}
-          className={`theme-card min-w-[160px] w-full min-h-[280px] h-full cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group relative flex flex-col overflow-visible touch-none ${showDropIndicator ? 'ring-2 ring-blue-400' : ''}`}
+          className={`theme-card min-w-[160px] w-full min-h-[280px] h-full cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group relative flex flex-col overflow-visible touch-none`}
         >
           {/* Click hint tooltip */}
           {showClickHint && (
@@ -579,7 +568,6 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
         </div>
       </div>
     </div>
-    </>
   );
 };
 
@@ -651,23 +639,17 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
   // Unikalne ID dla DnD - kombinacja id + createdAt zabezpiecza przed duplikatami
   const uniqueDragId = `${job.id}-${job.createdAt}`;
   
-  // Draggable
-  const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({
     id: uniqueDragId,
-    data: { jobId: job.id } // Prawdziwe ID do operacji
+    data: { jobId: job.id }
   });
-  
-  // Also droppable (for dropping other cards on this one)
-  const { setNodeRef: setDropRef, isOver: isDropOver } = useDroppable({
-    id: `card-${uniqueDragId}`,
-    data: { type: 'card', jobId: job.id }
-  });
-
-  // Combine refs
-  const setNodeRef = (node: HTMLElement | null) => {
-    setDragRef(node);
-    setDropRef(node);
-  };
 
   const [showClickHint, setShowClickHint] = useState(false);
   const [showArrows, setShowArrows] = useState(false);
@@ -682,10 +664,9 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
     : null;
   const addressParts = parseAddressForNav(job.data.address);
 
-  const showDropIndicator = isDropOver && !isDragging;
-
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
+    transition,
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 9999 : 'auto',
   };
@@ -701,21 +682,11 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
   const currentColumnId = job.columnId || 'PREPARE';
 
   return (
-    <>
-      {/* Drop indicator - pokazuje gdzie wpadnie kafelek */}
-      {showDropIndicator && (
-        <div 
-          className="w-full h-12 mb-2 rounded-lg border-dashed animate-pulse flex items-center justify-center"
-          style={{ borderColor: '#3b82f6', background: 'rgba(59, 130, 246, 0.2)', borderWidth: '3px' }}
-        >
-          <span className="text-[10px] text-blue-500 font-bold">↓ TUTAJ ↓</span>
-        </div>
-      )}
-      <div 
-        className="relative group"
-        onMouseEnter={() => setShowArrows(true)}
-        onMouseLeave={() => setShowArrows(false)}
-      >
+    <div 
+      className="relative group"
+      onMouseEnter={() => setShowArrows(true)}
+      onMouseLeave={() => setShowArrows(false)}
+    >
         {/* UP arrow - appears on hover at top */}
         {showArrows && canMoveUp && (
           <button
@@ -766,7 +737,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
           {...listeners}
           {...attributes}
           onDoubleClick={handleCardDoubleClick}
-          className={`theme-card cursor-grab active:cursor-grabbing transition-all hover:shadow-md relative overflow-hidden touch-none ${showDropIndicator ? 'ring-2 ring-blue-400' : ''}`}
+          className={`theme-card cursor-grab active:cursor-grabbing transition-all hover:shadow-md relative overflow-hidden touch-none`}
         >
         {/* PAYMENT STATUS BAR - na samej górze, kliknięcie otwiera mini-menu */}
         <div className="relative">
@@ -917,7 +888,6 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
         </div>
       </div>
     </div>
-    </>
   );
 };
 
@@ -1333,27 +1303,22 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
 
     const columnId = job.columnId || 'PREPARE';
     
-    // Special handling for PREPARE - WYŁĄCZONE STRZAŁKI LEFT/RIGHT (używaj drag & drop)
+    // Logika dla PREPARE: ruch w obrębie listy (+/- 1 index)
     if (columnId === 'PREPARE') {
-        const colJobs = jobs
-            .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
-            .sort((a, b) => {
-        const orderA = a.order ?? a.columnOrder ?? 0;
-        const orderB = b.order ?? b.columnOrder ?? 0;
-        return orderA - orderB;
-      });
+        const colJobs = getPrepareJobsSorted();
         const index = colJobs.findIndex(j => j.id === jobId);
+        
         if (index === -1) return { canMoveLeft: false, canMoveRight: false };
         
-        // WYŁĄCZONE: strzałki LEFT/RIGHT dla PREPARE - używaj drag & drop
         return {
-            canMoveLeft: false, // WYŁĄCZONE
-            canMoveRight: false, // WYŁĄCZONE
-            canMoveUp: index > 0,
-            canMoveDown: index < colJobs.length - 1
+            canMoveLeft: index > 0, // Można w lewo, jeśli nie jesteś pierwszy
+            canMoveRight: index < colJobs.length - 1, // Można w prawo, jeśli nie jesteś ostatni
+            canMoveUp: index > 0, // Opcjonalne: Na początek
+            canMoveDown: index < colJobs.length - 1 // Opcjonalne: Na koniec
         };
     }
 
+    // Logika dla kolumn dni tygodnia (przenoszenie między kolumnami)
     const order = getColumnOrder();
     const currentIndex = order.indexOf(columnId);
     
@@ -1446,9 +1411,9 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     }));
     
     try {
-      await jobsService.updateJob(jobId, { order: 0 });
+      await jobsService.updateJob(jobId, { sortOrder: 0 });
       await Promise.all(jobsToUpdate.map(u => 
-        jobsService.updateJob(u.id, { order: u.newOrder })
+        jobsService.updateJob(u.id, { sortOrder: u.newOrder * 10 })
       ));
       broadcastChange();
     } catch (err) {
@@ -1475,7 +1440,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     ));
     
     try {
-      await jobsService.updateJob(jobId, { order: newOrder });
+      await jobsService.updateJob(jobId, { sortOrder: newOrder * 10 });
       broadcastChange();
     } catch (err) {
       console.error('Jump to end failed', err);
@@ -1484,151 +1449,64 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   };
 
   // LEFT arrow dla PREPARE: Przesuwa o jedną pozycję w lewo (zamienia z poprzednim)
-  const handleMoveLeftInPrepare = async (jobId: string) => {
-    const job = jobs.find(j => j.id === jobId);
-    if (!job || (job.columnId || 'PREPARE') !== 'PREPARE') return;
-    
+  // Helper: Przesuń zlecenie w liście PREPARE o zadaną wartość (+1 lub -1)
+  const moveJobInPrepareList = async (jobId: string, direction: -1 | 1) => {
     const sortedJobs = getPrepareJobsSorted();
-    const index = sortedJobs.findIndex(j => j.id === jobId);
-    if (index === -1 || index === 0) return;
+    const currentIndex = sortedJobs.findIndex(j => j.id === jobId);
     
-    // Oblicz liczbę kolumn w gridzie
-    const columnsPerRow = getColumnsPerRow();
+    if (currentIndex === -1) return;
     
-    // Sprawdź czy jesteśmy na początku wiersza
-    const isAtStartOfRow = index % columnsPerRow === 0;
+    const newIndex = currentIndex + direction;
+    if (newIndex < 0 || newIndex >= sortedJobs.length) return;
+
+    // Tworzymy nową tablicę ID w pożądanej kolejności
+    const newOrderIds = sortedJobs.map(j => j.id);
+    // Usuń element z obecnej pozycji
+    const [movedId] = newOrderIds.splice(currentIndex, 1);
+    // Wstaw na nową pozycję
+    newOrderIds.splice(newIndex, 0, movedId);
     
-    // Jeśli jesteśmy na początku wiersza, nie możemy przesunąć w lewo
-    if (isAtStartOfRow) {
-      console.log('⚠️ handleMoveLeftInPrepare: Na początku wiersza', { index, columnsPerRow, isAtStartOfRow });
-      return;
-    }
-    
-    // Znajdź kafelek faktycznie w lewo (w tym samym wierszu)
-    const otherJob = sortedJobs[index - 1];
-    
-    // Użyj index jako order - to zapewni unikalne wartości
-    const order1 = index; // Aktualna pozycja
-    const order2 = index - 1; // Pozycja poprzedniego (w lewo)
-    
-    console.log('🔄 handleMoveLeftInPrepare:', {
-      jobId,
-      jobTitle: job.data.jobTitle?.substring(0, 30),
-      index,
-      columnsPerRow,
-      isAtStartOfRow: index % columnsPerRow === 0,
-      order1,
-      order2,
-      otherJobId: otherJob.id,
-      otherJobTitle: otherJob.data.jobTitle?.substring(0, 30)
+    console.log(`🔄 moveJobInPrepareList (${direction > 0 ? 'PRAWO' : 'LEWO'}):`, {
+        jobId,
+        fromIndex: currentIndex,
+        toIndex: newIndex,
+        newOrderIds
     });
-    
-    // Zamiana orderów
-    setJobs(prev => prev.map(j => {
-      if (j.id === jobId) return { ...j, order: order2, columnOrder: order2 };
-      if (j.id === otherJob.id) return { ...j, order: order1, columnOrder: order1 };
-      return j;
-    }));
-    
+
+    // 1. Optymistyczna aktualizacja UI
+    setJobs(prevJobs => {
+        const indexMap = new Map<string, number>();
+        newOrderIds.forEach((id, idx) => indexMap.set(id, idx));
+
+        return prevJobs.map(job => {
+            if ((job.columnId || 'PREPARE') === 'PREPARE' && indexMap.has(job.id)) {
+                const newIdx = indexMap.get(job.id)!;
+                return { 
+                    ...job, 
+                    sortOrder: (newIdx + 1) * 10,
+                    order: (newIdx + 1) * 10,
+                    columnOrder: (newIdx + 1) * 10,
+                    normalizedOrder: (newIdx + 1) * 10
+                };
+            }
+            return job;
+        });
+    });
+
+    // 2. Wysłanie do API
     try {
-      await Promise.all([
-        jobsService.updateJob(jobId, { order: order2 }),
-        jobsService.updateJob(otherJob.id, { order: order1 })
-      ]);
-      broadcastChange();
-      console.log('✅ handleMoveLeftInPrepare: Sukces');
+        await jobsService.reorderJobs('PREPARE', newOrderIds);
+        broadcastChange();
+        console.log('✅ moveJobInPrepareList: Zapisano w bazie');
     } catch (err) {
-      console.error('❌ Move left in PREPARE failed', err);
-      loadJobs();
+        console.error('❌ moveJobInPrepareList failed:', err);
+        loadJobs(); // Revert on error
     }
   };
 
-  // RIGHT arrow dla PREPARE: Przesuwa o jedną pozycję w prawo (zamienia z następnym)
-  const handleMoveRightInPrepare = async (jobId: string) => {
-    const job = jobs.find(j => j.id === jobId);
-    if (!job || (job.columnId || 'PREPARE') !== 'PREPARE') return;
-    
-    const sortedJobs = getPrepareJobsSorted();
-    const index = sortedJobs.findIndex(j => j.id === jobId);
-    if (index === -1 || index === sortedJobs.length - 1) {
-      console.log('⚠️ handleMoveRightInPrepare: Już na końcu', { index, total: sortedJobs.length });
-      return;
-    }
-    
-    // Oblicz liczbę kolumn w gridzie
-    const columnsPerRow = getColumnsPerRow();
-    
-    // Sprawdź czy jesteśmy na końcu wiersza
-    const isAtEndOfRow = (index + 1) % columnsPerRow === 0;
-    
-    // Jeśli jesteśmy na końcu wiersza, nie możemy przesunąć w prawo
-    if (isAtEndOfRow) {
-      console.log('⚠️ handleMoveRightInPrepare: Na końcu wiersza', { index, columnsPerRow, isAtEndOfRow });
-      return;
-    }
-    
-    // Znajdź kafelek faktycznie w prawo (w tym samym wierszu)
-    const otherJob = sortedJobs[index + 1];
-    
-    // Użyj index jako order - to zapewni unikalne wartości
-    const order1 = index; // Aktualna pozycja
-    const order2 = index + 1; // Pozycja następnego (w prawo)
-    
-    console.log('🔄 handleMoveRightInPrepare PRZED:', {
-      jobId,
-      jobTitle: job.data.jobTitle?.substring(0, 30),
-      index,
-      columnsPerRow,
-      isAtEndOfRow: (index + 1) % columnsPerRow === 0,
-      currentOrder: job.order,
-      currentColumnOrder: job.columnOrder,
-      order1,
-      otherJobId: otherJob.id,
-      otherJobTitle: otherJob.data.jobTitle?.substring(0, 30),
-      otherCurrentOrder: otherJob.order,
-      otherCurrentColumnOrder: otherJob.columnOrder,
-      order2,
-      allOrders: sortedJobs.map(j => ({ id: j.id, title: j.data.jobTitle?.substring(0, 20), order: j.order, columnOrder: j.columnOrder, normalized: j.normalizedOrder }))
-    });
-    
-    // Zamiana orderów - używamy index jako order
-    setJobs(prev => prev.map(j => {
-      if (j.id === jobId) return { ...j, order: order2, columnOrder: order2 };
-      if (j.id === otherJob.id) return { ...j, order: order1, columnOrder: order1 };
-      return j;
-    }));
-    
-    try {
-      console.log('💾 handleMoveRightInPrepare: Zapisuję do API...', {
-        jobId,
-        order2,
-        otherJobId: otherJob.id,
-        order1
-      });
-      
-      await Promise.all([
-        jobsService.updateJob(jobId, { order: order2 }),
-        jobsService.updateJob(otherJob.id, { order: order1 })
-      ]);
-      
-      console.log('✅ handleMoveRightInPrepare: API zapisane, wywołuję broadcastChange');
-      broadcastChange();
-      
-      // NIE odświeżaj - używamy optymistycznej aktualizacji
-      // loadJobs() wywoła się automatycznie przez storage event listener w innych oknach
-      // ale w tym oknie już mamy zaktualizowany stan lokalny
-      
-      // Sprawdź po aktualizacji
-      const afterSorted = getPrepareJobsSorted();
-      console.log('✅ handleMoveRightInPrepare PO:', {
-        success: true,
-        newOrders: afterSorted.map(j => ({ id: j.id, title: j.data.jobTitle?.substring(0, 20), order: j.order, columnOrder: j.columnOrder, normalized: j.normalizedOrder }))
-      });
-    } catch (err) {
-      console.error('❌ Move right in PREPARE failed', err);
-      loadJobs();
-    }
-  };
+  const handleMoveLeftInPrepare = (jobId: string) => moveJobInPrepareList(jobId, -1);
+  const handleMoveRightInPrepare = (jobId: string) => moveJobInPrepareList(jobId, 1);
+
 
   // Move job to the left column (dla innych kolumn niż PREPARE)
   const handleMoveLeft = async (jobId: string) => {
