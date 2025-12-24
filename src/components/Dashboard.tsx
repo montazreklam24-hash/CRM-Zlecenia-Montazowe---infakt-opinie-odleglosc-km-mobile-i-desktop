@@ -1347,13 +1347,17 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     };
   };
 
-  // Jump to start (początek - order = 0)
+  // ============================================
+  // NOWA IMPLEMENTACJA STRZAŁEK DLA PREPARE
+  // ============================================
+  
+  // UP arrow: Przenosi na sam początek (order = 0)
   const handleJumpToStart = async (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
     
     const colId = job.columnId || 'PREPARE';
-    if (colId !== 'PREPARE') return; // Tylko dla PREPARE
+    if (colId !== 'PREPARE') return;
     
     const colJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
@@ -1378,7 +1382,6 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     
     try {
       await jobsService.updateJob(jobId, { order: 0 });
-      // Zaktualizuj pozostałe zlecenia
       await Promise.all(jobsToUpdate.map(u => 
         jobsService.updateJob(u.id, { order: u.newOrder })
       ));
@@ -1389,13 +1392,13 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     }
   };
 
-  // Jump to end (koniec - order = max + 1)
+  // DOWN arrow: Przenosi na sam koniec (order = max + 1)
   const handleJumpToEnd = async (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
     
     const colId = job.columnId || 'PREPARE';
-    if (colId !== 'PREPARE') return; // Tylko dla PREPARE
+    if (colId !== 'PREPARE') return;
     
     const colJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
@@ -1404,8 +1407,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const index = colJobs.findIndex(j => j.id === jobId);
     if (index === -1 || index === colJobs.length - 1) return; // Już na końcu
     
-    // Oblicz nowy order (max + 1)
-    const maxOrder = Math.max(...colJobs.map(j => j.order || 0));
+    const maxOrder = Math.max(...colJobs.map(j => j.order || 0), -1);
     const newOrder = maxOrder + 1;
     
     // Optymistyczna aktualizacja
@@ -1422,111 +1424,142 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     }
   };
 
-  // Helper for reordering in PREPARE - przesuwa o jedną pozycję
-  const handleReorder = async (jobId: string, direction: 'up' | 'down') => {
+  // LEFT arrow dla PREPARE: Przesuwa o jedną pozycję w lewo (w górę w kolejności)
+  const handleMoveLeftInPrepare = async (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
     
     const colId = job.columnId || 'PREPARE';
+    if (colId !== 'PREPARE') return;
+    
     const colJobs = jobs
-        .filter(j => (j.columnId || 'PREPARE') === colId)
-        .sort((a, b) => (a.order || 0) - (b.order || 0));
-        
+      .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+    
     const index = colJobs.findIndex(j => j.id === jobId);
-    if (index === -1) return;
+    if (index === -1 || index === 0) return; // Już na początku
     
-    let swapIndex = -1;
-    if (direction === 'up') swapIndex = index - 1;
-    if (direction === 'down') swapIndex = index + 1;
-    
-    if (swapIndex < 0 || swapIndex >= colJobs.length) return;
-    
-    const otherJob = colJobs[swapIndex];
-    
-    // Zamień order między dwoma zleceniami
+    const otherJob = colJobs[index - 1];
     const order1 = job.order ?? index;
-    const order2 = otherJob.order ?? swapIndex;
+    const order2 = otherJob.order ?? (index - 1);
     
-    // Prosta zamiana orderów
-    const newOrder1 = order2;
-    const newOrder2 = order1;
-
+    // Zamiana orderów
     setJobs(prev => prev.map(j => {
-        if (j.id === jobId) return { ...j, order: newOrder2 };
-        if (j.id === otherJob.id) return { ...j, order: newOrder1 };
-        return j;
+      if (j.id === jobId) return { ...j, order: order2 };
+      if (j.id === otherJob.id) return { ...j, order: order1 };
+      return j;
     }));
     
     try {
-        await Promise.all([
-            jobsService.updateJob(jobId, { order: newOrder2 }),
-            jobsService.updateJob(otherJob.id, { order: newOrder1 })
-        ]);
-        broadcastChange();
+      await Promise.all([
+        jobsService.updateJob(jobId, { order: order2 }),
+        jobsService.updateJob(otherJob.id, { order: order1 })
+      ]);
+      broadcastChange();
     } catch (err) {
-        console.error('Reorder failed', err);
-        loadJobs();
+      console.error('Move left in PREPARE failed', err);
+      loadJobs();
     }
   };
 
-  // Move job to the left column
+  // RIGHT arrow dla PREPARE: Przesuwa o jedną pozycję w prawo (w dół w kolejności)
+  const handleMoveRightInPrepare = async (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    
+    const colId = job.columnId || 'PREPARE';
+    if (colId !== 'PREPARE') return;
+    
+    const colJobs = jobs
+      .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+    
+    const index = colJobs.findIndex(j => j.id === jobId);
+    if (index === -1 || index === colJobs.length - 1) return; // Już na końcu
+    
+    const otherJob = colJobs[index + 1];
+    const order1 = job.order ?? index;
+    const order2 = otherJob.order ?? (index + 1);
+    
+    // Zamiana orderów
+    setJobs(prev => prev.map(j => {
+      if (j.id === jobId) return { ...j, order: order2 };
+      if (j.id === otherJob.id) return { ...j, order: order1 };
+      return j;
+    }));
+    
+    try {
+      await Promise.all([
+        jobsService.updateJob(jobId, { order: order2 }),
+        jobsService.updateJob(otherJob.id, { order: order1 })
+      ]);
+      broadcastChange();
+    } catch (err) {
+      console.error('Move right in PREPARE failed', err);
+      loadJobs();
+    }
+  };
+
+  // Move job to the left column (dla innych kolumn niż PREPARE)
   const handleMoveLeft = async (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
     
     const columnId = job.columnId || 'PREPARE';
     
+    // Dla PREPARE używamy specjalnej funkcji
     if (columnId === 'PREPARE') {
-        await handleReorder(jobId, 'up');
-        return;
+      await handleMoveLeftInPrepare(jobId);
+      return;
     }
 
+    // Dla innych kolumn: przenoszenie między kolumnami
     const order = getColumnOrder();
     const currentIndex = order.indexOf(columnId);
-    if (currentIndex <= 0) return; // Already at leftmost
+    if (currentIndex <= 0) return;
     
     const newColumnId = order[currentIndex - 1];
     
-    // Optimistic update
     setJobs(prevJobs => prevJobs.map(j => 
       j.id === jobId ? { ...j, columnId: newColumnId } : j
     ));
     
-    // Save to backend
     try {
       await jobsService.updateJobColumn(jobId, newColumnId, undefined);
+      broadcastChange();
     } catch (err) {
       console.error('Failed to move left:', err);
       loadJobs();
     }
   };
 
-  // Move job to the right column
+  // Move job to the right column (dla innych kolumn niż PREPARE)
   const handleMoveRight = async (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
     
     const columnId = job.columnId || 'PREPARE';
     
+    // Dla PREPARE używamy specjalnej funkcji
     if (columnId === 'PREPARE') {
-        await handleReorder(jobId, 'down');
-        return;
+      await handleMoveRightInPrepare(jobId);
+      return;
     }
 
+    // Dla innych kolumn: przenoszenie między kolumnami
     const order = getColumnOrder();
     const currentIndex = order.indexOf(columnId);
-    if (currentIndex >= order.length - 1 || currentIndex === -1) return; // Already at rightmost
+    if (currentIndex >= order.length - 1 || currentIndex === -1) return;
     
     const newColumnId = order[currentIndex + 1];
     
-    // Optimistic update
     setJobs(prevJobs => prevJobs.map(j => 
       j.id === jobId ? { ...j, columnId: newColumnId } : j
     ));
     
-    // Save to backend
     try {
       await jobsService.updateJobColumn(jobId, newColumnId, undefined);
+      broadcastChange();
     } catch (err) {
       console.error('Failed to move right:', err);
       loadJobs();
