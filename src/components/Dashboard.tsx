@@ -598,6 +598,7 @@ const DroppableRow: React.FC<DroppableColumnProps> = ({ id, children, activeId }
   return (
     <div 
       ref={setNodeRef}
+      data-column-id={id}
       className={`p-5 transition-all overflow-visible ${
         isOver && activeId ? 'ring-2 ring-blue-400 ring-offset-2' : ''
       }`}
@@ -1346,9 +1347,19 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
         const index = colJobs.findIndex(j => j.id === jobId);
         if (index === -1) return { canMoveLeft: false, canMoveRight: false };
         
+        // Oblicz liczbę kolumn w gridzie
+        const columnsPerRow = getColumnsPerRow();
+        
+        // Sprawdź czy możemy przesunąć w lewo (nie jesteśmy na początku wiersza)
+        const canMoveLeft = index > 0 && index % columnsPerRow !== 0;
+        
+        // Sprawdź czy możemy przesunąć w prawo (nie jesteśmy na końcu wiersza i nie jesteśmy ostatnim kafelkiem)
+        const isAtEndOfRow = (index + 1) % columnsPerRow === 0;
+        const canMoveRight = index < colJobs.length - 1 && !isAtEndOfRow;
+        
         return {
-            canMoveLeft: index > 0,
-            canMoveRight: index < colJobs.length - 1,
+            canMoveLeft,
+            canMoveRight,
             canMoveUp: index > 0,
             canMoveDown: index < colJobs.length - 1
         };
@@ -1392,6 +1403,34 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       });
     
     return prepareJobs;
+  };
+
+  // Oblicz liczbę kolumn w gridzie PREPARE na podstawie szerokości ekranu
+  // Grid używa: repeat(auto-fill, minmax(180px, 1fr))
+  // Więc liczba kolumn = Math.floor((szerokość kontenera - padding) / 180)
+  const getColumnsPerRow = (): number => {
+    if (typeof window === 'undefined') return 4; // Fallback dla SSR
+    
+    // Znajdź kontener PREPARE
+    const prepContainer = document.querySelector('[data-column-id="PREPARE"]');
+    if (!prepContainer) {
+      // Fallback: oblicz na podstawie szerokości okna
+      const containerWidth = window.innerWidth - 64; // minus padding (32px z każdej strony)
+      return Math.max(1, Math.floor(containerWidth / 180));
+    }
+    
+    const gridElement = prepContainer.querySelector('[class*="grid"]');
+    if (!gridElement) {
+      const containerWidth = window.innerWidth - 64;
+      return Math.max(1, Math.floor(containerWidth / 180));
+    }
+    
+    // Sprawdź rzeczywistą szerokość kontenera
+    const rect = gridElement.getBoundingClientRect();
+    const containerWidth = rect.width - 32; // minus padding (16px z każdej strony = 32px)
+    const columnsPerRow = Math.max(1, Math.floor(containerWidth / 180));
+    
+    return columnsPerRow;
   };
 
   // UP arrow: Przenosi na sam początek (order = 0)
@@ -1465,16 +1504,31 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const index = sortedJobs.findIndex(j => j.id === jobId);
     if (index === -1 || index === 0) return;
     
+    // Oblicz liczbę kolumn w gridzie
+    const columnsPerRow = getColumnsPerRow();
+    
+    // Sprawdź czy jesteśmy na początku wiersza
+    const isAtStartOfRow = index % columnsPerRow === 0;
+    
+    // Jeśli jesteśmy na początku wiersza, nie możemy przesunąć w lewo
+    if (isAtStartOfRow) {
+      console.log('⚠️ handleMoveLeftInPrepare: Na początku wiersza', { index, columnsPerRow, isAtStartOfRow });
+      return;
+    }
+    
+    // Znajdź kafelek faktycznie w lewo (w tym samym wierszu)
     const otherJob = sortedJobs[index - 1];
     
     // Użyj index jako order - to zapewni unikalne wartości
     const order1 = index; // Aktualna pozycja
-    const order2 = index - 1; // Pozycja poprzedniego
+    const order2 = index - 1; // Pozycja poprzedniego (w lewo)
     
     console.log('🔄 handleMoveLeftInPrepare:', {
       jobId,
       jobTitle: job.data.jobTitle?.substring(0, 30),
       index,
+      columnsPerRow,
+      isAtStartOfRow: index % columnsPerRow === 0,
       order1,
       order2,
       otherJobId: otherJob.id,
@@ -1513,17 +1567,31 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       return;
     }
     
+    // Oblicz liczbę kolumn w gridzie
+    const columnsPerRow = getColumnsPerRow();
+    
+    // Sprawdź czy jesteśmy na końcu wiersza
+    const isAtEndOfRow = (index + 1) % columnsPerRow === 0;
+    
+    // Jeśli jesteśmy na końcu wiersza, nie możemy przesunąć w prawo
+    if (isAtEndOfRow) {
+      console.log('⚠️ handleMoveRightInPrepare: Na końcu wiersza', { index, columnsPerRow, isAtEndOfRow });
+      return;
+    }
+    
+    // Znajdź kafelek faktycznie w prawo (w tym samym wierszu)
     const otherJob = sortedJobs[index + 1];
     
     // Użyj index jako order - to zapewni unikalne wartości
-    // Jeśli wszystkie mają order: 0, to zamieniamy index zamiast order
     const order1 = index; // Aktualna pozycja
-    const order2 = index + 1; // Pozycja następnego
+    const order2 = index + 1; // Pozycja następnego (w prawo)
     
     console.log('🔄 handleMoveRightInPrepare PRZED:', {
       jobId,
       jobTitle: job.data.jobTitle?.substring(0, 30),
       index,
+      columnsPerRow,
+      isAtEndOfRow: (index + 1) % columnsPerRow === 0,
       currentOrder: job.order,
       currentColumnOrder: job.columnOrder,
       order1,
