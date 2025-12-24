@@ -323,23 +323,23 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
         onMouseEnter={() => setShowArrows(true)}
         onMouseLeave={() => setShowArrows(false)}
       >
-        {/* LEFT arrow - appears on hover at left (ukryte dla PREPARE - używamy UP/DOWN) */}
-        {showArrows && canMoveLeft && currentColumnId !== 'PREPARE' && (
+        {/* LEFT arrow - dla PREPARE przesuwa o jedną pozycję w lewo, dla innych kolumn przenosi między kolumnami */}
+        {showArrows && canMoveLeft && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveLeft?.(job.id); }}
             className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń w lewo"
+            title={currentColumnId === 'PREPARE' ? "Przesuń o jedną pozycję w lewo" : "Przesuń w lewo"}
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
         )}
         
-        {/* RIGHT arrow - appears on hover at right (ukryte dla PREPARE - używamy UP/DOWN) */}
-        {showArrows && canMoveRight && currentColumnId !== 'PREPARE' && (
+        {/* RIGHT arrow - dla PREPARE przesuwa o jedną pozycję w prawo, dla innych kolumn przenosi między kolumnami */}
+        {showArrows && canMoveRight && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveRight?.(job.id); }}
             className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń w prawo"
+            title={currentColumnId === 'PREPARE' ? "Przesuń o jedną pozycję w prawo" : "Przesuń w prawo"}
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -737,23 +737,23 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
           </button>
         )}
         
-        {/* LEFT arrow - appears on hover at left (ukryte dla PREPARE - używamy UP/DOWN) */}
-        {showArrows && canMoveLeft && currentColumnId !== 'PREPARE' && (
+        {/* LEFT arrow - dla PREPARE przesuwa o jedną pozycję w lewo, dla innych kolumn przenosi między kolumnami */}
+        {showArrows && canMoveLeft && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveLeft?.(job.id); }}
             className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń w lewo"
+            title={currentColumnId === 'PREPARE' ? "Przesuń o jedną pozycję w lewo" : "Przesuń w lewo"}
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
         )}
         
-        {/* RIGHT arrow - appears on hover at right (ukryte dla PREPARE - używamy UP/DOWN) */}
-        {showArrows && canMoveRight && currentColumnId !== 'PREPARE' && (
+        {/* RIGHT arrow - dla PREPARE przesuwa o jedną pozycję w prawo, dla innych kolumn przenosi między kolumnami */}
+        {showArrows && canMoveRight && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveRight?.(job.id); }}
             className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń w prawo"
+            title={currentColumnId === 'PREPARE' ? "Przesuń o jedną pozycję w prawo" : "Przesuń w prawo"}
           >
             <ChevronRight className="w-5 h-5" />
           </button>
