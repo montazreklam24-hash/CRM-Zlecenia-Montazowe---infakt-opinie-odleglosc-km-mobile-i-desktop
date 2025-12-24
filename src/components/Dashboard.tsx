@@ -1332,7 +1332,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
 
     const columnId = job.columnId || 'PREPARE';
     
-    // Special handling for PREPARE - arrows allow reordering
+    // Special handling for PREPARE - TYMCZASOWO WYŁĄCZONE STRZAŁKI LEFT/RIGHT
     if (columnId === 'PREPARE') {
         const colJobs = jobs
             .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
@@ -1342,11 +1342,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
         return orderA - orderB;
       });
         const index = colJobs.findIndex(j => j.id === jobId);
-        // Can move left (up) if not first, can move right (down) if not last
-        // Can move up (jump to start) if not first, can move down (jump to end) if not last
+        // TYMCZASOWO WYŁĄCZONE: canMoveLeft i canMoveRight zawsze false dla PREPARE
         return {
-            canMoveLeft: index > 0,
-            canMoveRight: index < colJobs.length - 1,
+            canMoveLeft: false, // TYMCZASOWO WYŁĄCZONE
+            canMoveRight: false, // TYMCZASOWO WYŁĄCZONE
             canMoveUp: index > 0,
             canMoveDown: index < colJobs.length - 1
         };
