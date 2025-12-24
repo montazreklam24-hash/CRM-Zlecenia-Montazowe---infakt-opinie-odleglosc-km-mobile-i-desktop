@@ -1375,15 +1375,14 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const prepareJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
       .map((job, idx) => {
-        // Normalizuj order - jeśli nie ma, użyj index
-        // Używamy idx jako fallback tylko gdy order/columnOrder są null/undefined
-        const normalizedOrder = job.order ?? job.columnOrder ?? idx;
+        const normalizedOrder = job.sortOrder ?? job.order ?? job.columnOrder ?? idx;
         return { ...job, normalizedOrder };
       })
       .sort((a, b) => {
-        // Sortuj po normalizedOrder, ale jeśli są równe, użyj idx jako tie-breaker
+        if (a.sortOrder !== null && a.sortOrder !== undefined && b.sortOrder !== null && b.sortOrder !== undefined) {
+          return a.sortOrder - b.sortOrder;
+        }
         if (a.normalizedOrder === b.normalizedOrder) {
-          // Znajdź oryginalny index w tablicy jobs
           const idxA = jobs.findIndex(j => j.id === a.id);
           const idxB = jobs.findIndex(j => j.id === b.id);
           return idxA - idxB;
@@ -1905,16 +1904,17 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       const sourceJobs = jobs
         .filter(j => (j.columnId || 'PREPARE') === sourceColumn)
         .sort((a, b) => {
-        const orderA = a.order ?? a.columnOrder ?? 0;
-        const orderB = b.order ?? b.columnOrder ?? 0;
-        return orderA - orderB;
-      });
+          if (a.sortOrder !== null && a.sortOrder !== undefined && b.sortOrder !== null && b.sortOrder !== undefined) {
+            return a.sortOrder - b.sortOrder;
+          }
+          return (a.createdAt || 0) - (b.createdAt || 0);
+        });
       
       // Build array of IDs
       const jobIds = sourceJobs.map(j => j.id);
       const currentIndex = jobIds.indexOf(draggedId);
       
-      if (currentIndex === -1) return; // Should not happen
+      if (currentIndex === -1) return;
 
       // Remove from old position
       jobIds.splice(currentIndex, 1);
@@ -1931,35 +1931,53 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       
       // Create new jobs array with updated orders
       const orderMap = new Map<string, number>();
-      jobIds.forEach((id, idx) => orderMap.set(id, idx));
+      jobIds.forEach((id, idx) => orderMap.set(id, (idx + 1) * 10));
       
       setJobs(prev => prev.map(job => 
-        orderMap.has(job.id) ? { ...job, order: orderMap.get(job.id)! } : job
+        orderMap.has(job.id) ? { ...job, sortOrder: orderMap.get(job.id)! } : job
       ));
       
       // Send update to backend
-      // We need to send the exact new index
-      await jobsService.updateJobPosition(draggedId, targetColumn, insertIndex);
+      await jobsService.reorderJobs(targetColumn, jobIds);
       
     } else {
       // Moving to different column
-      // ... (reszta bez zmian)
       const updatedJobs = jobs.map(job => {
         if (job.id === draggedId) {
-          return { ...job, columnId: targetColumn, order: newOrder };
-        }
-        // Shift jobs in target column
-        if ((job.columnId || 'PREPARE') === targetColumn) {
-           const currentOrder = job.order || 0;
-           if (currentOrder >= newOrder) {
-             return { ...job, order: currentOrder + 1 };
-           }
+          return { ...job, columnId: targetColumn };
         }
         return job;
       });
       
-      setJobs(updatedJobs);
-      await jobsService.updateJobPosition(draggedId, targetColumn, newOrder);
+      // Get all jobs for the target column in current order
+      const targetJobs = updatedJobs
+        .filter(j => (j.columnId || 'PREPARE') === targetColumn && j.id !== draggedId)
+        .sort((a, b) => {
+          if (a.sortOrder !== null && a.sortOrder !== undefined && b.sortOrder !== null && b.sortOrder !== undefined) {
+            return a.sortOrder - b.sortOrder;
+          }
+          return (a.createdAt || 0) - (b.createdAt || 0);
+        });
+        
+      const targetIds = targetJobs.map(j => j.id);
+      let insertIndex = targetIds.length;
+      if (insertBeforeJobId) {
+        insertIndex = targetIds.indexOf(insertBeforeJobId);
+        if (insertIndex === -1) insertIndex = targetIds.length;
+      }
+      targetIds.splice(insertIndex, 0, draggedId);
+      
+      // Update local state for all jobs in target column
+      const orderMap = new Map<string, number>();
+      targetIds.forEach((id, idx) => orderMap.set(id, (idx + 1) * 10));
+      
+      setJobs(prev => prev.map(job => {
+        if (job.id === draggedId) return { ...job, columnId: targetColumn, sortOrder: orderMap.get(job.id)! };
+        if (orderMap.has(job.id)) return { ...job, sortOrder: orderMap.get(job.id)! };
+        return job;
+      }));
+      
+      await jobsService.reorderJobs(targetColumn, targetIds);
     }
   };
 
@@ -1999,27 +2017,17 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   const getJobsForColumn = (colId: JobColumnId) => {
     const filtered = filteredJobs.filter(j => (j.columnId || 'PREPARE') === colId);
     
-    // Dla PREPARE: użyj znormalizowanych orderów (zapewnia poprawną kolejność w gridzie)
-    if (colId === 'PREPARE') {
-      return filtered
-        .map((job, idx) => {
-          const normalizedOrder = job.order ?? job.columnOrder ?? idx;
-          return { ...job, normalizedOrder };
-        })
-        .sort((a, b) => a.normalizedOrder - b.normalizedOrder);
-    }
-    
-    // Dla innych kolumn: standardowe sortowanie
-    const result = filtered.sort((a, b) => {
-      const orderA = a.order ?? a.columnOrder ?? 0;
-      const orderB = b.order ?? b.columnOrder ?? 0;
-      return orderA - orderB;
+    // Używamy sortOrder z bazy jeśli istnieje, w przeciwnym razie fallback na createdAt
+    return filtered.sort((a, b) => {
+      if (a.sortOrder !== null && a.sortOrder !== undefined && b.sortOrder !== null && b.sortOrder !== undefined) {
+        return a.sortOrder - b.sortOrder;
+      }
+      if (a.sortOrder !== null && a.sortOrder !== undefined) return -1;
+      if (b.sortOrder !== null && b.sortOrder !== undefined) return 1;
+      
+      // Fallback: starsze zlecenia na górze (created_at ASC)
+      return (a.createdAt || 0) - (b.createdAt || 0);
     });
-    // Debug: log when rendering WED column
-    if (colId === 'WED' && result.length > 0) {
-      console.log('🟠 RENDER WED:', result.map((j: Job) => ({ title: j.data.jobTitle?.substring(0,15), order: j.order })));
-    }
-    return result;
   };
 
   // Helper do sprawdzania czy karta pasuje do filtra płatności

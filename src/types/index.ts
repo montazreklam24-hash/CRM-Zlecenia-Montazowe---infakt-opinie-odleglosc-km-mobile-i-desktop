@@ -229,6 +229,7 @@ export interface Job {
   status: JobStatus;
   columnId?: JobColumnId;
   columnOrder?: number;
+  sortOrder?: number | null;
   order?: number; // kolejność w kolumnie
   data: JobOrderData;
   projectImages: string[];

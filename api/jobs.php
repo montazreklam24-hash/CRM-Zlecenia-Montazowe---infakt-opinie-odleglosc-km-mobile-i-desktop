@@ -25,7 +25,12 @@ function handleJobs($method, $id = null) {
             }
             break;
         case 'POST':
-            createJob();
+            $input = getJsonInput();
+            if (isset($input['action']) && $input['action'] === 'reorder') {
+                reorderJobs();
+            } else {
+                createJob();
+            }
             break;
         case 'PUT':
             if (!$id) {
@@ -45,6 +50,49 @@ function handleJobs($method, $id = null) {
 }
 
 /**
+ * POST /api/jobs (action=reorder) - Zmiana kolejności kart
+ */
+function reorderJobs() {
+    try {
+        $user = requireAuth();
+        $pdo = getDB();
+        $input = getJsonInput();
+        
+        $columnId = isset($input['columnId']) ? $input['columnId'] : null;
+        $orderedIds = isset($input['orderedIds']) ? $input['orderedIds'] : [];
+        
+        if (!$columnId || empty($orderedIds)) {
+            jsonResponse(['error' => 'ColumnId and orderedIds are required'], 400);
+        }
+
+        // Logowanie dla debugu
+        $logDir = __DIR__ . '/logs';
+        if (!is_dir($logDir)) mkdir($logDir, 0777, true);
+        file_put_contents($logDir . '/debug_jobs.log', date('Y-m-d H:i:s') . " REORDER: Column: $columnId, IDs: " . implode(',', $orderedIds) . "\n", FILE_APPEND);
+
+        $pdo->beginTransaction();
+        
+        // Resetujemy sort_order dla wszystkich w tej kolumnie (opcjonalnie, ale bezpieczniej)
+        // Ale lepiej po prostu przypisać nowe wartości 10, 20, 30...
+        
+        $stmt = $pdo->prepare("UPDATE jobs_ai SET sort_order = ?, column_id = ? WHERE id = ?");
+        
+        foreach ($orderedIds as $index => $jobId) {
+            $sortOrder = ($index + 1) * 10; // 10, 20, 30... dla łatwiejszego wstawiania ręcznego jeśli trzeba
+            $stmt->execute([$sortOrder, $columnId, $jobId]);
+        }
+        
+        $pdo->commit();
+        
+        jsonResponse(['success' => true, 'message' => 'Kolejność została zapisana']);
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        error_log('Error reordering jobs: ' . $e->getMessage());
+        jsonResponse(['error' => 'Database error: ' . $e->getMessage()], 500);
+    }
+}
+
+/**
  * GET /api/jobs (dawniej jobs-all) - Lista wszystkich zleceń
  */
 function getJobs() {
@@ -52,7 +100,8 @@ function getJobs() {
     $pdo = getDB();
     
     // Pobieramy wszystko z jobs_ai (teraz jedyne źródło)
-    $sql = "SELECT * FROM jobs_ai ORDER BY column_order ASC, created_at DESC";
+    // Sortowanie: najpierw sort_order (jeśli nie NULL), potem created_at (fallback)
+    $sql = "SELECT * FROM jobs_ai ORDER BY sort_order IS NULL, sort_order ASC, created_at ASC";
     $stmt = $pdo->query($sql);
     $jobs = $stmt->fetchAll();
     
@@ -589,6 +638,7 @@ function mapJobToFrontend($job) {
         'paymentStatus' => isset($job['payment_status']) ? $job['payment_status'] : 'none',
         'columnId' => $job['column_id'] ? $job['column_id'] : 'PREPARE',
         'columnOrder' => intval($job['column_order']),
+        'sortOrder' => $job['sort_order'] !== null ? intval($job['sort_order']) : null,
         'data' => array(
             'jobTitle' => $job['title'],
             'clientName' => $job['client_name'],

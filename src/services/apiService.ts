@@ -275,6 +275,19 @@ export const jobsService = {
       body: JSON.stringify({ columnId, columnOrder: order }),
     });
   },
+
+  async reorderJobs(columnId: JobColumnId, orderedIds: string[]): Promise<void> {
+    if (DEMO_MODE) return;
+    
+    await apiRequest('/jobs', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'reorder',
+        columnId,
+        orderedIds,
+      }),
+    });
+  },
   
   async completeJob(
     id: string, 
