@@ -2643,18 +2643,19 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                         <div key={job.id} style={orderValue !== undefined ? { order: orderValue } : undefined}>
                           <DraggableJobCard
                             job={job}
-                          isAdmin={isAdmin}
-                          onSelectJob={onSelectJob}
-                          onDelete={handleDelete}
-                          onDuplicate={handleDuplicate}
-                          onPaymentStatusChange={handlePaymentStatusChange}
-                          onMoveToColumn={handleMoveToColumn}
-                          onMoveLeft={handleMoveLeft}
-                          onMoveRight={handleMoveRight}
-                          canMoveLeft={canMoveLeft}
-                          canMoveRight={canMoveRight}
-                          onContextMenu={handleContextMenu}
-                        />
+                            isAdmin={isAdmin}
+                            onSelectJob={onSelectJob}
+                            onDelete={handleDelete}
+                            onDuplicate={handleDuplicate}
+                            onPaymentStatusChange={handlePaymentStatusChange}
+                            onMoveToColumn={handleMoveToColumn}
+                            onMoveLeft={handleMoveLeft}
+                            onMoveRight={handleMoveRight}
+                            canMoveLeft={canMoveLeft}
+                            canMoveRight={canMoveRight}
+                            onContextMenu={handleContextMenu}
+                          />
+                        </div>
                       );
                     })}
                   </DroppableRow>
@@ -2729,7 +2730,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                           <div key={job.id} style={orderValue !== undefined ? { order: orderValue } : undefined}>
                             <DraggableJobCard
                               job={job}
-                            isAdmin={isAdmin}
+                              isAdmin={isAdmin}
                             onSelectJob={onSelectJob}
                             onDelete={handleDelete}
                             onDuplicate={handleDuplicate}
