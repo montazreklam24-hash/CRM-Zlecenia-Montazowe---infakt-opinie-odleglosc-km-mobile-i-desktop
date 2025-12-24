@@ -309,10 +309,10 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
 
   return (
     <>
-      {/* Drop indicator - pokazuje gdzie wpadnie kafelek */}
+      {/* Drop indicator - pokazuje gdzie wpadnie kafelek - renderowany jako osobny element w gridzie */}
       {showDropIndicator && (
         <div 
-          className="min-w-[160px] w-40 h-16 mr-3 rounded-lg border-dashed animate-pulse flex items-center justify-center"
+          className="min-w-[160px] w-full h-full min-h-[280px] rounded-lg border-dashed animate-pulse flex items-center justify-center"
           style={{ borderColor: '#3b82f6', background: 'rgba(59, 130, 246, 0.2)', borderWidth: '3px' }}
         >
           <span className="text-xs text-blue-500 font-bold">↓ TUTAJ ↓</span>
@@ -2556,30 +2556,26 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                         const { canMoveLeft, canMoveRight, canMoveUp, canMoveDown } = getJobMoveLeftRightInfo(job.id);
                         const matchesFilter = jobMatchesPaymentFilter(job);
                         return (
-                          <div 
+                          <DraggableJobCard
                             key={job.id}
-                            className={matchesFilter ? '' : 'opacity-50 brightness-75 transition-opacity'}
-                          >
-                            <DraggableJobCard
-                              job={job}
-                              isAdmin={isAdmin}
-                              onSelectJob={onSelectJob}
-                              onDelete={handleDelete}
-                              onDuplicate={handleDuplicate}
-                              onArchive={handleArchive}
-                              onPaymentStatusChange={handlePaymentStatusChange}
-                              onMoveToColumn={handleMoveToColumn}
-                              onMoveLeft={handleMoveLeft}
-                              onMoveRight={handleMoveRight}
-                              onMoveUp={handleJumpToStart}
-                              onMoveDown={handleJumpToEnd}
-                              canMoveLeft={canMoveLeft}
-                              canMoveRight={canMoveRight}
-                              canMoveUp={canMoveUp}
-                              canMoveDown={canMoveDown}
-                              onContextMenu={handleContextMenu}
-                            />
-                          </div>
+                            job={job}
+                            isAdmin={isAdmin}
+                            onSelectJob={onSelectJob}
+                            onDelete={handleDelete}
+                            onDuplicate={handleDuplicate}
+                            onArchive={handleArchive}
+                            onPaymentStatusChange={handlePaymentStatusChange}
+                            onMoveToColumn={handleMoveToColumn}
+                            onMoveLeft={handleMoveLeft}
+                            onMoveRight={handleMoveRight}
+                            onMoveUp={handleJumpToStart}
+                            onMoveDown={handleJumpToEnd}
+                            canMoveLeft={canMoveLeft}
+                            canMoveRight={canMoveRight}
+                            canMoveUp={canMoveUp}
+                            canMoveDown={canMoveDown}
+                            onContextMenu={handleContextMenu}
+                          />
                         );
                       })
                     )}
