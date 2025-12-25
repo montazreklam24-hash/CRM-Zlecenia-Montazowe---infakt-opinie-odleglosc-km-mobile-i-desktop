@@ -644,7 +644,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const matchesSearch = !searchQuery || 
       job.data.jobTitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.data.clientName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.data.address?.toLowerCase().includes(searchQuery.toLowerCase());
+      job.data.address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.friendlyId?.toLowerCase().includes(searchQuery.toLowerCase());
     let matchesArchiveFilters = true;
     if (activeTab === 'ARCHIVED') {
       if (archivePaymentFilter !== 'all') matchesArchiveFilters = matchesArchiveFilters && (job.paymentStatus || PaymentStatus.NONE) === archivePaymentFilter;
