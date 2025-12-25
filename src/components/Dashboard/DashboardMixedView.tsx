@@ -150,7 +150,7 @@ export const DashboardMixedView: React.FC<DashboardMixedViewProps> = ({
            </button>
         </div>
         
-        <div className={`grid grid-cols-1 gap-3 transition-all duration-300 w-full ${showWeekend ? 'sm:grid-cols-7' : 'sm:grid-cols-5'}`}>
+        <div className={`grid grid-cols-1 gap-4 transition-all duration-300 w-full ${showWeekend ? 'sm:grid-cols-7' : 'sm:grid-cols-5'}`}>
            {ROWS_CONFIG.filter(r => {
              if (showWeekend) {
                return ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].includes(r.id);
@@ -163,7 +163,7 @@ export const DashboardMixedView: React.FC<DashboardMixedViewProps> = ({
               const isToday = mapDayToId[today] === row.id;
 
               return (
-                <div key={row.id} className={`theme-surface flex flex-col min-h-[600px] h-full transition-all ${isToday ? 'ring-2 ring-blue-500 shadow-xl z-20' : ''}`} style={{ borderRadius: 'var(--radius-lg)' }}>
+                <div key={row.id} className={`theme-surface flex flex-col min-h-[600px] h-full transition-all ${isToday ? 'ring-2 ring-blue-500 shadow-xl z-20' : ''}`} style={{ borderRadius: 'var(--radius-lg)', minWidth: '0' }}>
                   <div className={`${row.headerBg} ${row.headerText} px-3 py-3 flex justify-between items-center sticky top-0 z-10`} style={{ borderTopLeftRadius: 'var(--radius-lg)', borderTopRightRadius: 'var(--radius-lg)' }}>
                      {isToday && (
                        <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center animate-bounce z-50 pointer-events-none">
