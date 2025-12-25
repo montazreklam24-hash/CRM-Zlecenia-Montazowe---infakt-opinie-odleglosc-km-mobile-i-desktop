@@ -2012,7 +2012,16 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       // Payment status filter
       if (archivePaymentFilter !== 'all') {
         const jobPaymentStatus = job.paymentStatus || PaymentStatus.NONE;
-        matchesArchiveFilters = matchesArchiveFilters && jobPaymentStatus === archivePaymentFilter;
+        
+        if (archivePaymentFilter === PaymentStatus.PROFORMA) {
+          const hasProformaDocument = !!job.invoices?.some(inv => inv.type === 'proforma');
+          matchesArchiveFilters = matchesArchiveFilters && (jobPaymentStatus === PaymentStatus.PROFORMA || hasProformaDocument);
+        } else if (archivePaymentFilter === PaymentStatus.PARTIAL) {
+          const hasAdvanceDocument = !!job.invoices?.some(inv => inv.type === 'advance');
+          matchesArchiveFilters = matchesArchiveFilters && (jobPaymentStatus === PaymentStatus.PARTIAL || hasAdvanceDocument);
+        } else {
+          matchesArchiveFilters = matchesArchiveFilters && jobPaymentStatus === archivePaymentFilter;
+        }
       }
       
       // Review status filter
@@ -2048,6 +2057,19 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   // Helper do sprawdzania czy karta pasuje do filtra płatności
   const jobMatchesPaymentFilter = (job: Job): boolean => {
     if (activeTab !== 'ACTIVE' || paymentFilter === 'ALL') return true;
+    
+    // Jeśli szukamy proformy, sprawdź też czy ma proformę w dokumentach
+    if (paymentFilter === PaymentStatus.PROFORMA) {
+      const hasProformaDocument = !!job.invoices?.some(inv => inv.type === 'proforma');
+      return job.paymentStatus === PaymentStatus.PROFORMA || hasProformaDocument;
+    }
+
+    // Jeśli szukamy zaliczki (PARTIAL), sprawdź też dokumenty typu advance
+    if (paymentFilter === PaymentStatus.PARTIAL) {
+      const hasAdvanceDocument = !!job.invoices?.some(inv => inv.type === 'advance');
+      return job.paymentStatus === PaymentStatus.PARTIAL || hasAdvanceDocument;
+    }
+    
     const jobPaymentStatus = job.paymentStatus || PaymentStatus.NONE;
     return jobPaymentStatus === paymentFilter;
   };
@@ -2187,7 +2209,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                   : 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
               }`}
             >
-              Gotówka
+              Barter
             </button>
             <button
               onClick={() => setPaymentFilter(PaymentStatus.OVERDUE)}
@@ -2197,7 +2219,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                   : 'bg-red-50 text-red-600 hover:bg-red-100'
               }`}
             >
-              Przeterminowane
+              Do zapłaty
             </button>
             <button
               onClick={() => setPaymentFilter(PaymentStatus.PARTIAL)}
@@ -2207,7 +2229,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                   : 'bg-purple-50 text-purple-600 hover:bg-purple-100'
               }`}
             >
-              Częściowe
+              Zaliczka
             </button>
           </div>
         )}
@@ -2276,7 +2298,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                     : 'bg-red-50 text-red-600 hover:bg-red-100'
                 }`}
               >
-                Przeterminowane
+                Do zapłaty
               </button>
             </div>
             

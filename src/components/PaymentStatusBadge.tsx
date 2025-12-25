@@ -32,12 +32,12 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
       label: '' 
     },
     [PaymentStatus.PROFORMA]: { 
-      bg: 'bg-blue-50', 
-      text: 'text-blue-700', 
-      border: 'border-blue-200',
+      bg: 'bg-orange-50', 
+      text: 'text-orange-700', 
+      border: 'border-orange-200',
       icon: '', 
       label: 'Proforma',
-      gradient: 'from-blue-600 to-blue-700'
+      gradient: 'from-orange-500 to-orange-600'
     },
     [PaymentStatus.PARTIAL]: { 
       bg: 'bg-purple-50', 
@@ -123,10 +123,10 @@ export const PaymentStatusBar: React.FC<{
 }> = ({ status, onClick, showLabel = true }) => {
   const config: Record<PaymentStatus, { bg: string; label: string }> = {
     [PaymentStatus.NONE]: { bg: 'bg-gradient-to-r from-slate-300 to-slate-400', label: 'BRAK' },
-    [PaymentStatus.PROFORMA]: { bg: 'bg-gradient-to-r from-blue-600 to-blue-700', label: 'PROFORMA' },
+    [PaymentStatus.PROFORMA]: { bg: 'bg-gradient-to-r from-orange-500 to-orange-600', label: 'PROFORMA' },
     [PaymentStatus.PARTIAL]: { bg: 'bg-gradient-to-r from-purple-400 to-purple-500', label: 'ZALICZKA' },
     [PaymentStatus.PAID]: { bg: 'bg-gradient-to-r from-green-400 to-green-500', label: 'OPŁACONE' },
-    [PaymentStatus.CASH]: { bg: 'bg-gradient-to-r from-yellow-400 to-yellow-500', label: 'GOT├ôWKA' },
+    [PaymentStatus.CASH]: { bg: 'bg-gradient-to-r from-yellow-400 to-yellow-500', label: 'BARTER' },
     [PaymentStatus.OVERDUE]: { bg: 'bg-gradient-to-r from-red-400 to-red-500', label: 'DO ZAPŁATY' }
   };
 

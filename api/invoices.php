@@ -547,7 +547,12 @@ function handleAttachInvoice() {
         }
         
         // Określ typ faktury
-        $invoiceType = isset($invoice['kind']) && $invoice['kind'] === 'proforma' ? 'proforma' : 'vat';
+        $invoiceType = 'vat';
+        if (isset($invoice['kind'])) {
+            if ($invoice['kind'] === 'proforma') $invoiceType = 'proforma';
+            elseif ($invoice['kind'] === 'advance_invoice') $invoiceType = 'advance';
+            elseif ($invoice['kind'] === 'final_invoice') $invoiceType = 'final';
+        }
         
         // Określ status płatności
         $paymentStatus = isset($invoice['payment_status']) ? $invoice['payment_status'] : 'unpaid';
@@ -720,8 +725,9 @@ function handleGetJobInvoices($jobId) {
         
         $mapped = array();
         foreach ($invoices as $inv) {
-            // Mapuj typ: 'vat' -> 'invoice' dla zgodności z typem Invoice
-            $invoiceType = ($inv['type'] === 'vat') ? 'invoice' : $inv['type'];
+            // Mapuj typ dla zgodności z typem frontendowym Invoice
+            $invoiceType = $inv['type'];
+            if ($inv['type'] === 'vat') $invoiceType = 'invoice';
             
             $mapped[] = array(
                 'id' => intval($inv['id']),
@@ -758,7 +764,7 @@ function createInvoicesTable($pdo) {
             job_id VARCHAR(50),
             infakt_id INT,
             infakt_number VARCHAR(50),
-            type ENUM('proforma', 'vat') DEFAULT 'proforma',
+            type ENUM('proforma', 'vat', 'advance', 'final') DEFAULT 'proforma',
             client_id INT,
             total_net DECIMAL(10,2),
             total_gross DECIMAL(10,2),

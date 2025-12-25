@@ -584,7 +584,7 @@ function mapJobToFrontend($job) {
                     job_id VARCHAR(50),
                     infakt_id INT,
                     infakt_number VARCHAR(50),
-                    type ENUM('proforma', 'vat') DEFAULT 'proforma',
+                    type ENUM('proforma', 'vat', 'advance', 'final') DEFAULT 'proforma',
                     client_id INT,
                     total_net DECIMAL(10,2),
                     total_gross DECIMAL(10,2),
