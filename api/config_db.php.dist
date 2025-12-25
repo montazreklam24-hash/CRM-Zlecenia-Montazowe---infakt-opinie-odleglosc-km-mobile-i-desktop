@@ -1,0 +1,17 @@
+<?php
+/**
+ * Konfiguracja bazy danych na serwerze produkcyjnym.
+ * 
+ * INSTRUKCJA:
+ * 1. Zmień nazwę tego pliku na "config_db.php"
+ * 2. Wypełnij poniższe dane danymi z panelu hostingu
+ */
+
+return [
+    'host' => 'localhost',      // Zazwyczaj 'localhost', czasem adres IP
+    'database' => 'NAZWA_BAZY', // Np. user_crm
+    'username' => 'UZYTKOWNIK', // Np. user_crm
+    'password' => 'HASLO',      // Hasło do bazy danych
+    'charset' => 'utf8mb4'
+];
+
