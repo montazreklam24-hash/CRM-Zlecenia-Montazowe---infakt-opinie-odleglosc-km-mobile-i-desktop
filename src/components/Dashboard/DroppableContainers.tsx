@@ -61,9 +61,8 @@ export const DroppableRow: React.FC<DroppableColumnProps> = ({ id, children, act
         isOver && activeId ? 'ring-2 ring-blue-400 ring-offset-2' : ''
       }`}
       style={{ 
-        background: isOver && activeId ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-surface)', 
-        backdropFilter: 'var(--blur)', 
-        WebkitBackdropFilter: 'var(--blur)'
+        background: isOver && activeId ? 'rgba(59, 130, 246, 0.1)' : 'transparent', 
+        borderRadius: 'var(--radius-lg)'
       }}
     >
       <div 
@@ -89,9 +88,8 @@ export const DroppableColumn: React.FC<DroppableColumnProps> = ({ id, children, 
         isOver && activeId ? 'ring-2 ring-blue-400 ring-offset-2' : ''
       }`}
       style={{ 
-        background: isOver && activeId ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-surface)', 
-        backdropFilter: 'var(--blur)', 
-        WebkitBackdropFilter: 'var(--blur)' 
+        background: isOver && activeId ? 'rgba(59, 130, 246, 0.1)' : 'transparent', 
+        borderRadius: 'var(--radius-lg)'
       }}
     >
       {children}

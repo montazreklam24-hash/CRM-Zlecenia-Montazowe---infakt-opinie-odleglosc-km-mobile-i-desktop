@@ -214,7 +214,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
 
       {/* Main Content - Obniżony o 50px więcej */}
       <main className="flex-1 pt-44 p-4 md:p-8 min-h-screen transition-all duration-300 w-full">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-[1800px] mx-auto w-full">
            <Outlet />
         </div>
       </main>

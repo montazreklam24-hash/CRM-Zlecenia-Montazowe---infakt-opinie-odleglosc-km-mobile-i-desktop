@@ -78,13 +78,13 @@ export const DashboardKanbanView: React.FC<DashboardKanbanViewProps> = ({
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex overflow-x-auto pb-4 snap-x snap-mandatory sm:grid sm:grid-cols-7 sm:gap-2 sm:overflow-visible">
+        <div className="flex overflow-x-auto pb-4 snap-x snap-mandatory sm:grid sm:grid-cols-7 sm:gap-2 sm:overflow-visible w-full min-h-[600px]">
           {KANBAN_ROWS_CONFIG.map(row => {
             const rowJobs = getJobsForColumn(row.id);
             return (
               <div 
                 key={row.id} 
-                className="theme-surface flex flex-col min-w-[85vw] sm:min-w-0 sm:w-auto mr-3 sm:mr-0 snap-center border-r sm:border-r-0 border-slate-200/50 last:mr-0"
+                className="theme-surface flex flex-col min-w-[85vw] sm:min-w-0 sm:w-full h-full mr-3 sm:mr-0 snap-center border-r sm:border-r-0 border-slate-200/50 last:mr-0"
                 style={{ borderRadius: 'var(--radius-lg)' }}
               >
                 <div className={`${row.headerBg} ${row.headerText} px-3 py-3 flex justify-between items-center flex-shrink-0 sticky top-0 z-10`}>
