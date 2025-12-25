@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Job, JobStatus, UserRole, JobColumnId, PaymentStatus } from '../types';
 import { jobsService } from '../services/apiService';
 import { 
@@ -312,8 +313,8 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
       onMouseEnter={() => setShowArrows(true)}
       onMouseLeave={() => setShowArrows(false)}
     >
-        {/* LEFT arrow - WYŁĄCZONE DLA PREPARE (używaj drag & drop) */}
-        {showArrows && canMoveLeft && currentColumnId !== 'PREPARE' && (
+        {/* LEFT arrow */}
+        {showArrows && canMoveLeft && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveLeft?.(job.id); }}
             className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
@@ -323,8 +324,8 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           </button>
         )}
         
-        {/* RIGHT arrow - WYŁĄCZONE DLA PREPARE (używaj drag & drop) */}
-        {showArrows && canMoveRight && currentColumnId !== 'PREPARE' && (
+        {/* RIGHT arrow */}
+        {showArrows && canMoveRight && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveRight?.(job.id); }}
             className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
@@ -709,8 +710,8 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
           </button>
         )}
         
-        {/* LEFT arrow - WYŁĄCZONE DLA PREPARE (używaj drag & drop) */}
-        {showArrows && canMoveLeft && currentColumnId !== 'PREPARE' && (
+        {/* LEFT arrow */}
+        {showArrows && canMoveLeft && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveLeft?.(job.id); }}
             className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
@@ -720,8 +721,8 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
           </button>
         )}
         
-        {/* RIGHT arrow - WYŁĄCZONE DLA PREPARE (używaj drag & drop) */}
-        {showArrows && canMoveRight && currentColumnId !== 'PREPARE' && (
+        {/* RIGHT arrow */}
+        {showArrows && canMoveRight && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveRight?.(job.id); }}
             className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
@@ -1036,6 +1037,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
 
   useEffect(() => {
     loadJobs();
+    console.log("DASHBOARD: ENABLE_ARROWS_V2");
   }, []);
 
   // Odśwież listę zleceń gdy refreshTrigger się zmienia
@@ -2620,15 +2622,15 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
             })}
           </div>
 
-          <DragOverlay>
+          <DragOverlay zIndex={10000}>
             {activeId ? (() => {
               const activeJob = jobs.find(j => j.id === activeId);
               if (!activeJob) return null;
-              return (
-                <div className="theme-card shadow-2xl rotate-2 opacity-95 p-2" style={{ width: '120px' }}>
+              return createPortal(
+                <div className="theme-card shadow-2xl rotate-2 opacity-95 p-2 pointer-events-none" style={{ width: '120px', zIndex: 10000 }}>
                   <div className="aspect-square rounded overflow-hidden mb-2" style={{ background: 'var(--bg-surface)' }}>
                     {activeJob.projectImages?.[0] ? (
-                      <img src={getJobThumbnailUrl(activeJob.projectImages[0])} className="w-full h-full object-cover" alt="" loading="lazy" />
+                      <img src={getJobThumbnailUrl(activeJob.projectImages[0])} className="w-full h-full object-cover" alt="" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Box className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
@@ -2638,7 +2640,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                   <h4 className="font-bold text-[9px] line-clamp-2" style={{ color: 'var(--text-primary)' }}>
                     {activeJob.data.jobTitle || 'Bez nazwy'}
                   </h4>
-                </div>
+                </div>,
+                document.body
               );
             })() : null}
           </DragOverlay>
@@ -2712,27 +2715,26 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
           </div>
 
           {/* Drag Overlay - follows cursor */}
-          <DragOverlay>
+          <DragOverlay zIndex={10000}>
             {activeId ? (() => {
               const activeJob = jobs.find(j => j.id === activeId);
               if (!activeJob) return null;
-              return (
-                <div className="theme-card w-40 shadow-2xl rotate-2 opacity-95">
-                  <div className="aspect-square relative overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
+              return createPortal(
+                <div className="theme-card shadow-2xl rotate-2 opacity-95 p-2 pointer-events-none" style={{ width: '120px', zIndex: 10000 }}>
+                  <div className="aspect-square rounded overflow-hidden mb-2" style={{ background: 'var(--bg-surface)' }}>
                     {activeJob.projectImages?.[0] ? (
-                      <img src={getJobThumbnailUrl(activeJob.projectImages[0])} className="w-full h-full object-cover" alt="" loading="lazy" />
+                      <img src={getJobThumbnailUrl(activeJob.projectImages[0])} className="w-full h-full object-cover" alt="" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <Box className="w-10 h-10" style={{ color: 'var(--text-muted)' }} />
+                        <Box className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
                       </div>
                     )}
                   </div>
-                  <div className="p-2">
-                    <h4 className="font-bold text-[10px] line-clamp-2" style={{ color: 'var(--text-primary)' }}>
-                      {activeJob.data.jobTitle || 'Bez nazwy'}
-                    </h4>
-                  </div>
-                </div>
+                  <h4 className="font-bold text-[9px] line-clamp-2" style={{ color: 'var(--text-primary)' }}>
+                    {activeJob.data.jobTitle || 'Bez nazwy'}
+                  </h4>
+                </div>,
+                document.body
               );
             })() : null}
           </DragOverlay>
@@ -2860,15 +2862,15 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
           </div>
 
           {/* Drag Overlay - follows cursor */}
-          <DragOverlay>
+          <DragOverlay zIndex={10000}>
             {activeId ? (() => {
               const activeJob = jobs.find(j => j.id === activeId);
               if (!activeJob) return null;
-              return (
-                <div className="theme-card shadow-2xl rotate-2 opacity-95 p-2" style={{ width: '120px' }}>
+              return createPortal(
+                <div className="theme-card shadow-2xl rotate-2 opacity-95 p-2 pointer-events-none" style={{ width: '120px', zIndex: 10000 }}>
                   <div className="aspect-square rounded overflow-hidden mb-2" style={{ background: 'var(--bg-surface)' }}>
                     {activeJob.projectImages?.[0] ? (
-                      <img src={getJobThumbnailUrl(activeJob.projectImages[0])} className="w-full h-full object-cover" alt="" loading="lazy" />
+                      <img src={getJobThumbnailUrl(activeJob.projectImages[0])} className="w-full h-full object-cover" alt="" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Box className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
@@ -2878,7 +2880,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                   <h4 className="font-bold text-[9px] line-clamp-2" style={{ color: 'var(--text-primary)' }}>
                     {activeJob.data.jobTitle || 'Bez nazwy'}
                   </h4>
-                </div>
+                </div>,
+                document.body
               );
             })() : null}
           </DragOverlay>

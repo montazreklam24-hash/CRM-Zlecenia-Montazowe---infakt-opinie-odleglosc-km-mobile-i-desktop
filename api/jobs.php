@@ -428,6 +428,11 @@ function updateJob($id) {
             $params[] = $input['order'];
         }
         
+        if (isset($input['sortOrder'])) {
+            $updates[] = "sort_order = ?";
+            $params[] = $input['sortOrder'];
+        }
+        
         // Współrzędne
         if (array_key_exists('coordinates', $data)) {
             $coords = $data['coordinates'];
