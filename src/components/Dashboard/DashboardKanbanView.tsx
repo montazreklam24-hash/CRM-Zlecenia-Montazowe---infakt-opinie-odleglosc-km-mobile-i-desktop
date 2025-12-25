@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { DndContext, DragOverlay } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Box, CheckCircle2 } from 'lucide-react';
 import { Job, JobColumnId, PaymentStatus } from '../../types';
 import { KANBAN_ROWS_CONFIG } from './DashboardConstants';
@@ -99,32 +100,37 @@ export const DashboardKanbanView: React.FC<DashboardKanbanViewProps> = ({
 
                 <DroppableColumn id={row.id} activeId={activeId}>
                   <div className="flex flex-col gap-5 w-full py-4 px-2 overflow-visible">
-                    {rowJobs.map(job => {
-                      const { canMoveUp, canMoveDown } = getJobMoveInfo(job.id);
-                      const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
-                      return (
-                        <SmallKanbanCard
-                          key={job.id}
-                          job={job}
-                          isAdmin={isAdmin}
-                          onSelectJob={onSelectJob}
-                          onDelete={handleDelete}
-                          onDuplicate={handleDuplicate}
-                          onArchive={handleArchive}
-                          onMoveUp={handleMoveUp}
-                          onMoveDown={handleMoveDown}
-                          canMoveUp={canMoveUp}
-                          canMoveDown={canMoveDown}
-                          onMoveLeft={handleMoveLeft}
-                          onMoveRight={handleMoveRight}
-                          canMoveLeft={canMoveLeft}
-                          canMoveRight={canMoveRight}
-                          onPaymentStatusChange={handlePaymentStatusChange}
-                          onMoveToColumn={handleMoveToColumn}
-                          onContextMenu={handleContextMenu}
-                        />
-                      );
-                    })}
+                    <SortableContext 
+                      items={rowJobs.map(j => `${j.id}-${j.createdAt}`)} 
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {rowJobs.map(job => {
+                        const { canMoveUp, canMoveDown } = getJobMoveInfo(job.id);
+                        const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
+                        return (
+                          <SmallKanbanCard
+                            key={job.id}
+                            job={job}
+                            isAdmin={isAdmin}
+                            onSelectJob={onSelectJob}
+                            onDelete={handleDelete}
+                            onDuplicate={handleDuplicate}
+                            onArchive={handleArchive}
+                            onMoveUp={handleMoveUp}
+                            onMoveDown={handleMoveDown}
+                            canMoveUp={canMoveUp}
+                            canMoveDown={canMoveDown}
+                            onMoveLeft={handleMoveLeft}
+                            onMoveRight={handleMoveRight}
+                            canMoveLeft={canMoveLeft}
+                            canMoveRight={canMoveRight}
+                            onPaymentStatusChange={handlePaymentStatusChange}
+                            onMoveToColumn={handleMoveToColumn}
+                            onContextMenu={handleContextMenu}
+                          />
+                        );
+                      })}
+                    </SortableContext>
                   </div>
                 </DroppableColumn>
               </div>

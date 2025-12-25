@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { DndContext, DragOverlay } from '@dnd-kit/core';
+import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { Box, CheckCircle2 } from 'lucide-react';
 import { Job, JobColumnId, PaymentStatus } from '../../types';
 import { EXTENDED_ROWS_CONFIG } from './DashboardConstants';
@@ -98,32 +99,37 @@ export const DashboardBoardView: React.FC<DashboardBoardViewProps> = ({
                       Przeciągnij tutaj zlecenie
                     </div>
                   ) : (
-                    rowJobs.map((job: Job) => {
-                      const { canMoveLeft, canMoveRight, canMoveUp, canMoveDown } = getJobMoveLeftRightInfo(job.id);
-                      return (
-                        <div key={job.id}>
-                          <DraggableJobCard
-                            job={job}
-                            isAdmin={isAdmin}
-                            onSelectJob={onSelectJob}
-                            onDelete={handleDelete}
-                            onDuplicate={handleDuplicate}
-                            onArchive={handleArchive}
-                            onPaymentStatusChange={handlePaymentStatusChange}
-                            onMoveToColumn={handleMoveToColumn}
-                            onMoveLeft={handleMoveLeft}
-                            onMoveRight={handleMoveRight}
-                            onMoveUp={job.columnId === 'PREPARE' ? handleJumpToStart : undefined}
-                            onMoveDown={job.columnId === 'PREPARE' ? handleJumpToEnd : undefined}
-                            canMoveLeft={canMoveLeft}
-                            canMoveRight={canMoveRight}
-                            canMoveUp={job.columnId === 'PREPARE' ? canMoveUp : undefined}
-                            canMoveDown={job.columnId === 'PREPARE' ? canMoveDown : undefined}
-                            onContextMenu={handleContextMenu}
-                          />
-                        </div>
-                      );
-                    })
+                    <SortableContext 
+                      items={rowJobs.map(j => `${j.id}-${j.createdAt}`)} 
+                      strategy={rectSortingStrategy}
+                    >
+                      {rowJobs.map((job: Job) => {
+                        const { canMoveLeft, canMoveRight, canMoveUp, canMoveDown } = getJobMoveLeftRightInfo(job.id);
+                        return (
+                          <div key={job.id}>
+                            <DraggableJobCard
+                              job={job}
+                              isAdmin={isAdmin}
+                              onSelectJob={onSelectJob}
+                              onDelete={handleDelete}
+                              onDuplicate={handleDuplicate}
+                              onArchive={handleArchive}
+                              onPaymentStatusChange={handlePaymentStatusChange}
+                              onMoveToColumn={handleMoveToColumn}
+                              onMoveLeft={handleMoveLeft}
+                              onMoveRight={handleMoveRight}
+                              onMoveUp={job.columnId === 'PREPARE' ? handleJumpToStart : undefined}
+                              onMoveDown={job.columnId === 'PREPARE' ? handleJumpToEnd : undefined}
+                              canMoveLeft={canMoveLeft}
+                              canMoveRight={canMoveRight}
+                              canMoveUp={job.columnId === 'PREPARE' ? canMoveUp : undefined}
+                              canMoveDown={job.columnId === 'PREPARE' ? canMoveDown : undefined}
+                              onContextMenu={handleContextMenu}
+                            />
+                          </div>
+                        );
+                      })}
+                    </SortableContext>
                   )}
                 </DroppableRow>
               </div>

@@ -10,6 +10,7 @@ import {
   DragOverEvent,
   DragEndEvent
 } from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
 
 import JobContextMenu from './JobContextMenu';
 
@@ -524,9 +525,20 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
 
   const handleDragOver = (event: DragOverEvent) => {
     let overIdValue = event.over?.id as string || null;
-    if (overIdValue && overIdValue.startsWith('card-')) {
-      overIdValue = (event.over?.data?.current as any)?.jobId || overIdValue.replace('card-', '').split('-')[0];
+    if (!overIdValue) {
+      setOverId(null);
+      return;
     }
+
+    const overData = event.over?.data?.current as any;
+    if (overData?.jobId) {
+      overIdValue = overData.jobId;
+    } else if (overIdValue.startsWith('card-')) {
+      overIdValue = overIdValue.replace('card-', '').split('-')[0];
+    } else if (overIdValue.includes('-')) {
+      overIdValue = overIdValue.split('-')[0];
+    }
+    
     setOverId(overIdValue);
   };
 
@@ -535,17 +547,30 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     setActiveId(null);
     setOverId(null);
     if (!over) return;
+
+    // Pobierz czyste ID zlecenia (bez timestampu lub prefiksu)
     const draggedId = (active.data?.current as any)?.jobId || active.id.toString().split('-')[0];
     let droppedOnId = over.id as string;
-    if (droppedOnId.startsWith('card-')) {
-      droppedOnId = (over.data?.current as any)?.jobId || droppedOnId.replace('card-', '').split('-')[0];
+    
+    // Obsługa różnych formatów ID (card-ID, ID-timestamp, lub samo ID)
+    const overData = over.data?.current as any;
+    if (overData?.jobId) {
+      droppedOnId = overData.jobId;
+    } else if (droppedOnId.startsWith('card-')) {
+      droppedOnId = droppedOnId.replace('card-', '').split('-')[0];
+    } else if (droppedOnId.includes('-')) {
+      droppedOnId = droppedOnId.split('-')[0];
     }
+
     if (draggedId === droppedOnId) return;
+
     const allColumnIds = ['PREPARE', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN', 'COMPLETED'];
     const sourceColumn = findColumnForJob(draggedId);
     if (!sourceColumn) return;
+
     let targetColumn: JobColumnId;
     let insertBeforeJobId: string | null = null;
+
     if (allColumnIds.includes(droppedOnId)) {
       targetColumn = droppedOnId as JobColumnId;
     } else {
@@ -554,35 +579,61 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       targetColumn = overJobColumn;
       insertBeforeJobId = droppedOnId;
     }
+
     if (sourceColumn === targetColumn) {
       const sourceJobs = getJobsForColumn(sourceColumn);
       const jobIds = sourceJobs.map(j => j.id);
-      const currentIndex = jobIds.indexOf(draggedId);
-      if (currentIndex === -1) return;
-      jobIds.splice(currentIndex, 1);
-      let insertIndex = jobIds.length;
+      const oldIndex = jobIds.indexOf(draggedId);
+      if (oldIndex === -1) return;
+
+      let newIndex = oldIndex;
       if (insertBeforeJobId) {
-        insertIndex = jobIds.indexOf(insertBeforeJobId);
-        if (insertIndex === -1) insertIndex = jobIds.length;
+        newIndex = jobIds.indexOf(insertBeforeJobId);
+        if (newIndex === -1) newIndex = oldIndex;
+      } else {
+        // Jeśli nie upuszczono na konkretną kartę (insertBeforeJobId jest null),
+        // ale jesteśmy w tej samej kolumnie, to nie zmieniajmy pozycji.
+        // Zapobiega to "uciekaniu na koniec" przy upuszczeniu między kafelkami.
+        return;
       }
-      jobIds.splice(insertIndex, 0, draggedId);
+
+      if (oldIndex === newIndex) return;
+
+      const newOrder = arrayMove(jobIds, oldIndex, newIndex);
+
       const orderMap = new Map<string, number>();
-      jobIds.forEach((id, idx) => orderMap.set(id, (idx + 1) * 10));
-      setJobs(prev => prev.map(job => orderMap.has(job.id) ? { ...job, sortOrder: orderMap.get(job.id)! } : job));
-      await jobsService.reorderJobs(targetColumn, jobIds);
+      newOrder.forEach((id, idx) => orderMap.set(id, (idx + 1) * 10));
+
+      setJobs(prev => prev.map(job => 
+        orderMap.has(job.id) ? { ...job, sortOrder: orderMap.get(job.id)! } : job
+      ));
+
+      await jobsService.reorderJobs(targetColumn, newOrder);
       broadcastChange();
     } else {
-      const updatedJobs = jobs.map(job => job.id === draggedId ? { ...job, columnId: targetColumn } : job);
-      const targetJobs = updatedJobs.filter(j => (j.columnId || 'PREPARE') === targetColumn)
+      // Pobierz zlecenia już będące w kolumnie docelowej (bez tego przeciąganego)
+      const targetJobs = jobs.filter(j => (j.columnId || 'PREPARE') === targetColumn && j.id !== draggedId)
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || (a.createdAt || 0) - (b.createdAt || 0));
+      
       const targetIds = targetJobs.map(j => j.id);
+      
+      let insertIndex = targetIds.length;
+      if (insertBeforeJobId) {
+        insertIndex = targetIds.indexOf(insertBeforeJobId);
+        if (insertIndex === -1) insertIndex = targetIds.length;
+      }
+      
+      targetIds.splice(insertIndex, 0, draggedId);
+
       const orderMap = new Map<string, number>();
       targetIds.forEach((id, idx) => orderMap.set(id, (idx + 1) * 10));
+
       setJobs(prev => prev.map(job => {
         if (job.id === draggedId) return { ...job, columnId: targetColumn, sortOrder: orderMap.get(job.id)! };
         if (orderMap.has(job.id)) return { ...job, sortOrder: orderMap.get(job.id)! };
         return job;
       }));
+
       await jobsService.reorderJobs(targetColumn, targetIds);
       broadcastChange();
     }

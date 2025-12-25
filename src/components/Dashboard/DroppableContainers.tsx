@@ -1,19 +1,41 @@
 import React from 'react';
-import { useDroppable, CollisionDetection, pointerWithin, rectIntersection } from '@dnd-kit/core';
+import { useDroppable, CollisionDetection, pointerWithin, rectIntersection, closestCorners } from '@dnd-kit/core';
 import { JobColumnId } from '../../types';
 
 export const cardFirstCollision: CollisionDetection = (args) => {
   const pointerCollisions = pointerWithin(args);
-  const cardCollisions = pointerCollisions.filter(c => 
-    typeof c.id === 'string' && c.id.startsWith('card-')
-  );
-  const otherCollisions = pointerCollisions.filter(c => 
-    typeof c.id !== 'string' || !c.id.startsWith('card-')
-  );
+  
+  // Lista ID kolumn, aby odróżnić je od kart
+  const columnIds = ['PREPARE', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN', 'COMPLETED'];
+  
+  const cardCollisions = pointerCollisions.filter(c => {
+    const id = c.id.toString();
+    // Karta ma ID w formacie "jobId-timestamp" lub zaczyna się od "card-"
+    return id.includes('-') || (id.startsWith('card-') && !columnIds.includes(id));
+  });
   
   if (cardCollisions.length > 0) {
     return cardCollisions;
   }
+
+  // Jeśli nie jesteśmy bezpośrednio nad kartą, spróbujmy znaleźć najbliższą kartę
+  // zamiast od razu zwracać kolumnę. To kluczowe dla przerw między kafelkami.
+  const closestCardCollisions = closestCorners({
+    ...args,
+    droppableContainers: args.droppableContainers.filter(container => {
+      const id = container.id.toString();
+      return id.includes('-') || (id.startsWith('card-') && !columnIds.includes(id));
+    })
+  });
+
+  if (closestCardCollisions.length > 0) {
+    return closestCardCollisions;
+  }
+  
+  const otherCollisions = pointerCollisions.filter(c => {
+    const id = c.id.toString();
+    return columnIds.includes(id);
+  });
   
   if (otherCollisions.length > 0) {
     return otherCollisions;

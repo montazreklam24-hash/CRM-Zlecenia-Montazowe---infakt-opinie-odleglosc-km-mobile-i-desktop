@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { DndContext, DragOverlay } from '@dnd-kit/core';
+import { SortableContext, rectSortingStrategy, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Box, CheckCircle2 } from 'lucide-react';
 import { Job, JobColumnId, PaymentStatus } from '../../types';
 import { ROWS_CONFIG } from './DashboardConstants';
@@ -103,31 +104,36 @@ export const DashboardMixedView: React.FC<DashboardMixedViewProps> = ({
                     Przeciągnij tutaj zlecenie
                   </div>
                 ) : (
-                  rowJobs.map((job: Job) => {
-                    const { canMoveLeft, canMoveRight, canMoveUp, canMoveDown } = getJobMoveLeftRightInfo(job.id);
-                    return (
-                      <DraggableJobCard
-                        key={job.id}
-                        job={job}
-                        isAdmin={isAdmin}
-                        onSelectJob={onSelectJob}
-                        onDelete={handleDelete}
-                        onDuplicate={handleDuplicate}
-                        onArchive={handleArchive}
-                        onPaymentStatusChange={handlePaymentStatusChange}
-                        onMoveToColumn={handleMoveToColumn}
-                        onMoveLeft={handleMoveLeft}
-                        onMoveRight={handleMoveRight}
-                        onMoveUp={handleJumpToStart}
-                        onMoveDown={handleJumpToEnd}
-                        canMoveLeft={canMoveLeft}
-                        canMoveRight={canMoveRight}
-                        canMoveUp={canMoveUp}
-                        canMoveDown={canMoveDown}
-                        onContextMenu={handleContextMenu}
-                      />
-                    );
-                  })
+                  <SortableContext 
+                    items={rowJobs.map(j => `${j.id}-${j.createdAt}`)} 
+                    strategy={rectSortingStrategy}
+                  >
+                    {rowJobs.map((job: Job) => {
+                      const { canMoveLeft, canMoveRight, canMoveUp, canMoveDown } = getJobMoveLeftRightInfo(job.id);
+                      return (
+                        <DraggableJobCard
+                          key={job.id}
+                          job={job}
+                          isAdmin={isAdmin}
+                          onSelectJob={onSelectJob}
+                          onDelete={handleDelete}
+                          onDuplicate={handleDuplicate}
+                          onArchive={handleArchive}
+                          onPaymentStatusChange={handlePaymentStatusChange}
+                          onMoveToColumn={handleMoveToColumn}
+                          onMoveLeft={handleMoveLeft}
+                          onMoveRight={handleMoveRight}
+                          onMoveUp={handleJumpToStart}
+                          onMoveDown={handleJumpToEnd}
+                          canMoveLeft={canMoveLeft}
+                          canMoveRight={canMoveRight}
+                          canMoveUp={canMoveUp}
+                          canMoveDown={canMoveDown}
+                          onContextMenu={handleContextMenu}
+                        />
+                      );
+                    })}
+                  </SortableContext>
                 )}
               </DroppableRow>
             </div>
@@ -175,32 +181,37 @@ export const DashboardMixedView: React.FC<DashboardMixedViewProps> = ({
                   </div>
                   <DroppableColumn id={row.id} activeId={activeId}>
                      <div className="flex flex-col gap-4 w-full p-2">
-                        {rowJobs.map(job => {
-                           const { canMoveUp, canMoveDown } = getJobMoveInfo(job.id);
-                           const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
-                           return (
-                              <SmallKanbanCard
-                                key={job.id}
-                                job={job}
-                                isAdmin={isAdmin}
-                                onSelectJob={onSelectJob}
-                                onDelete={handleDelete}
-                                onDuplicate={handleDuplicate}
-                                onArchive={handleArchive}
-                                onMoveUp={handleMoveUp}
-                                onMoveDown={handleMoveDown}
-                                canMoveUp={canMoveUp}
-                                canMoveDown={canMoveDown}
-                                onMoveLeft={handleMoveLeft}
-                                onMoveRight={handleMoveRight}
-                                canMoveLeft={canMoveLeft}
-                                canMoveRight={canMoveRight}
-                                onContextMenu={handleContextMenu}
-                                onPaymentStatusChange={handlePaymentStatusChange}
-                                onMoveToColumn={handleMoveToColumn}
-                              />
-                           );
-                        })}
+                        <SortableContext 
+                          items={rowJobs.map(j => `${j.id}-${j.createdAt}`)} 
+                          strategy={verticalListSortingStrategy}
+                        >
+                          {rowJobs.map(job => {
+                             const { canMoveUp, canMoveDown } = getJobMoveInfo(job.id);
+                             const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
+                             return (
+                                <SmallKanbanCard
+                                  key={job.id}
+                                  job={job}
+                                  isAdmin={isAdmin}
+                                  onSelectJob={onSelectJob}
+                                  onDelete={handleDelete}
+                                  onDuplicate={handleDuplicate}
+                                  onArchive={handleArchive}
+                                  onMoveUp={handleMoveUp}
+                                  onMoveDown={handleMoveDown}
+                                  canMoveUp={canMoveUp}
+                                  canMoveDown={canMoveDown}
+                                  onMoveLeft={handleMoveLeft}
+                                  onMoveRight={handleMoveRight}
+                                  canMoveLeft={canMoveLeft}
+                                  canMoveRight={canMoveRight}
+                                  onContextMenu={handleContextMenu}
+                                  onPaymentStatusChange={handlePaymentStatusChange}
+                                  onMoveToColumn={handleMoveToColumn}
+                                />
+                             );
+                          })}
+                        </SortableContext>
                      </div>
                   </DroppableColumn>
                 </div>
@@ -231,27 +242,32 @@ export const DashboardMixedView: React.FC<DashboardMixedViewProps> = ({
                 <span className="bg-white/20 px-2.5 py-1 text-xs font-bold" style={{ borderRadius: 'var(--radius-md)' }}>{rowJobs.length}</span>
               </div>
               <DroppableRow id={row.id} activeId={activeId}>
-                {rowJobs.map((job) => {
-                  const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
-                  return (
-                    <div key={job.id}>
-                      <DraggableJobCard
-                        job={job}
-                        isAdmin={isAdmin}
-                        onSelectJob={onSelectJob}
-                        onDelete={handleDelete}
-                        onDuplicate={handleDuplicate}
-                        onPaymentStatusChange={handlePaymentStatusChange}
-                        onMoveToColumn={handleMoveToColumn}
-                        onMoveLeft={handleMoveLeft}
-                        onMoveRight={handleMoveRight}
-                        canMoveLeft={canMoveLeft}
-                        canMoveRight={canMoveRight}
-                        onContextMenu={handleContextMenu}
-                      />
-                    </div>
-                  );
-                })}
+                <SortableContext 
+                  items={rowJobs.map(j => `${j.id}-${j.createdAt}`)} 
+                  strategy={rectSortingStrategy}
+                >
+                  {rowJobs.map((job) => {
+                    const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
+                    return (
+                      <div key={job.id}>
+                        <DraggableJobCard
+                          job={job}
+                          isAdmin={isAdmin}
+                          onSelectJob={onSelectJob}
+                          onDelete={handleDelete}
+                          onDuplicate={handleDuplicate}
+                          onPaymentStatusChange={handlePaymentStatusChange}
+                          onMoveToColumn={handleMoveToColumn}
+                          onMoveLeft={handleMoveLeft}
+                          onMoveRight={handleMoveRight}
+                          canMoveLeft={canMoveLeft}
+                          canMoveRight={canMoveRight}
+                          onContextMenu={handleContextMenu}
+                        />
+                      </div>
+                    );
+                  })}
+                </SortableContext>
               </DroppableRow>
             </div>
            );
