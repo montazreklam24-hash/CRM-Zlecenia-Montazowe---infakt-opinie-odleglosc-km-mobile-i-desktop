@@ -480,7 +480,6 @@ export const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
               status={job.paymentStatus || PaymentStatus.NONE}
               onClick={(e) => { e.stopPropagation(); setShowPaymentMenu(!showPaymentMenu); }}
               showLabel={false}
-              size="small"
             />
             
             {showPaymentMenu && (
