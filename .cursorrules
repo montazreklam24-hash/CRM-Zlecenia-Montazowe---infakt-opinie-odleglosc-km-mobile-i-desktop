@@ -1,11 +1,11 @@
 # Reguły dla CRM Zlecenia Montażowe
 
-## Git
+## Git & Deploy
 - Po każdej zmianie lub grupie zmian rób git commit
 - Używaj konwencji: fix:, feat:, refactor:, chore:
 - Wiadomości commitów opisowe (po polsku lub angielsku)
-- Nie czekaj na koniec sesji z commitami
 - ZAWSZE rób git push po commitach!
+- **ZAWSZE po zmianach w kodzie rób `npm run build` aby zaktualizować folder dist/**
 
 ## Backup
 - npm run build automatycznie robi backup ZIP przed buildem
@@ -13,16 +13,16 @@
 - Można też ręcznie: npm run backup
 - build:fast pomija backup (tylko gdy pilne)
 
+## Deploy
+- **Build ZAWSZE: npm run build**
+- Folder dist/ wgrywać na FTP
+- NIE nadpisywać uploads/ na serwerze (zdjęcia klientów)
+
 ## Stack
 - Frontend: React + TypeScript + Vite
 - Backend: PHP 5.6+ API (folder api/)
 - Baza: MySQL
 - UI: Tailwind CSS
-
-## Deploy
-- Build: npm run build
-- Folder dist/ wgrywać na FTP
-- NIE nadpisywać uploads/ na serwerze (zdjęcia klientów)
 
 ## Konwencje kodu
 - Komponenty React w src/components/
@@ -40,3 +40,10 @@
 - W OSM używaj `autoPan: false` w `bindPopup` i ręcznie wywołuj `map.panTo(marker.getLatLng())` w zdarzeniach `mouseover` i `click`.
 - To kluczowe dla UX na urządzeniach mobilnych i małych ekranach.
 
+## Workflow po zmianach w kodzie:
+1. Wprowadź zmiany w src/
+2. git add .
+3. git commit -m "typ: opis zmiany"
+4. git push
+5. **npm run build** (ZAWSZE!)
+6. Folder dist/ jest gotowy do wgrania na serwer
