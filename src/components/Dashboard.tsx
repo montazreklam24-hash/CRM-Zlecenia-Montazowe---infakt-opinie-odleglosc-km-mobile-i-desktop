@@ -359,6 +359,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
         </div>
       )}
       <div 
+        data-job-id={job.id}
         className={`relative group h-full transition-all duration-300 ${!matchesFilter ? 'opacity-40 grayscale-[60%]' : 'opacity-100'}`}
         onMouseEnter={() => !isTouchDevice && setShowArrows(true)}
         onMouseLeave={() => !isTouchDevice && setShowArrows(false)}
@@ -769,6 +770,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
         </div>
       )}
       <div 
+        data-job-id={job.id}
         className={`relative group ${!matchesFilter ? 'opacity-40 grayscale-[60%]' : 'opacity-100'} transition-all duration-300`}
         onMouseEnter={() => !isTouchDevice && setShowArrows(true)}
         onMouseLeave={() => !isTouchDevice && setShowArrows(false)}
