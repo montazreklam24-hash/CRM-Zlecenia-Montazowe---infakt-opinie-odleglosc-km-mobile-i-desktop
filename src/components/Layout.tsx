@@ -57,7 +57,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
           </button>
           
           {/* Logo */}
-          <div className="flex items-center cursor-pointer relative h-16" onClick={() => navigate('/')}>
+          <div className="flex items-center cursor-pointer relative h-16" onClick={() => window.location.href = '/'}>
             <div className="relative h-full flex items-center">
                {/* Logo PNG wystające w dół */}
                <img 
