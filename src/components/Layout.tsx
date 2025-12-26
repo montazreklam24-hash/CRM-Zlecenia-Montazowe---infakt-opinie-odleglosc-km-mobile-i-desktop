@@ -81,7 +81,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
                     CRM.MontazReklam24.pl
                   </span>
                   <span className="text-gray-400 text-[10px] lowercase leading-tight ml-1">
-                    wersja beta
+                    wersja gamma
                   </span>
                </div>
             </div>
