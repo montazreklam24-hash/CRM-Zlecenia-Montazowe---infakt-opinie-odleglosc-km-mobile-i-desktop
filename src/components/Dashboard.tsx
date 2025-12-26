@@ -170,34 +170,6 @@ const formatPhoneNumber = (phone: string | undefined): string => {
   return phone;
 };
 
-// ============================================
-// DOM HELPERS DLA PRZESUWANIA KART
-// ============================================
-
-const getOrderedIdsFromDOM = (container: HTMLElement): string[] => {
-  return Array.from(container.querySelectorAll('[data-job-id]'))
-    .map(el => el.getAttribute('data-job-id'))
-    .filter(Boolean) as string[];
-};
-
-const moveCardByOne = (cardEl: HTMLElement, direction: -1 | 1): void => {
-  const container = cardEl.parentElement;
-  if (!container) return;
-
-  if (direction === 1) {
-    const next = cardEl.nextElementSibling as HTMLElement | null;
-    if (next) {
-      next.after(cardEl);
-    }
-  } else {
-    const prev = cardEl.previousElementSibling as HTMLElement | null;
-    if (prev) {
-      prev.before(cardEl);
-    }
-  }
-};
-
-
 // Formatowanie adresu (skrócone)
 const formatAddressShort = (address: string | undefined): string => {
   if (!address) return 'BRAK ADRESU';
@@ -1552,43 +1524,37 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const job = jobs.find(j => j.id === jobId);
     if (!job || (job.columnId || 'PREPARE') !== 'PREPARE') return;
     
-    // Znajdź element w DOM dla natychmiastowej reakcji
-    const cardEl = document.querySelector(`[data-job-id="${jobId}"]`) as HTMLElement;
-    const container = cardEl?.parentElement;
+    const sortedJobs = getPrepareJobsSorted();
+    const index = sortedJobs.findIndex(j => j.id === jobId);
+    if (index === -1 || index === 0) return;
+
+    console.log('🔄 handleMoveLeft:', { jobId, fromIndex: index, toIndex: index - 1 });
     
-    if (cardEl && container) {
-      const sortedJobs = getPrepareJobsSorted();
-      const index = sortedJobs.findIndex(j => j.id === jobId);
-      if (index === -1 || index === 0) return;
+    // Zamień miejscami sortOrder z poprzednim elementem
+    const currentJob = sortedJobs[index];
+    const prevJob = sortedJobs[index - 1];
+    
+    const currentSortOrder = currentJob.sortOrder ?? currentJob.normalizedOrder;
+    const prevSortOrder = prevJob.sortOrder ?? prevJob.normalizedOrder;
+    
+    // Optymistyczna aktualizacja stanu
+    setJobs(prev => prev.map(j => {
+      if (j.id === currentJob.id) return { ...j, sortOrder: prevSortOrder };
+      if (j.id === prevJob.id) return { ...j, sortOrder: currentSortOrder };
+      return j;
+    }));
 
-      console.log('🔄 handleMoveLeft (DOM first):', { jobId, fromIndex: index, toIndex: index - 1 });
-      
-      // 1. Natychmiastowe przesunięcie w DOM
-      moveCardByOne(cardEl, -1);
-      
-      // 2. Odczytanie nowej kolejności z DOM
-      const orderedIds = getOrderedIdsFromDOM(container);
-      
-      // 3. Optymistyczna aktualizacja stanu React (żeby zsynchronizować dane)
-      setJobs(prev => {
-        const updated = [...prev];
-        orderedIds.forEach((id, i) => {
-          const idx = updated.findIndex(uj => uj.id === id);
-          if (idx !== -1) {
-            updated[idx] = { ...updated[idx], sortOrder: (i + 1) * 10 };
-          }
-        });
-        return updated;
-      });
-
-      // 4. Zapis do backendu
-      try {
-        await jobsService.reorderJobs('PREPARE', orderedIds);
-        broadcastChange();
-      } catch (err) {
-        console.error('❌ Move left in PREPARE failed', err);
-        loadJobs();
-      }
+    // Zapis do backendu - zamień kolejność
+    const newOrder = [...sortedJobs];
+    [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+    const orderedIds = newOrder.map(j => j.id);
+    
+    try {
+      await jobsService.reorderJobs('PREPARE', orderedIds);
+      broadcastChange();
+    } catch (err) {
+      console.error('❌ Move left in PREPARE failed', err);
+      loadJobs();
     }
   };
 
@@ -1596,43 +1562,37 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const job = jobs.find(j => j.id === jobId);
     if (!job || (job.columnId || 'PREPARE') !== 'PREPARE') return;
     
-    // Znajdź element w DOM dla natychmiastowej reakcji
-    const cardEl = document.querySelector(`[data-job-id="${jobId}"]`) as HTMLElement;
-    const container = cardEl?.parentElement;
+    const sortedJobs = getPrepareJobsSorted();
+    const index = sortedJobs.findIndex(j => j.id === jobId);
+    if (index === -1 || index === sortedJobs.length - 1) return;
+
+    console.log('🔄 handleMoveRight:', { jobId, fromIndex: index, toIndex: index + 1 });
     
-    if (cardEl && container) {
-      const sortedJobs = getPrepareJobsSorted();
-      const index = sortedJobs.findIndex(j => j.id === jobId);
-      if (index === -1 || index === sortedJobs.length - 1) return;
+    // Zamień miejscami sortOrder z następnym elementem
+    const currentJob = sortedJobs[index];
+    const nextJob = sortedJobs[index + 1];
+    
+    const currentSortOrder = currentJob.sortOrder ?? currentJob.normalizedOrder;
+    const nextSortOrder = nextJob.sortOrder ?? nextJob.normalizedOrder;
+    
+    // Optymistyczna aktualizacja stanu
+    setJobs(prev => prev.map(j => {
+      if (j.id === currentJob.id) return { ...j, sortOrder: nextSortOrder };
+      if (j.id === nextJob.id) return { ...j, sortOrder: currentSortOrder };
+      return j;
+    }));
 
-      console.log('🔄 handleMoveRight (DOM first):', { jobId, fromIndex: index, toIndex: index + 1 });
-      
-      // 1. Natychmiastowe przesunięcie w DOM
-      moveCardByOne(cardEl, 1);
-      
-      // 2. Odczytanie nowej kolejności z DOM
-      const orderedIds = getOrderedIdsFromDOM(container);
-      
-      // 3. Optymistyczna aktualizacja stanu React
-      setJobs(prev => {
-        const updated = [...prev];
-        orderedIds.forEach((id, i) => {
-          const idx = updated.findIndex(uj => uj.id === id);
-          if (idx !== -1) {
-            updated[idx] = { ...updated[idx], sortOrder: (i + 1) * 10 };
-          }
-        });
-        return updated;
-      });
-
-      // 4. Zapis do backendu
-      try {
-        await jobsService.reorderJobs('PREPARE', orderedIds);
-        broadcastChange();
-      } catch (err) {
-        console.error('❌ Move right in PREPARE failed', err);
-        loadJobs();
-      }
+    // Zapis do backendu - zamień kolejność
+    const newOrder = [...sortedJobs];
+    [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+    const orderedIds = newOrder.map(j => j.id);
+    
+    try {
+      await jobsService.reorderJobs('PREPARE', orderedIds);
+      broadcastChange();
+    } catch (err) {
+      console.error('❌ Move right in PREPARE failed', err);
+      loadJobs();
     }
   };
 
