@@ -1527,8 +1527,6 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const sortedJobs = getPrepareJobsSorted();
     const index = sortedJobs.findIndex(j => j.id === jobId);
     if (index === -1 || index === 0) return;
-
-    console.log('🔄 handleMoveLeft:', { jobId, fromIndex: index, toIndex: index - 1 });
     
     // Zamień miejscami sortOrder z poprzednim elementem
     const currentJob = sortedJobs[index];
@@ -1565,8 +1563,6 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const sortedJobs = getPrepareJobsSorted();
     const index = sortedJobs.findIndex(j => j.id === jobId);
     if (index === -1 || index === sortedJobs.length - 1) return;
-
-    console.log('🔄 handleMoveRight:', { jobId, fromIndex: index, toIndex: index + 1 });
     
     // Zamień miejscami sortOrder z następnym elementem
     const currentJob = sortedJobs[index];
@@ -1698,15 +1694,6 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
       ? Math.max(...targetColumnJobs.map(j => j.order || 0)) + 1 
       : 0;
     
-    console.log('📦 handleMoveToColumn:', {
-      jobId,
-      jobTitle: job.data.jobTitle,
-      from: sourceColumnId,
-      to: targetColumnId,
-      newOrder: maxOrder,
-      targetColumnJobsCount: targetColumnJobs.length
-    });
-    
     // Optymistyczna aktualizacja UI - ustaw zarówno columnId JAK I order
     setJobs(prevJobs => prevJobs.map(j => 
       j.id === jobId ? { ...j, columnId: targetColumnId, order: maxOrder } : j
@@ -1716,7 +1703,6 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     try {
       await jobsService.updateJobColumn(jobId, targetColumnId, maxOrder);
       broadcastChange();
-      console.log('✅ handleMoveToColumn: zapisano pomyślnie');
     } catch (err) {
       console.error('❌ Failed to move job to column:', err);
       loadJobs(); // Reload on error - przywróć stan z backendu
