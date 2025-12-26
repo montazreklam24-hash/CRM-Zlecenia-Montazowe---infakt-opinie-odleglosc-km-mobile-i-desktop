@@ -58,17 +58,17 @@ function reorderJobs() {
         $pdo = getDB();
         $input = getJsonInput();
         
-        $columnId = isset($input['columnId']) ? $input['columnId'] : null;
+        $columnId = isset($input['columnId']) ? $input['columnId'] : (isset($input['status']) ? $input['status'] : null);
         $orderedIds = isset($input['orderedIds']) ? $input['orderedIds'] : [];
         
         if (!$columnId || empty($orderedIds)) {
-            jsonResponse(['error' => 'ColumnId and orderedIds are required'], 400);
+            jsonResponse(['error' => 'ColumnId (status) and orderedIds are required'], 400);
         }
 
-        // Logowanie dla debugu
+        // Logowanie dla debugu (zgodnie z wymaganiami)
         $logDir = __DIR__ . '/logs';
         if (!is_dir($logDir)) mkdir($logDir, 0777, true);
-        file_put_contents($logDir . '/debug_jobs.log', date('Y-m-d H:i:s') . " REORDER: Column: $columnId, IDs: " . implode(',', $orderedIds) . "\n", FILE_APPEND);
+        file_put_contents($logDir . '/debug_jobs.log', date('Y-m-d H:i:s') . " REORDER: Status: $columnId, Count: " . count($orderedIds) . ", IDs: " . implode(',', $orderedIds) . "\n", FILE_APPEND);
 
         $pdo->beginTransaction();
         

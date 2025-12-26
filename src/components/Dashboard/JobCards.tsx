@@ -91,48 +91,59 @@ export const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
   return (
     <div 
       className="relative group h-full"
+      data-job-id={job.id}
       onMouseEnter={() => setShowArrows(true)}
       onMouseLeave={() => setShowArrows(false)}
     >
-        {/* LEFT arrow */}
-        {showArrows && canMoveLeft && (
+        {/* LEFT arrow - zawsze widoczne */}
+        {(canMoveLeft || canMoveLeft === false) && (
           <button
-            onClick={(e) => { e.stopPropagation(); onMoveLeft?.(job.id); }}
-            className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń w lewo"
+            onClick={(e) => { e.stopPropagation(); if (canMoveLeft) onMoveLeft?.(job.id); }}
+            disabled={!canMoveLeft}
+            className={`absolute top-1/2 -left-3 -translate-y-1/2 z-[100] w-7 h-7 flex items-center justify-center rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.2)] transition-all font-bold text-sm ${
+              canMoveLeft 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-125 cursor-pointer opacity-100' 
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-30'
+            }`}
+            title={canMoveLeft ? "Przesuń o 1 w lewo" : "Pierwsza pozycja"}
           >
-            <ChevronLeft className="w-5 h-5" />
+            ◀
           </button>
         )}
         
-        {/* RIGHT arrow */}
-        {showArrows && canMoveRight && (
+        {/* RIGHT arrow - zawsze widoczne */}
+        {(canMoveRight || canMoveRight === false) && (
           <button
-            onClick={(e) => { e.stopPropagation(); onMoveRight?.(job.id); }}
-            className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń w prawo"
+            onClick={(e) => { e.stopPropagation(); if (canMoveRight) onMoveRight?.(job.id); }}
+            disabled={!canMoveRight}
+            className={`absolute top-1/2 -right-3 -translate-y-1/2 z-[100] w-7 h-7 flex items-center justify-center rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.2)] transition-all font-bold text-sm ${
+              canMoveRight 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-125 cursor-pointer opacity-100' 
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-30'
+            }`}
+            title={canMoveRight ? "Przesuń o 1 w prawo" : "Ostatnia pozycja"}
           >
-            <ChevronRight className="w-5 h-5" />
+            ▶
           </button>
         )}
 
         {/* UP arrow */}
-        {showArrows && currentColumnId === 'PREPARE' && canMoveUp && (
+        {canMoveUp && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveUp?.(job.id); }}
-            className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 p-0.5 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Na początek"
+            className="absolute -top-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all"
+            title={currentColumnId === 'PREPARE' ? "Na sam początek" : "Przesuń w górę"}
           >
             <ChevronUp className="w-5 h-5" />
           </button>
         )}
 
         {/* DOWN arrow */}
-        {showArrows && currentColumnId === 'PREPARE' && canMoveDown && (
+        {canMoveDown && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveDown?.(job.id); }}
-            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-20 p-0.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Na koniec"
+            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all"
+            title={currentColumnId === 'PREPARE' ? "Na sam koniec" : "Przesuń w dół"}
           >
             <ChevronDown className="w-5 h-5" />
           </button>
@@ -397,14 +408,15 @@ export const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
   return (
     <div 
       className="relative group"
+      data-job-id={job.id}
       onMouseEnter={() => setShowArrows(true)}
       onMouseLeave={() => setShowArrows(false)}
     >
         {/* UP arrow */}
-        {showArrows && canMoveUp && (
+        {canMoveUp && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveUp?.(job.id); }}
-            className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
+            className="absolute -top-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all"
             title="Przesuń w górę"
           >
             <ChevronUp className="w-5 h-5" />
@@ -412,35 +424,45 @@ export const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
         )}
         
         {/* DOWN arrow */}
-        {showArrows && canMoveDown && (
+        {canMoveDown && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveDown?.(job.id); }}
-            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
+            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all"
             title="Przesuń w dół"
           >
             <ChevronDown className="w-5 h-5" />
           </button>
         )}
 
-        {/* LEFT arrow */}
-        {showArrows && canMoveLeft && (
+        {/* LEFT arrow - zawsze widoczne */}
+        {(canMoveLeft || canMoveLeft === false) && (
           <button
-            onClick={(e) => { e.stopPropagation(); onMoveLeft?.(job.id); }}
-            className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń w lewo"
+            onClick={(e) => { e.stopPropagation(); if (canMoveLeft) onMoveLeft?.(job.id); }}
+            disabled={!canMoveLeft}
+            className={`absolute top-1/2 -left-3 -translate-y-1/2 z-[100] w-7 h-7 flex items-center justify-center rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.2)] transition-all font-bold text-sm ${
+              canMoveLeft 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-125 cursor-pointer opacity-100' 
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-30'
+            }`}
+            title={canMoveLeft ? "Przesuń w lewo" : "Pierwsza pozycja"}
           >
-            <ChevronLeft className="w-5 h-5" />
+            ◀
           </button>
         )}
         
-        {/* RIGHT arrow */}
-        {showArrows && canMoveRight && (
+        {/* RIGHT arrow - zawsze widoczne */}
+        {(canMoveRight || canMoveRight === false) && (
           <button
-            onClick={(e) => { e.stopPropagation(); onMoveRight?.(job.id); }}
-            className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń w prawo"
+            onClick={(e) => { e.stopPropagation(); if (canMoveRight) onMoveRight?.(job.id); }}
+            disabled={!canMoveRight}
+            className={`absolute top-1/2 -right-3 -translate-y-1/2 z-[100] w-7 h-7 flex items-center justify-center rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.2)] transition-all font-bold text-sm ${
+              canMoveRight 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-125 cursor-pointer opacity-100' 
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-30'
+            }`}
+            title={canMoveRight ? "Przesuń w prawo" : "Ostatnia pozycja"}
           >
-            <ChevronRight className="w-5 h-5" />
+            ▶
           </button>
         )}
 

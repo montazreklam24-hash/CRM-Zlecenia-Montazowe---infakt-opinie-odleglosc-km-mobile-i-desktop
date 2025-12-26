@@ -56,6 +56,33 @@ export const formatAddressShort = (address: string | undefined): string => {
   return address;
 };
 
+// ============================================
+// DOM HELPERS DLA PRZESUWANIA KART
+// ============================================
+
+export const getOrderedIdsFromDOM = (container: HTMLElement): string[] => {
+  return Array.from(container.querySelectorAll('[data-job-id]'))
+    .map(el => el.getAttribute('data-job-id'))
+    .filter(Boolean) as string[];
+};
+
+export const moveCardByOne = (cardEl: HTMLElement, direction: -1 | 1): void => {
+  const container = cardEl.parentElement;
+  if (!container) return;
+
+  if (direction === 1) {
+    const next = cardEl.nextElementSibling as HTMLElement | null;
+    if (next) {
+      next.after(cardEl);
+    }
+  } else {
+    const prev = cardEl.previousElementSibling as HTMLElement | null;
+    if (prev) {
+      prev.before(cardEl);
+    }
+  }
+};
+
 export const getPaymentStatusColor = (status: PaymentStatus): string => {
   switch (status) {
     case PaymentStatus.PAID: return '#22c55e'; // green

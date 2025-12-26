@@ -118,6 +118,7 @@ interface DraggableJobCardProps {
   onPaymentStatusChange?: (jobId: string, status: PaymentStatus) => void;
   onMoveToColumn?: (jobId: string, columnId: JobColumnId) => void;
   onContextMenu?: (e: React.MouseEvent, job: Job) => void;
+  matchesFilter?: boolean;
 }
 
 const BASE_COORDS = { lat: 52.2297, lng: 21.0122 }; // ul. Poprawna 39R, Warszawa
@@ -167,6 +168,33 @@ const formatPhoneNumber = (phone: string | undefined): string => {
   }
   
   return phone;
+};
+
+// ============================================
+// DOM HELPERS DLA PRZESUWANIA KART
+// ============================================
+
+const getOrderedIdsFromDOM = (container: HTMLElement): string[] => {
+  return Array.from(container.querySelectorAll('[data-job-id]'))
+    .map(el => el.getAttribute('data-job-id'))
+    .filter(Boolean) as string[];
+};
+
+const moveCardByOne = (cardEl: HTMLElement, direction: -1 | 1): void => {
+  const container = cardEl.parentElement;
+  if (!container) return;
+
+  if (direction === 1) {
+    const next = cardEl.nextElementSibling as HTMLElement | null;
+    if (next) {
+      next.after(cardEl);
+    }
+  } else {
+    const prev = cardEl.previousElementSibling as HTMLElement | null;
+    if (prev) {
+      prev.before(cardEl);
+    }
+  }
 };
 
 
@@ -232,7 +260,7 @@ const MOVE_COLUMNS: { id: JobColumnId; label: string; shortLabel: string; icon: 
 const DraggableJobCard: React.FC<DraggableJobCardProps> = ({ 
   job, isAdmin, onSelectJob, onDelete, onDuplicate, onArchive,
   onMoveLeft, onMoveRight, onMoveUp, onMoveDown, canMoveLeft, canMoveRight, canMoveUp, canMoveDown,
-  onPaymentStatusChange, onMoveToColumn, onContextMenu
+  onPaymentStatusChange, onMoveToColumn, onContextMenu, matchesFilter
 }) => {
   // Unikalne ID dla DnD - kombinacja id + createdAt zabezpiecza przed duplikatami
   const uniqueDragId = `${job.id}-${job.createdAt}`;
@@ -255,12 +283,6 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
     setDropRef(node);
   };
 
-  const style: React.CSSProperties = {
-    transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 9999 : 'auto',
-  };
-
   const showDropIndicator = isDropOver && !isDragging;
 
   const paymentColor = getPaymentStatusColor(job.paymentStatus || PaymentStatus.NONE);
@@ -281,7 +303,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
     year: 'numeric'
   }) : null;
 
-  const { isTouchDevice } = useDeviceType();
+  const isTouchDevice = useDeviceType().isTouchDevice;
   const [showClickHint, setShowClickHint] = useState(false);
   const [showArrows, setShowArrows] = useState(isTouchDevice);
   // Stan mini-menu statusu płatności
@@ -294,6 +316,14 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
     ? calculateDistance(BASE_COORDS.lat, BASE_COORDS.lng, job.data.coordinates.lat, job.data.coordinates.lng)
     : null;
   const addressParts = parseAddressForNav(job.data.address);
+
+  const style: React.CSSProperties = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.5 : (matchesFilter ? 1 : 0.3),
+    zIndex: isDragging ? 9999 : 'auto',
+    filter: matchesFilter ? 'none' : 'grayscale(60%) blur(0.5px)',
+    transition: 'all 0.3s ease-in-out',
+  };
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (isDragging) return;
@@ -329,49 +359,59 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
         </div>
       )}
       <div 
-        className="relative group h-full"
+        className={`relative group h-full transition-all duration-300 ${!matchesFilter ? 'opacity-40 grayscale-[60%]' : 'opacity-100'}`}
         onMouseEnter={() => !isTouchDevice && setShowArrows(true)}
         onMouseLeave={() => !isTouchDevice && setShowArrows(false)}
       >
-        {/* LEFT arrow */}
-        {showArrows && canMoveLeft && (
+        {/* LEFT arrow - zawsze widoczne jeśli canMoveLeft jest przekazane */}
+        {(canMoveLeft || canMoveLeft === false) && (
           <button
-            onClick={(e) => { e.stopPropagation(); onMoveLeft?.(job.id); }}
-            className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń w lewo"
+            onClick={(e) => { e.stopPropagation(); if (canMoveLeft) onMoveLeft?.(job.id); }}
+            disabled={!canMoveLeft}
+            className={`absolute top-1/2 -left-3 -translate-y-1/2 z-[100] w-7 h-7 flex items-center justify-center rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.2)] transition-all font-bold text-sm ${
+              canMoveLeft 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-125 cursor-pointer opacity-100' 
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-30'
+            }`}
+            title={canMoveLeft ? "Przesuń o 1 w lewo" : "Pierwsza pozycja"}
           >
-            <ChevronLeft className="w-5 h-5" />
+            ◀
           </button>
         )}
         
-        {/* RIGHT arrow */}
-        {showArrows && canMoveRight && (
+        {/* RIGHT arrow - zawsze widoczne jeśli canMoveRight jest przekazane */}
+        {(canMoveRight || canMoveRight === false) && (
           <button
-            onClick={(e) => { e.stopPropagation(); onMoveRight?.(job.id); }}
-            className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń w prawo"
+            onClick={(e) => { e.stopPropagation(); if (canMoveRight) onMoveRight?.(job.id); }}
+            disabled={!canMoveRight}
+            className={`absolute top-1/2 -right-3 -translate-y-1/2 z-[100] w-7 h-7 flex items-center justify-center rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.2)] transition-all font-bold text-sm ${
+              canMoveRight 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-125 cursor-pointer opacity-100' 
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-30'
+            }`}
+            title={canMoveRight ? "Przesuń o 1 w prawo" : "Ostatnia pozycja"}
           >
-            <ChevronRight className="w-5 h-5" />
+            ▶
           </button>
         )}
 
         {/* UP arrow (jump to start) - tylko dla PREPARE, pojawia się na górze */}
-        {showArrows && currentColumnId === 'PREPARE' && canMoveUp && (
+        {canMoveUp && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveUp?.(job.id); }}
-            className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 p-0.5 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Na początek"
+            className="absolute -top-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all"
+            title={currentColumnId === 'PREPARE' ? "Na sam początek" : "Przesuń w górę"}
           >
             <ChevronUp className="w-5 h-5" />
           </button>
         )}
 
         {/* DOWN arrow (jump to end) - tylko dla PREPARE, pojawia się na dole */}
-        {showArrows && currentColumnId === 'PREPARE' && canMoveDown && (
+        {canMoveDown && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveDown?.(job.id); }}
-            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-20 p-0.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Na koniec"
+            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all"
+            title={currentColumnId === 'PREPARE' ? "Na sam koniec" : "Przesuń w dół"}
           >
             <ChevronDown className="w-5 h-5" />
           </button>
@@ -656,7 +696,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
   job, isAdmin, onSelectJob, onDelete, onDuplicate, onArchive,
   onMoveUp, onMoveDown, canMoveUp, canMoveDown, 
   onMoveLeft, onMoveRight, canMoveLeft, canMoveRight,
-  onContextMenu, onPaymentStatusChange, onMoveToColumn
+  onContextMenu, onPaymentStatusChange, onMoveToColumn, matchesFilter
 }) => {
   // Unikalne ID dla DnD - kombinacja id + createdAt zabezpiecza przed duplikatami
   const uniqueDragId = `${job.id}-${job.createdAt}`;
@@ -679,7 +719,9 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
     setDropRef(node);
   };
 
-  const { isTouchDevice } = useDeviceType();
+  const showDropIndicator = isDropOver && !isDragging;
+
+  const isTouchDevice = useDeviceType().isTouchDevice;
   const [showClickHint, setShowClickHint] = useState(false);
   const [showArrows, setShowArrows] = useState(isTouchDevice);
   // Stan mini-menu statusu płatności
@@ -687,18 +729,12 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
   // Stan rozwinięcia sekcji "Przenieś do"
   const [showMoveMenu, setShowMoveMenu] = useState(false);
 
-  // Address & Distance for Navigation Button
-  const distance = job.data.coordinates 
-    ? calculateDistance(BASE_COORDS.lat, BASE_COORDS.lng, job.data.coordinates.lat, job.data.coordinates.lng)
-    : null;
-  const addressParts = parseAddressForNav(job.data.address);
-
-  const showDropIndicator = isDropOver && !isDragging;
-
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.5 : (matchesFilter ? 1 : 0.3),
     zIndex: isDragging ? 9999 : 'auto',
+    filter: matchesFilter ? 'none' : 'grayscale(60%) blur(0.5px)',
+    transition: 'all 0.3s ease-in-out',
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -733,55 +769,65 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
         </div>
       )}
       <div 
-        className="relative group"
+        className={`relative group ${!matchesFilter ? 'opacity-40 grayscale-[60%]' : 'opacity-100'} transition-all duration-300`}
         onMouseEnter={() => !isTouchDevice && setShowArrows(true)}
         onMouseLeave={() => !isTouchDevice && setShowArrows(false)}
         onClick={handleCardClick}
       >
-        {/* UP arrow - appears on hover at top */}
-        {showArrows && canMoveUp && (
+        {/* UP arrow */}
+        {canMoveUp && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveUp?.(job.id); }}
-            className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
+            className="absolute -top-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all"
             title="Przesuń w górę"
           >
             <ChevronUp className="w-5 h-5" />
           </button>
         )}
         
-        {/* DOWN arrow - appears on hover at bottom */}
-        {showArrows && canMoveDown && (
+        {/* DOWN arrow */}
+        {canMoveDown && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveDown?.(job.id); }}
-            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
+            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all"
             title="Przesuń w dół"
           >
             <ChevronDown className="w-5 h-5" />
           </button>
         )}
-        
-        {/* LEFT arrow */}
-        {showArrows && canMoveLeft && (
+
+        {/* LEFT arrow - zawsze widoczne jeśli canMoveLeft jest przekazane */}
+        {(canMoveLeft || canMoveLeft === false) && (
           <button
-            onClick={(e) => { e.stopPropagation(); onMoveLeft?.(job.id); }}
-            className="absolute top-1/2 -left-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń w lewo"
+            onClick={(e) => { e.stopPropagation(); if (canMoveLeft) onMoveLeft?.(job.id); }}
+            disabled={!canMoveLeft}
+            className={`absolute top-1/2 -left-3 -translate-y-1/2 z-[100] w-7 h-7 flex items-center justify-center rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.2)] transition-all font-bold text-sm ${
+              canMoveLeft 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-125 cursor-pointer opacity-100' 
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-30'
+            }`}
+            title={canMoveLeft ? "Przesuń o 1 w lewo" : "Pierwsza pozycja"}
           >
-            <ChevronLeft className="w-5 h-5" />
+            ◀
           </button>
         )}
         
-        {/* RIGHT arrow */}
-        {showArrows && canMoveRight && (
+        {/* RIGHT arrow - zawsze widoczne jeśli canMoveRight jest przekazane */}
+        {(canMoveRight || canMoveRight === false) && (
           <button
-            onClick={(e) => { e.stopPropagation(); onMoveRight?.(job.id); }}
-            className="absolute top-1/2 -right-3 -translate-y-1/2 z-20 p-0.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:scale-110 transition-all"
-            title="Przesuń w prawo"
+            onClick={(e) => { e.stopPropagation(); if (canMoveRight) onMoveRight?.(job.id); }}
+            disabled={!canMoveRight}
+            className={`absolute top-1/2 -right-3 -translate-y-1/2 z-[100] w-7 h-7 flex items-center justify-center rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.2)] transition-all font-bold text-sm ${
+              canMoveRight 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-125 cursor-pointer opacity-100' 
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-30'
+            }`}
+            title={canMoveRight ? "Przesuń o 1 w prawo" : "Ostatnia pozycja"}
           >
-            <ChevronRight className="w-5 h-5" />
+            ▶
           </button>
         )}
-        
+
         <div 
           ref={setNodeRef}
           style={style}
@@ -1326,8 +1372,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const columnJobs = jobs
       .filter(j => (j.columnId || 'PREPARE') === columnId)
       .sort((a, b) => {
-        const orderA = a.order ?? a.columnOrder ?? 0;
-        const orderB = b.order ?? b.columnOrder ?? 0;
+        const orderA = a.sortOrder ?? a.order ?? a.columnOrder ?? 0;
+        const orderB = b.sortOrder ?? b.order ?? b.columnOrder ?? 0;
         return orderA - orderB;
       });
     
@@ -1351,31 +1397,33 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   // Helper to check if job can move left/right
   const getJobMoveLeftRightInfo = (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
-    if (!job) return { canMoveLeft: false, canMoveRight: false };
+    if (!job) return { canMoveLeft: false, canMoveRight: false, canMoveUp: false, canMoveDown: false };
 
     const columnId = job.columnId || 'PREPARE';
     
-    // Dla PREPARE - obliczamy canMoveUp/Down dla reorderingu w gridzie
-    // canMoveLeft/Right dla przenoszenia między kolumnami
-    const colJobs = jobs
-        .filter(j => (j.columnId || 'PREPARE') === 'PREPARE')
-        .sort((a, b) => {
-            const orderA = a.order ?? a.columnOrder ?? 0;
-            const orderB = b.order ?? b.columnOrder ?? 0;
-            return orderA - orderB;
-        });
-    const index = colJobs.findIndex(j => j.id === jobId);
+    // Dla PREPARE używamy strzałek do reorderingu wewnątrz kolumny (grid)
+    if (columnId === 'PREPARE') {
+      const sortedJobs = getPrepareJobsSorted();
+      const index = sortedJobs.findIndex(j => j.id === jobId);
+      return {
+        canMoveLeft: index > 0,
+        canMoveRight: index < sortedJobs.length - 1,
+        canMoveUp: index > 0, // UP/DOWN zachowujemy dla skoków na start/koniec
+        canMoveDown: index < sortedJobs.length - 1
+      };
+    }
 
+    // Dla innych kolumn strzałki lewo/prawo służą do przenoszenia między kolumnami
     const order = getColumnOrder();
     const currentIndex = order.indexOf(columnId);
     
-    if (currentIndex === -1) return { canMoveLeft: false, canMoveRight: false };
+    if (currentIndex === -1) return { canMoveLeft: false, canMoveRight: false, canMoveUp: false, canMoveDown: false };
     
     return {
       canMoveLeft: currentIndex > 0,
       canMoveRight: currentIndex < order.length - 1,
-      canMoveUp: columnId === 'PREPARE' ? index > 0 : false,
-      canMoveDown: columnId === 'PREPARE' ? index < colJobs.length - 1 : false
+      canMoveUp: false,
+      canMoveDown: false
     };
   };
 
@@ -1435,7 +1483,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     return columnsPerRow;
   };
 
-  // UP arrow: Przenosi na sam początek (order = 0)
+  // UP arrow: Przenosi na sam początek (sortOrder = 0)
   const handleJumpToStart = async (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job || (job.columnId || 'PREPARE') !== 'PREPARE') return;
@@ -1448,21 +1496,21 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const jobsToUpdate = sortedJobs.slice(0, index).map((j, idx) => ({
       id: j.id,
       currentOrder: j.normalizedOrder,
-      newOrder: idx + 1
+      newOrder: (idx + 1) * 10
     }));
     
     // Optymistyczna aktualizacja
     setJobs(prev => prev.map(j => {
-      if (j.id === jobId) return { ...j, order: 0, columnOrder: 0 };
+      if (j.id === jobId) return { ...j, sortOrder: 0 };
       const update = jobsToUpdate.find(u => u.id === j.id);
-      if (update) return { ...j, order: update.newOrder, columnOrder: update.newOrder };
+      if (update) return { ...j, sortOrder: update.newOrder };
       return j;
     }));
     
     try {
-      await jobsService.updateJob(jobId, { order: 0 });
+      await jobsService.updateJob(jobId, { sortOrder: 0 });
       await Promise.all(jobsToUpdate.map(u => 
-        jobsService.updateJob(u.id, { order: u.newOrder })
+        jobsService.updateJob(u.id, { sortOrder: u.newOrder })
       ));
       broadcastChange();
     } catch (err) {
@@ -1471,7 +1519,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     }
   };
 
-  // DOWN arrow: Przenosi na sam koniec (order = max + 1)
+  // DOWN arrow: Przenosi na sam koniec (sortOrder = max + 10)
   const handleJumpToEnd = async (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job || (job.columnId || 'PREPARE') !== 'PREPARE') return;
@@ -1480,16 +1528,16 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     const index = sortedJobs.findIndex(j => j.id === jobId);
     if (index === -1 || index === sortedJobs.length - 1) return;
     
-    const maxOrder = Math.max(...sortedJobs.map(j => j.normalizedOrder), -1);
-    const newOrder = maxOrder + 1;
+    const maxSortOrder = Math.max(...sortedJobs.map(j => j.sortOrder ?? j.normalizedOrder), 0);
+    const newSortOrder = maxSortOrder + 10;
     
     // Optymistyczna aktualizacja
     setJobs(prev => prev.map(j => 
-      j.id === jobId ? { ...j, order: newOrder, columnOrder: newOrder } : j
+      j.id === jobId ? { ...j, sortOrder: newSortOrder } : j
     ));
     
     try {
-      await jobsService.updateJob(jobId, { order: newOrder });
+      await jobsService.updateJob(jobId, { sortOrder: newSortOrder });
       broadcastChange();
     } catch (err) {
       console.error('Jump to end failed', err);
@@ -1497,150 +1545,92 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     }
   };
 
-  // LEFT arrow dla PREPARE: Przesuwa o jedną pozycję w lewo (zamienia z poprzednim)
+  // LEFT arrow dla PREPARE: Przesuwa o jedną pozycję w lewo (wcześniej w tablicy)
   const handleMoveLeftInPrepare = async (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job || (job.columnId || 'PREPARE') !== 'PREPARE') return;
     
-    const sortedJobs = getPrepareJobsSorted();
-    const index = sortedJobs.findIndex(j => j.id === jobId);
-    if (index === -1 || index === 0) return;
+    // Znajdź element w DOM dla natychmiastowej reakcji
+    const cardEl = document.querySelector(`[data-job-id="${jobId}"]`) as HTMLElement;
+    const container = cardEl?.parentElement;
     
-    // Oblicz liczbę kolumn w gridzie
-    const columnsPerRow = getColumnsPerRow();
-    
-    // Sprawdź czy jesteśmy na początku wiersza
-    const isAtStartOfRow = index % columnsPerRow === 0;
-    
-    // Jeśli jesteśmy na początku wiersza, nie możemy przesunąć w lewo
-    if (isAtStartOfRow) {
-      console.log('⚠️ handleMoveLeftInPrepare: Na początku wiersza', { index, columnsPerRow, isAtStartOfRow });
-      return;
-    }
-    
-    // Znajdź kafelek faktycznie w lewo (w tym samym wierszu)
-    const otherJob = sortedJobs[index - 1];
-    
-    // Użyj index jako order - to zapewni unikalne wartości
-    const order1 = index; // Aktualna pozycja
-    const order2 = index - 1; // Pozycja poprzedniego (w lewo)
-    
-    console.log('🔄 handleMoveLeftInPrepare:', {
-      jobId,
-      jobTitle: job.data.jobTitle?.substring(0, 30),
-      index,
-      columnsPerRow,
-      isAtStartOfRow: index % columnsPerRow === 0,
-      order1,
-      order2,
-      otherJobId: otherJob.id,
-      otherJobTitle: otherJob.data.jobTitle?.substring(0, 30)
-    });
-    
-    // Zamiana orderów
-    setJobs(prev => prev.map(j => {
-      if (j.id === jobId) return { ...j, order: order2, columnOrder: order2 };
-      if (j.id === otherJob.id) return { ...j, order: order1, columnOrder: order1 };
-      return j;
-    }));
-    
-    try {
-      await Promise.all([
-        jobsService.updateJob(jobId, { order: order2 }),
-        jobsService.updateJob(otherJob.id, { order: order1 })
-      ]);
-      broadcastChange();
-      console.log('✅ handleMoveLeftInPrepare: Sukces');
-    } catch (err) {
-      console.error('❌ Move left in PREPARE failed', err);
-      loadJobs();
+    if (cardEl && container) {
+      const sortedJobs = getPrepareJobsSorted();
+      const index = sortedJobs.findIndex(j => j.id === jobId);
+      if (index === -1 || index === 0) return;
+
+      console.log('🔄 handleMoveLeft (DOM first):', { jobId, fromIndex: index, toIndex: index - 1 });
+      
+      // 1. Natychmiastowe przesunięcie w DOM
+      moveCardByOne(cardEl, -1);
+      
+      // 2. Odczytanie nowej kolejności z DOM
+      const orderedIds = getOrderedIdsFromDOM(container);
+      
+      // 3. Optymistyczna aktualizacja stanu React (żeby zsynchronizować dane)
+      setJobs(prev => {
+        const updated = [...prev];
+        orderedIds.forEach((id, i) => {
+          const idx = updated.findIndex(uj => uj.id === id);
+          if (idx !== -1) {
+            updated[idx] = { ...updated[idx], sortOrder: (i + 1) * 10 };
+          }
+        });
+        return updated;
+      });
+
+      // 4. Zapis do backendu
+      try {
+        await jobsService.reorderJobs('PREPARE', orderedIds);
+        broadcastChange();
+      } catch (err) {
+        console.error('❌ Move left in PREPARE failed', err);
+        loadJobs();
+      }
     }
   };
 
-  // RIGHT arrow dla PREPARE: Przesuwa o jedną pozycję w prawo (zamienia z następnym)
   const handleMoveRightInPrepare = async (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job || (job.columnId || 'PREPARE') !== 'PREPARE') return;
     
-    const sortedJobs = getPrepareJobsSorted();
-    const index = sortedJobs.findIndex(j => j.id === jobId);
-    if (index === -1 || index === sortedJobs.length - 1) {
-      console.log('⚠️ handleMoveRightInPrepare: Już na końcu', { index, total: sortedJobs.length });
-      return;
-    }
+    // Znajdź element w DOM dla natychmiastowej reakcji
+    const cardEl = document.querySelector(`[data-job-id="${jobId}"]`) as HTMLElement;
+    const container = cardEl?.parentElement;
     
-    // Oblicz liczbę kolumn w gridzie
-    const columnsPerRow = getColumnsPerRow();
-    
-    // Sprawdź czy jesteśmy na końcu wiersza
-    const isAtEndOfRow = (index + 1) % columnsPerRow === 0;
-    
-    // Jeśli jesteśmy na końcu wiersza, nie możemy przesunąć w prawo
-    if (isAtEndOfRow) {
-      console.log('⚠️ handleMoveRightInPrepare: Na końcu wiersza', { index, columnsPerRow, isAtEndOfRow });
-      return;
-    }
-    
-    // Znajdź kafelek faktycznie w prawo (w tym samym wierszu)
-    const otherJob = sortedJobs[index + 1];
-    
-    // Użyj index jako order - to zapewni unikalne wartości
-    const order1 = index; // Aktualna pozycja
-    const order2 = index + 1; // Pozycja następnego (w prawo)
-    
-    console.log('🔄 handleMoveRightInPrepare PRZED:', {
-      jobId,
-      jobTitle: job.data.jobTitle?.substring(0, 30),
-      index,
-      columnsPerRow,
-      isAtEndOfRow: (index + 1) % columnsPerRow === 0,
-      currentOrder: job.order,
-      currentColumnOrder: job.columnOrder,
-      order1,
-      otherJobId: otherJob.id,
-      otherJobTitle: otherJob.data.jobTitle?.substring(0, 30),
-      otherCurrentOrder: otherJob.order,
-      otherCurrentColumnOrder: otherJob.columnOrder,
-      order2,
-      allOrders: sortedJobs.map(j => ({ id: j.id, title: j.data.jobTitle?.substring(0, 20), order: j.order, columnOrder: j.columnOrder, normalized: j.normalizedOrder }))
-    });
-    
-    // Zamiana orderów - używamy index jako order
-    setJobs(prev => prev.map(j => {
-      if (j.id === jobId) return { ...j, order: order2, columnOrder: order2 };
-      if (j.id === otherJob.id) return { ...j, order: order1, columnOrder: order1 };
-      return j;
-    }));
-    
-    try {
-      console.log('💾 handleMoveRightInPrepare: Zapisuję do API...', {
-        jobId,
-        order2,
-        otherJobId: otherJob.id,
-        order1
+    if (cardEl && container) {
+      const sortedJobs = getPrepareJobsSorted();
+      const index = sortedJobs.findIndex(j => j.id === jobId);
+      if (index === -1 || index === sortedJobs.length - 1) return;
+
+      console.log('🔄 handleMoveRight (DOM first):', { jobId, fromIndex: index, toIndex: index + 1 });
+      
+      // 1. Natychmiastowe przesunięcie w DOM
+      moveCardByOne(cardEl, 1);
+      
+      // 2. Odczytanie nowej kolejności z DOM
+      const orderedIds = getOrderedIdsFromDOM(container);
+      
+      // 3. Optymistyczna aktualizacja stanu React
+      setJobs(prev => {
+        const updated = [...prev];
+        orderedIds.forEach((id, i) => {
+          const idx = updated.findIndex(uj => uj.id === id);
+          if (idx !== -1) {
+            updated[idx] = { ...updated[idx], sortOrder: (i + 1) * 10 };
+          }
+        });
+        return updated;
       });
-      
-      await Promise.all([
-        jobsService.updateJob(jobId, { order: order2 }),
-        jobsService.updateJob(otherJob.id, { order: order1 })
-      ]);
-      
-      console.log('✅ handleMoveRightInPrepare: API zapisane, wywołuję broadcastChange');
-      broadcastChange();
-      
-      // NIE odświeżaj - używamy optymistycznej aktualizacji
-      // loadJobs() wywoła się automatycznie przez storage event listener w innych oknach
-      // ale w tym oknie już mamy zaktualizowany stan lokalny
-      
-      // Sprawdź po aktualizacji
-      const afterSorted = getPrepareJobsSorted();
-      console.log('✅ handleMoveRightInPrepare PO:', {
-        success: true,
-        newOrders: afterSorted.map(j => ({ id: j.id, title: j.data.jobTitle?.substring(0, 20), order: j.order, columnOrder: j.columnOrder, normalized: j.normalizedOrder }))
-      });
-    } catch (err) {
-      console.error('❌ Move right in PREPARE failed', err);
-      loadJobs();
+
+      // 4. Zapis do backendu
+      try {
+        await jobsService.reorderJobs('PREPARE', orderedIds);
+        broadcastChange();
+      } catch (err) {
+        console.error('❌ Move right in PREPARE failed', err);
+        loadJobs();
+      }
     }
   };
 
@@ -2620,6 +2610,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             canMoveUp={canMoveUp}
                             canMoveDown={canMoveDown}
                             onContextMenu={handleContextMenu}
+                            matchesFilter={matchesFilter}
                           />
                         );
                       })
@@ -2673,6 +2664,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             {rowJobs.map(job => {
                                const { canMoveUp, canMoveDown } = getJobMoveInfo(job.id);
                                const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
+                               const matchesFilter = jobMatchesPaymentFilter(job);
                                return (
                                   <SmallKanbanCard
                                     key={job.id}
@@ -2693,6 +2685,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                                     onContextMenu={handleContextMenu}
                                     onPaymentStatusChange={handlePaymentStatusChange}
                                     onMoveToColumn={handleMoveToColumn}
+                                    matchesFilter={matchesFilter}
                                   />
                                );
                             })}
@@ -2773,6 +2766,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                   <DroppableRow id={row.id} activeId={activeId}>
                     {rowJobs.map((job, idx) => {
                       const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
+                      const matchesFilter = jobMatchesPaymentFilter(job);
                       return (
                         <div key={job.id}>
                           <DraggableJobCard
@@ -2788,6 +2782,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             canMoveLeft={canMoveLeft}
                             canMoveRight={canMoveRight}
                             onContextMenu={handleContextMenu}
+                            matchesFilter={matchesFilter}
                           />
                         </div>
                       );
@@ -2858,6 +2853,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                     ) : (
                       rowJobs.map((job: Job, idx: number) => {
                         const { canMoveLeft, canMoveRight, canMoveUp, canMoveDown } = getJobMoveLeftRightInfo(job.id);
+                        const matchesFilter = jobMatchesPaymentFilter(job);
+                        const isPrepare = (job.columnId || 'PREPARE') === 'PREPARE';
                         return (
                           <div key={job.id}>
                             <DraggableJobCard
@@ -2871,17 +2868,18 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                             onMoveToColumn={handleMoveToColumn}
                             onMoveLeft={handleMoveLeft}
                             onMoveRight={handleMoveRight}
-                            onMoveUp={job.columnId === 'PREPARE' ? handleJumpToStart : undefined}
-                            onMoveDown={job.columnId === 'PREPARE' ? handleJumpToEnd : undefined}
+                            onMoveUp={isPrepare ? handleJumpToStart : undefined}
+                            onMoveDown={isPrepare ? handleJumpToEnd : undefined}
                             canMoveLeft={canMoveLeft}
                             canMoveRight={canMoveRight}
-                            canMoveUp={job.columnId === 'PREPARE' ? canMoveUp : undefined}
-                            canMoveDown={job.columnId === 'PREPARE' ? canMoveDown : undefined}
+                            canMoveUp={isPrepare ? canMoveUp : undefined}
+                            canMoveDown={isPrepare ? canMoveDown : undefined}
                             onContextMenu={handleContextMenu}
+                            matchesFilter={matchesFilter}
                           />
-                          </div>
-                        );
-                      })
+                        </div>
+                      );
+                    })
                     )}
                   </DroppableRow>
                 </div>

@@ -105,6 +105,7 @@ export const DashboardBoardView: React.FC<DashboardBoardViewProps> = ({
                     >
                       {rowJobs.map((job: Job) => {
                         const { canMoveLeft, canMoveRight, canMoveUp, canMoveDown } = getJobMoveLeftRightInfo(job.id);
+                        const isPrepare = (job.columnId || 'PREPARE') === 'PREPARE';
                         return (
                           <div key={job.id}>
                             <DraggableJobCard
@@ -118,12 +119,12 @@ export const DashboardBoardView: React.FC<DashboardBoardViewProps> = ({
                               onMoveToColumn={handleMoveToColumn}
                               onMoveLeft={handleMoveLeft}
                               onMoveRight={handleMoveRight}
-                              onMoveUp={job.columnId === 'PREPARE' ? handleJumpToStart : undefined}
-                              onMoveDown={job.columnId === 'PREPARE' ? handleJumpToEnd : undefined}
+                              onMoveUp={isPrepare ? handleJumpToStart : undefined}
+                              onMoveDown={isPrepare ? handleJumpToEnd : undefined}
                               canMoveLeft={canMoveLeft}
                               canMoveRight={canMoveRight}
-                              canMoveUp={job.columnId === 'PREPARE' ? canMoveUp : undefined}
-                              canMoveDown={job.columnId === 'PREPARE' ? canMoveDown : undefined}
+                              canMoveUp={isPrepare ? canMoveUp : undefined}
+                              canMoveDown={isPrepare ? canMoveDown : undefined}
                               onContextMenu={handleContextMenu}
                             />
                           </div>
