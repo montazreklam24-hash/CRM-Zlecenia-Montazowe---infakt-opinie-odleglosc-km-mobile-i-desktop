@@ -19,16 +19,11 @@ interface MobileMapViewProps {
   onOpenJob: (job: Job) => void;
 }
 
+import { getPaymentStatusConfig, PAYMENT_STATUS_LIST } from '../../constants/paymentStatus';
+
 // Payment status colors for markers
 const getMarkerColor = (status: PaymentStatus | undefined): string => {
-  switch (status) {
-    case PaymentStatus.PAID: return '#22c55e';
-    case PaymentStatus.PROFORMA: return '#f97316';
-    case PaymentStatus.PARTIAL: return '#a855f7';
-    case PaymentStatus.CASH: return '#eab308';
-    case PaymentStatus.OVERDUE: return '#ef4444';
-    default: return '#3b82f6';
-  }
+  return getPaymentStatusConfig(status).color;
 };
 
 // Create custom marker icon
@@ -351,20 +346,14 @@ const MobileMapView: React.FC<MobileMapViewProps> = ({ jobs, onBack, onOpenJob }
 
       {/* Map Legend */}
       <div className="absolute top-16 left-3 bg-white/90 backdrop-blur rounded-lg shadow-lg p-2 z-20 text-[10px]">
-        <div className="font-bold text-slate-700 mb-1">Legenda:</div>
-        <div className="space-y-0.5">
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-green-500" /> Opłacone
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-orange-500" /> Proforma
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-yellow-500" /> Barter
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-orange-500" /> Do zapłaty
-          </div>
+        <div className="font-bold text-slate-700 mb-1 text-[11px]">Legenda płatności:</div>
+        <div className="space-y-1">
+          {PAYMENT_STATUS_LIST.filter(s => s.value !== PaymentStatus.NONE).map(s => (
+            <div key={s.value} className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ background: s.color }} />
+              <span className="font-medium">{s.label}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

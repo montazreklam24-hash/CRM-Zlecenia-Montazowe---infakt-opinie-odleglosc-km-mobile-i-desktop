@@ -242,7 +242,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   : 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
               }`}
             >
-              Barter
+              Gotówka
             </button>
             <button
               onClick={() => setArchivePaymentFilter(PaymentStatus.OVERDUE)}

@@ -13,13 +13,11 @@ import { checkPaymentStatusChange } from '../../utils/paymentStatusGuard';
 
 // Payment status helpers
 const getPaymentStatusColor = (status: PaymentStatus): string => {
-  const cfg = getPaymentStatusConfig(status);
-  return cfg.color;
+  return getPaymentStatusConfig(status).color;
 };
 
 const getPaymentStatusLabel = (status: PaymentStatus): string => {
-  const cfg = getPaymentStatusConfig(status);
-  return cfg.label.toUpperCase();
+  return getPaymentStatusConfig(status).label.toUpperCase();
 };
 
 // Format address without postal code

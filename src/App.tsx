@@ -293,6 +293,27 @@ const App: React.FC = () => {
              onJobSaved={closeModal}
              onArchive={async (id) => { /* logic same as desktop */ closeModal(); }}
              onDelete={async (id) => { /* logic same as desktop */ closeModal(); }}
+             onPaymentStatusChange={async (jobId, status, source) => {
+               const job = state.selectedJob;
+               if (!job) return;
+               
+               const { checkPaymentStatusChange } = await import('./utils/paymentStatusGuard');
+               const canChange = checkPaymentStatusChange(job, status, source);
+               if (!canChange) return;
+
+               try {
+                 await jobsService.updateJob(jobId, { paymentStatus: status });
+                 setState(prev => ({
+                   ...prev,
+                   selectedJob: prev.selectedJob?.id === jobId 
+                     ? { ...prev.selectedJob, paymentStatus: status } 
+                     : prev.selectedJob
+                 }));
+                 setDashboardRefreshTrigger(prev => prev + 1);
+               } catch (error) {
+                 console.error('Failed to update payment status:', error);
+               }
+             }}
            />
         )}
         
@@ -374,6 +395,27 @@ const App: React.FC = () => {
                  onDelete={async (id) => {
                     await jobsService.deleteJob(id);
                     closeModal();
+                 }}
+                 onPaymentStatusChange={async (jobId, status, source) => {
+                   const job = state.selectedJob;
+                   if (!job) return;
+                   
+                   const { checkPaymentStatusChange } = await import('./utils/paymentStatusGuard');
+                   const canChange = checkPaymentStatusChange(job, status, source);
+                   if (!canChange) return;
+
+                   try {
+                     await jobsService.updateJob(jobId, { paymentStatus: status });
+                     setState(prev => ({
+                       ...prev,
+                       selectedJob: prev.selectedJob?.id === jobId 
+                         ? { ...prev.selectedJob, paymentStatus: status } 
+                         : prev.selectedJob
+                     }));
+                     setDashboardRefreshTrigger(prev => prev + 1);
+                   } catch (error) {
+                     console.error('Failed to update payment status:', error);
+                   }
                  }}
                />
             )}

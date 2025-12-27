@@ -2,6 +2,7 @@
 import { createPortal } from 'react-dom';
 import { Job, JobColumnId, PaymentStatus } from '../types';
 import { Trash2, Archive, X, Check, ExternalLink, Copy } from 'lucide-react';
+import { PAYMENT_STATUS_LIST } from '../constants/paymentStatus';
 
 interface JobContextMenuProps {
   job: Job;
@@ -16,16 +17,6 @@ interface JobContextMenuProps {
   onOpenJob?: (job: Job) => void;
   isAdmin?: boolean;
 }
-
-// Statusy płatności
-const PAYMENT_STATUSES: { value: PaymentStatus; label: string; bgColor: string; textColor: string }[] = [
-  { value: PaymentStatus.NONE, label: 'Brak', bgColor: '#94a3b8', textColor: '#fff' },
-  { value: PaymentStatus.PROFORMA, label: 'Proforma', bgColor: '#f97316', textColor: '#fff' },
-  { value: PaymentStatus.PARTIAL, label: 'Zaliczka', bgColor: '#a855f7', textColor: '#fff' },
-  { value: PaymentStatus.PAID, label: 'Opłacone', bgColor: '#22c55e', textColor: '#fff' },
-  { value: PaymentStatus.CASH, label: 'Gotówka', bgColor: '#eab308', textColor: '#fff' },
-  { value: PaymentStatus.OVERDUE, label: 'Do zapłaty', bgColor: '#ef4444', textColor: '#fff' },
-];
 
 // Kolumny/dni
 const COLUMNS: { id: JobColumnId; label: string; shortLabel: string; icon: string }[] = [
@@ -189,21 +180,21 @@ const JobContextMenu: React.FC<JobContextMenuProps> = ({
           <div className="p-2 border-b border-gray-100">
             <div className="text-[9px] uppercase text-slate-400 font-bold mb-1.5 px-1">Status płatności</div>
             <div className="flex flex-wrap gap-1">
-              {PAYMENT_STATUSES.map((status) => {
-                const isActive = currentPayment === status.value;
+              {PAYMENT_STATUS_LIST.map((cfg) => {
+                const isActive = currentPayment === cfg.value;
                 return (
                   <button
-                    key={status.value}
-                    onClick={() => handlePaymentChange(status.value)}
+                    key={cfg.value}
+                    onClick={() => handlePaymentChange(cfg.value)}
                     className={`px-2 py-1 rounded text-[10px] font-bold transition-all flex items-center gap-1 ${
                       isActive ? 'ring-2 ring-offset-1 ring-slate-600 scale-105' : 'opacity-80 hover:opacity-100'
                     }`}
                     style={{ 
-                      background: status.bgColor, 
-                      color: status.textColor 
+                      background: cfg.color, 
+                      color: '#fff' 
                     }}
                   >
-                    {status.label}
+                    {cfg.label}
                     {isActive && <Check className="w-3 h-3" />}
                   </button>
                 );

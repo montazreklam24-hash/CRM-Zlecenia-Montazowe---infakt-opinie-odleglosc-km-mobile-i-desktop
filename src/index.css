@@ -614,6 +614,11 @@ body[data-theme="trello-modern"]::before {
   background: var(--bg-card);
 }
 
+.custom-marker-icon {
+  background: none !important;
+  border: none !important;
+}
+
 .custom-icon {
   background: none !important;
   border: none !important;

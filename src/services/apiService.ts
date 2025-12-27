@@ -1,4 +1,5 @@
-import { Job, JobOrderData, ChecklistItem, JobColumnId, User, JobStatus, PaymentType } from '../types';
+import { Job, JobOrderData, ChecklistItem, JobColumnId, User, JobStatus, PaymentType, PaymentStatus } from '../types';
+import { normalizePaymentStatus } from '../constants/paymentStatus';
 
 // TRYB DEMO - bez backendu
 const DEMO_MODE = false; // Pełna funkcjonalność z API
@@ -201,7 +202,13 @@ export const jobsService = {
       `/jobs${query ? `?${query}` : ''}`
     );
     
-    return response.jobs;
+    // Normalizuj statusy płatności (przestarzałe -> cash, nieznane -> none)
+    const jobs = (response.jobs || []).map(job => ({
+      ...job,
+      paymentStatus: normalizePaymentStatus(job.paymentStatus)
+    }));
+    
+    return jobs;
   },
   
   async getJob(id: string): Promise<Job> {
@@ -213,7 +220,14 @@ export const jobsService = {
     
     // Brak prefiksów, proste ID
     const response = await apiRequest<{ success: boolean; job: Job }>(`/jobs/${id}`);
-    return response.job;
+    
+    // Normalizuj status płatności
+    const job = response.job;
+    if (job) {
+      job.paymentStatus = normalizePaymentStatus(job.paymentStatus);
+    }
+    
+    return job;
   },
   
   async createJob(

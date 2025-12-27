@@ -126,27 +126,15 @@ const COLUMNS: { id: JobColumnId; short: string; full: string; color: string }[]
   { id: 'COMPLETED', short: '✓', full: 'Ukończone', color: '#16a34a' },
 ];
 
+import { getPaymentStatusConfig, PAYMENT_STATUS_LIST } from '../../constants/paymentStatus';
+
 // Payment status helpers
 const getPaymentColor = (status: PaymentStatus): string => {
-  switch (status) {
-    case PaymentStatus.PAID: return '#22c55e';
-    case PaymentStatus.PROFORMA: return '#f97316';
-    case PaymentStatus.PARTIAL: return '#a855f7';
-    case PaymentStatus.CASH: return '#eab308';
-    case PaymentStatus.OVERDUE: return '#ef4444';
-    default: return '#64748b';
-  }
+  return getPaymentStatusConfig(status).color;
 };
 
 const getPaymentLabel = (status: PaymentStatus): string => {
-  switch (status) {
-    case PaymentStatus.PAID: return 'OPŁACONE';
-    case PaymentStatus.PROFORMA: return 'PROFORMA';
-    case PaymentStatus.PARTIAL: return 'ZALICZKA';
-    case PaymentStatus.CASH: return 'BARTER';
-    case PaymentStatus.OVERDUE: return 'DO ZAPŁATY';
-    default: return '';
-  }
+  return getPaymentStatusConfig(status).label.toUpperCase();
 };
 
 // Format address (no postal code)
@@ -194,11 +182,11 @@ interface MobileDashboardProps {
 // Payment filter options
 const PAYMENT_FILTERS: { status: PaymentStatus | 'ALL'; label: string; color: string }[] = [
   { status: 'ALL', label: 'Wszystkie', color: '#64748b' },
-  { status: PaymentStatus.PAID, label: '💚', color: '#22c55e' },
-  { status: PaymentStatus.PROFORMA, label: '🟠', color: '#f97316' },
-  { status: PaymentStatus.CASH, label: '🟡', color: '#eab308' },
-  { status: PaymentStatus.OVERDUE, label: '🔴', color: '#ef4444' },
-  { status: PaymentStatus.PARTIAL, label: '🟣', color: '#a855f7' },
+  ...PAYMENT_STATUS_LIST.filter(s => s.value !== PaymentStatus.NONE).map(s => ({
+    status: s.value as PaymentStatus | 'ALL',
+    label: s.label,
+    color: s.color
+  }))
 ];
 
 const MobileDashboard: React.FC<MobileDashboardProps> = ({
@@ -615,7 +603,7 @@ const PAYMENT_OPTIONS: { value: PaymentStatus; label: string; color: string }[] 
   { value: PaymentStatus.PROFORMA, label: 'PROFORMA', color: '#f97316' },
   { value: PaymentStatus.PARTIAL, label: 'ZALICZKA', color: '#a855f7' },
   { value: PaymentStatus.PAID, label: 'OPŁACONE', color: '#22c55e' },
-  { value: PaymentStatus.CASH, label: 'BARTER', color: '#eab308' },
+  { value: PaymentStatus.CASH, label: 'GOTÓWKA', color: '#eab308' },
   { value: PaymentStatus.OVERDUE, label: 'DO ZAPŁATY', color: '#ef4444' },
 ];
 
@@ -794,18 +782,18 @@ const MobileJobCardCompact: React.FC<MobileJobCardCompactProps> = ({
               💳 Status płatności:
             </div>
             <div className="grid grid-cols-3 gap-2 mb-3">
-              {PAYMENT_OPTIONS.map(opt => (
+              {PAYMENT_STATUS_LIST.map(opt => (
                 <button
                   key={opt.value}
                   onClick={() => handlePaymentChange(opt.value)}
                   className={`px-2 py-2 rounded-xl text-[10px] font-bold text-center transition-all ${
                     job.paymentStatus === opt.value 
-                      ? 'ring-2 ring-offset-1 ring-orange-500' 
+                      ? 'ring-2 ring-offset-1 ring-orange-500 shadow-lg' 
                       : ''
                   }`}
                   style={{ 
                     background: opt.color,
-                    color: opt.value === PaymentStatus.CASH ? '#000' : '#fff'
+                    color: '#fff'
                   }}
                 >
                   {opt.label}

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Invoice, InvoiceItem, PaymentStatus } from '../types';
 import { invoiceService, InvoiceItemData, InvoiceClientData } from '../services/invoiceService';
+import { PAYMENT_STATUS_LIST, getPaymentStatusConfig } from '../constants/paymentStatus';
 
 interface InvoiceModuleProps {
   jobId: string;
@@ -21,7 +22,7 @@ interface InvoiceModuleProps {
   paidAmount?: number;
   invoices?: Invoice[];
   isAdmin: boolean;
-  onStatusChange?: (status: PaymentStatus) => void;
+  onStatusChange?: (status: PaymentStatus, source?: 'manual' | 'auto') => void;
   onClientDataChange?: (data: InvoiceClientData) => void;
   // Opcjonalnie dla kompatybilności wstecznej
   billing?: {
@@ -319,7 +320,11 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
         alert(`${invoiceType === 'proforma' ? 'Proforma' : 'Faktura'} ${result.invoice.number} została wystawiona!${result.invoice.emailSent ? '\n✉️ Email wysłany!' : ''}`);
         setItems([]);
         if (onStatusChange) {
-          onStatusChange(invoiceType === 'proforma' ? PaymentStatus.PROFORMA : PaymentStatus.PAID);
+          // Automatyczna zmiana statusu po wystawieniu dokumentu (source: auto)
+          onStatusChange(
+            invoiceType === 'proforma' ? PaymentStatus.PROFORMA : PaymentStatus.PAID,
+            'auto'
+          );
         }
       } else {
         throw new Error(result.error || 'Nieznany błąd');
@@ -331,27 +336,23 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
     }
   };
 
-  // Oznacz jako barter (bez FV)
-  const handleMarkAsBarter = () => {
+  // Oznacz jako gotówka (bez FV)
+  const handleMarkAsCash = () => {
     if (onStatusChange) {
-      onStatusChange(PaymentStatus.CASH);
+      // Ręczna zmiana na gotówkę (source: manual)
+      onStatusChange(PaymentStatus.CASH, 'manual');
     }
   };
 
   // Status badge
-  const getStatusBadge = () => {
-    const badges: Record<PaymentStatus, { bg: string; text: string; label: string }> = {
-      [PaymentStatus.NONE]: { bg: 'bg-slate-100', text: 'text-slate-600', label: 'Brak dokumentu' },
-      [PaymentStatus.PROFORMA]: { bg: 'bg-orange-100', text: 'text-orange-700', label: '📄 Proforma' },
-      [PaymentStatus.PARTIAL]: { bg: 'bg-purple-100', text: 'text-purple-700', label: '💸 Zaliczka' },
-      [PaymentStatus.PAID]: { bg: 'bg-green-100', text: 'text-green-700', label: '✅ Opłacone' },
-      [PaymentStatus.CASH]: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: '🤝 Barter' },
-      [PaymentStatus.OVERDUE]: { bg: 'bg-red-100', text: 'text-red-700', label: '⚠️ Przeterminowane' }
-    };
-    return badges[paymentStatus] || badges[PaymentStatus.NONE];
-  };
+  const cfg = getPaymentStatusConfig(paymentStatus);
+  const statusBadgeLabel = cfg.label;
 
-  const statusBadge = getStatusBadge();
+  const handleStatusChangeManual = (newStatus: PaymentStatus) => {
+    if (onStatusChange) {
+      onStatusChange(newStatus, 'manual');
+    }
+  };
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -365,28 +366,69 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
             <Receipt className="w-5 h-5 text-indigo-600" />
           </div>
           <div>
-            <h3 className="font-bold text-slate-800">FAKTUROWANIE (INFAKT)</h3>
+            <h3 className="font-bold text-slate-800 text-sm md:text-base">PŁATNOŚĆ I FAKTUROWANIE</h3>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${statusBadge.bg} ${statusBadge.text}`}>
-                {statusBadge.label}
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${cfg.bgClass} ${cfg.textClass} border ${cfg.borderClass}`}>
+                {statusBadgeLabel}
               </span>
               {totalGross > 0 && (
-                <span className="text-sm text-slate-500">
+                <span className="text-sm text-slate-500 font-medium">
                   {paidAmount > 0 ? `${paidAmount.toFixed(2)} / ` : ''}{totalGross.toFixed(2)} zł
                 </span>
               )}
             </div>
           </div>
         </div>
-        <button className="p-2 hover:bg-slate-100 rounded-lg">
-          {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Szybka zmiana statusu dostępna nawet gdy zwinięte */}
+          {isAdmin && (
+            <div onClick={(e) => e.stopPropagation()} className="hidden md:block">
+              <select
+                value={paymentStatus}
+                onChange={(e) => handleStatusChangeManual(e.target.value as PaymentStatus)}
+                className={`text-[10px] font-bold py-1 px-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white`}
+              >
+                {PAYMENT_STATUS_LIST.map(s => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <button className="p-2 hover:bg-slate-100 rounded-lg">
+            {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Expanded Content */}
       {isExpanded && (
         <div className="border-t border-slate-100 p-4 space-y-4">
           
+          {/* Manual Status Control for Mobile / Detailed view */}
+          {isAdmin && (
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ręczna zmiana statusu</label>
+              <div className="flex flex-wrap gap-1.5">
+                {PAYMENT_STATUS_LIST.map((s) => (
+                  <button
+                    key={s.value}
+                    onClick={() => handleStatusChangeManual(s.value)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                      paymentStatus === s.value 
+                        ? 'bg-white border-slate-300 shadow-sm scale-105' 
+                        : 'bg-slate-100 border-transparent text-slate-500 hover:bg-white hover:border-slate-200'
+                    }`}
+                    style={{ 
+                      color: paymentStatus === s.value ? s.color : undefined,
+                      borderColor: paymentStatus === s.value ? s.color : undefined
+                    }}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {/* Ostrzeżenie o odległości */}
           {distanceWarning && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
@@ -505,16 +547,6 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
                   }`}
                 >
                   📋 Faktura VAT
-                </button>
-                <button
-                  onClick={handleMarkAsBarter}
-                  className={`flex-1 py-2 px-4 rounded-lg font-bold text-sm transition-all ${
-                    paymentStatus === PaymentStatus.CASH
-                      ? 'bg-yellow-100 text-yellow-700 ring-2 ring-yellow-300'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  🤝 Barter
                 </button>
               </div>
 

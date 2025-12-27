@@ -7,27 +7,15 @@ import {
 } from 'lucide-react';
 import JobPlaceholder from '../JobPlaceholder';
 
+import { getPaymentStatusConfig } from '../../constants/paymentStatus';
+
 // Helper function for payment status color
 const getPaymentStatusColor = (status: PaymentStatus): string => {
-  switch (status) {
-    case PaymentStatus.PAID: return '#22c55e';
-    case PaymentStatus.PROFORMA: return '#f97316';
-    case PaymentStatus.PARTIAL: return '#a855f7';
-    case PaymentStatus.CASH: return '#eab308';
-    case PaymentStatus.OVERDUE: return '#ef4444';
-    default: return '#64748b';
-  }
+  return getPaymentStatusConfig(status).color;
 };
 
 const getPaymentStatusLabel = (status: PaymentStatus): string => {
-  switch (status) {
-    case PaymentStatus.PAID: return 'OPŁACONE';
-    case PaymentStatus.PROFORMA: return 'PROFORMA';
-    case PaymentStatus.PARTIAL: return 'ZALICZKA';
-    case PaymentStatus.CASH: return 'BARTER';
-    case PaymentStatus.OVERDUE: return 'DO ZAPŁATY';
-    default: return '';
-  }
+  return getPaymentStatusConfig(status).label.toUpperCase();
 };
 
 // ROWS_CONFIG for move menu

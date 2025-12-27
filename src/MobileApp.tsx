@@ -293,11 +293,17 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
     
+    // Guard: sprawdź czy można zmienić (confirm dla nadpisania automatyki)
+    const { checkPaymentStatusChange } = await import('./utils/paymentStatusGuard');
+    const canChange = checkPaymentStatusChange(job, status, 'manual');
+    if (!canChange) return;
+    
     // Optimistic update
     setJobs(prev => prev.map(j => j.id === jobId ? { ...j, paymentStatus: status } : j));
     
     try {
       await jobsService.updateJob(jobId, { paymentStatus: status });
+      console.log(`[MobileApp] Payment status updated: ${job.paymentStatus} -> ${status}`);
     } catch (err) {
       console.error('Failed to update payment status:', err);
       loadJobs(); // Rollback on error

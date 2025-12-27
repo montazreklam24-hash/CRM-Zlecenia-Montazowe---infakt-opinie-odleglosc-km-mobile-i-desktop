@@ -24,6 +24,7 @@ interface JobCardProps {
   onJobSaved?: () => void;
   onArchive?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onPaymentStatusChange?: (jobId: string, status: PaymentStatus, source: 'manual' | 'auto') => Promise<void>;
 }
 
 declare global {
@@ -156,7 +157,17 @@ const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({
   );
 };
 
-const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role, onBack, onJobSaved, onArchive, onDelete }) => {
+const JobCard: React.FC<JobCardProps> = ({ 
+  job, 
+  initialData, 
+  initialImages, 
+  role, 
+  onBack, 
+  onJobSaved, 
+  onArchive, 
+  onDelete,
+  onPaymentStatusChange
+}) => {
   const isAdmin = role === UserRole.ADMIN;
   const [isEditing, setIsEditing] = useState(!job);
   
@@ -1155,12 +1166,17 @@ const JobCard: React.FC<JobCardProps> = ({ job, initialData, initialImages, role
               paidAmount={job.paidAmount || 0}
               invoices={job.invoices || []}
               isAdmin={isAdmin}
-              onStatusChange={async (status) => {
-                try {
-                  await jobsService.updateJob(job.id, { paymentStatus: status });
-                  console.log('Payment status changed to:', status);
-                } catch (error) {
-                  console.error('Failed to update payment status:', error);
+              onStatusChange={async (status, source = 'manual') => {
+                if (onPaymentStatusChange) {
+                  await onPaymentStatusChange(job.id, status, source);
+                } else {
+                  // Fallback jeśli nie przekazano handlera (nie powinno się zdarzyć)
+                  try {
+                    await jobsService.updateJob(job.id, { paymentStatus: status });
+                    console.log(`Payment status changed to: ${status} (source: ${source})`);
+                  } catch (error) {
+                    console.error('Failed to update payment status:', error);
+                  }
                 }
               }}
               onClientDataChange={(billingData) => {

@@ -83,25 +83,15 @@ export const moveCardByOne = (cardEl: HTMLElement, direction: -1 | 1): void => {
   }
 };
 
+import { getPaymentStatusConfig } from '../../constants/paymentStatus';
+
+// ... (existing code)
+
 export const getPaymentStatusColor = (status: PaymentStatus): string => {
-  switch (status) {
-    case PaymentStatus.PAID: return '#22c55e'; // green
-    case PaymentStatus.PROFORMA: return '#f97316'; // orange
-    case PaymentStatus.PARTIAL: return '#f97316'; // orange
-    case PaymentStatus.CASH: return '#eab308'; // yellow
-    case PaymentStatus.OVERDUE: return '#ea580c'; // dark orange
-    default: return 'transparent';
-  }
+  return getPaymentStatusConfig(status).color;
 };
 
 export const getPaymentStatusLabel = (status: PaymentStatus): string => {
-  switch (status) {
-    case PaymentStatus.PAID: return 'OPŁACONE';
-    case PaymentStatus.PROFORMA: return 'PROFORMA';
-    case PaymentStatus.PARTIAL: return 'ZALICZKA';
-    case PaymentStatus.CASH: return 'GOTÓWKA';
-    case PaymentStatus.OVERDUE: return 'DO ZAPŁATY';
-    default: return '';
-  }
+  return getPaymentStatusConfig(status).label.toUpperCase();
 };
 

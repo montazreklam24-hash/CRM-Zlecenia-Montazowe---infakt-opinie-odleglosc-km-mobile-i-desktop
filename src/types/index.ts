@@ -10,7 +10,7 @@ export enum PaymentStatus {
   PROFORMA = 'proforma',   // Wystawiona proforma - pomarańczowy
   PARTIAL = 'partial',     // Częściowo opłacone (zaliczka) - fioletowy
   PAID = 'paid',           // Opłacone - zielony
-  CASH = 'cash',           // Barter (bez faktury) - żółty
+  CASH = 'cash',           // Gotówka (bez faktury) - żółty
   OVERDUE = 'overdue'      // Przeterminowane - czerwony
 }
 

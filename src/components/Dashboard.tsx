@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Job, JobStatus, UserRole, JobColumnId, PaymentStatus } from '../types';
 import { jobsService } from '../services/apiService';
+import { checkPaymentStatusChange } from '../utils/paymentStatusGuard';
 import { 
   Plus, MapPin, CheckCircle2, Trash2, Box, Kanban, 
   Download, Copy, RefreshCw, Search, StretchHorizontal, ExternalLink,
@@ -196,26 +197,16 @@ const formatAddressShort = (address: string | undefined): string => {
 };
 
 // Helper function for payment status color
+import { PAYMENT_STATUS_CONFIG, getPaymentStatusConfig } from '../constants/paymentStatus';
+
+// ... (existing code)
+
 const getPaymentStatusColor = (status: PaymentStatus): string => {
-  switch (status) {
-    case PaymentStatus.PAID: return '#22c55e'; // green
-    case PaymentStatus.PROFORMA: return '#f97316'; // orange
-    case PaymentStatus.PARTIAL: return '#f97316'; // orange
-    case PaymentStatus.CASH: return '#eab308'; // yellow
-    case PaymentStatus.OVERDUE: return '#ea580c'; // dark orange
-    default: return 'transparent';
-  }
+  return getPaymentStatusConfig(status).color;
 };
 
 const getPaymentStatusLabel = (status: PaymentStatus): string => {
-  switch (status) {
-    case PaymentStatus.PAID: return 'OPŁACONE';
-    case PaymentStatus.PROFORMA: return 'PROFORMA';
-    case PaymentStatus.PARTIAL: return 'ZALICZKA';
-    case PaymentStatus.CASH: return 'GOTÓWKA';
-    case PaymentStatus.OVERDUE: return 'DO ZAPŁATY';
-    default: return '';
-  }
+  return getPaymentStatusConfig(status).label.toUpperCase();
 };
 
 // Kolumny dostępne do przenoszenia (do sekcji "Przenieś do" na kafelku)
@@ -277,7 +268,6 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
 
   const isTouchDevice = useDeviceType().isTouchDevice;
   const [showClickHint, setShowClickHint] = useState(false);
-  const [showArrows, setShowArrows] = useState(isTouchDevice);
   // Stan mini-menu statusu płatności
   const [showPaymentMenu, setShowPaymentMenu] = useState(false);
   // Stan rozwinięcia sekcji "Przenieś do"
@@ -300,9 +290,10 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
   const handleCardClick = (e: React.MouseEvent) => {
     if (isDragging) return;
     
-    // Na urządzeniach dotykowych kliknięcie przełącza widoczność strzałek
+    // Na urządzeniach dotykowych kliknięcie pokazuje wskazówkę
     if (isTouchDevice) {
-      setShowArrows(!showArrows);
+      setShowClickHint(true);
+      setTimeout(() => setShowClickHint(false), 1500);
       return;
     }
 
@@ -333,18 +324,16 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
       <div 
         data-job-id={job.id}
         className={`relative group h-full transition-all duration-300 ${!matchesFilter ? 'opacity-40 grayscale-[60%]' : 'opacity-100'}`}
-        onMouseEnter={() => !isTouchDevice && setShowArrows(true)}
-        onMouseLeave={() => !isTouchDevice && setShowArrows(false)}
       >
         {/* LEFT arrow - zawsze widoczne jeśli canMoveLeft jest przekazane */}
         {(canMoveLeft || canMoveLeft === false) && (
           <button
             onClick={(e) => { e.stopPropagation(); if (canMoveLeft) onMoveLeft?.(job.id); }}
             disabled={!canMoveLeft}
-            className={`absolute top-1/2 -left-3 -translate-y-1/2 z-[100] p-1 rounded-full shadow-lg transition-all ${
+            className={`absolute top-1/2 -left-3 -translate-y-1/2 z-[100] p-1 rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-50 hover:!opacity-100 ${
               canMoveLeft 
                 ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-125 cursor-pointer' 
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-50'
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
             }`}
             title={canMoveLeft ? "Przesuń o 1 w lewo" : "Pierwsza pozycja"}
           >
@@ -357,10 +346,10 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           <button
             onClick={(e) => { e.stopPropagation(); if (canMoveRight) onMoveRight?.(job.id); }}
             disabled={!canMoveRight}
-            className={`absolute top-1/2 -right-3 -translate-y-1/2 z-[100] p-1 rounded-full shadow-lg transition-all ${
+            className={`absolute top-1/2 -right-3 -translate-y-1/2 z-[100] p-1 rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-50 hover:!opacity-100 ${
               canMoveRight 
                 ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-125 cursor-pointer' 
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-50'
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
             }`}
             title={canMoveRight ? "Przesuń o 1 w prawo" : "Ostatnia pozycja"}
           >
@@ -372,7 +361,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
         {canMoveUp && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveUp?.(job.id); }}
-            className="absolute -top-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all"
+            className="absolute -top-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all opacity-0 group-hover:opacity-50 hover:!opacity-100"
             title={currentColumnId === 'PREPARE' ? "Na sam początek" : "Przesuń w górę"}
           >
             <ChevronUp className="w-5 h-5" />
@@ -383,7 +372,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
         {canMoveDown && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveDown?.(job.id); }}
-            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all"
+            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all opacity-0 group-hover:opacity-50 hover:!opacity-100"
             title={currentColumnId === 'PREPARE' ? "Na sam koniec" : "Przesuń w dół"}
           >
             <ChevronDown className="w-5 h-5" />
@@ -696,7 +685,6 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
 
   const isTouchDevice = useDeviceType().isTouchDevice;
   const [showClickHint, setShowClickHint] = useState(false);
-  const [showArrows, setShowArrows] = useState(isTouchDevice);
   // Stan mini-menu statusu płatności
   const [showPaymentMenu, setShowPaymentMenu] = useState(false);
   // Stan rozwinięcia sekcji "Przenieś do"
@@ -713,9 +701,10 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
   const handleCardClick = (e: React.MouseEvent) => {
     if (isDragging) return;
     
-    // Na urządzeniach dotykowych kliknięcie przełącza widoczność strzałek
+    // Na urządzeniach dotykowych kliknięcie pokazuje wskazówkę
     if (isTouchDevice) {
-      setShowArrows(!showArrows);
+      setShowClickHint(true);
+      setTimeout(() => setShowClickHint(false), 1500);
       return;
     }
   };
@@ -744,15 +733,13 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
       <div 
         data-job-id={job.id}
         className={`relative group ${!matchesFilter ? 'opacity-40 grayscale-[60%]' : 'opacity-100'} transition-all duration-300`}
-        onMouseEnter={() => !isTouchDevice && setShowArrows(true)}
-        onMouseLeave={() => !isTouchDevice && setShowArrows(false)}
         onClick={handleCardClick}
       >
         {/* UP arrow */}
         {canMoveUp && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveUp?.(job.id); }}
-            className="absolute -top-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all"
+            className="absolute -top-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all opacity-0 group-hover:opacity-50 hover:!opacity-100"
             title="Przesuń w górę"
           >
             <ChevronUp className="w-5 h-5" />
@@ -763,7 +750,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
         {canMoveDown && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveDown?.(job.id); }}
-            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all"
+            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all opacity-0 group-hover:opacity-50 hover:!opacity-100"
             title="Przesuń w dół"
           >
             <ChevronDown className="w-5 h-5" />
@@ -775,10 +762,10 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
           <button
             onClick={(e) => { e.stopPropagation(); if (canMoveLeft) onMoveLeft?.(job.id); }}
             disabled={!canMoveLeft}
-            className={`absolute top-1/2 -left-3 -translate-y-1/2 z-[100] p-1 rounded-full shadow-lg transition-all ${
+            className={`absolute top-1/2 -left-3 -translate-y-1/2 z-[100] p-1 rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-50 hover:!opacity-100 ${
               canMoveLeft 
                 ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-125 cursor-pointer' 
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-50'
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
             }`}
             title={canMoveLeft ? "Przesuń o 1 w lewo" : "Pierwsza pozycja"}
           >
@@ -791,10 +778,10 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
           <button
             onClick={(e) => { e.stopPropagation(); if (canMoveRight) onMoveRight?.(job.id); }}
             disabled={!canMoveRight}
-            className={`absolute top-1/2 -right-3 -translate-y-1/2 z-[100] p-1 rounded-full shadow-lg transition-all ${
+            className={`absolute top-1/2 -right-3 -translate-y-1/2 z-[100] p-1 rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-50 hover:!opacity-100 ${
               canMoveRight 
                 ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-125 cursor-pointer' 
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-50'
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
             }`}
             title={canMoveRight ? "Przesuń o 1 w prawo" : "Ostatnia pozycja"}
           >
@@ -1663,7 +1650,22 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   };
 
   // Zmiana statusu płatności bezpośrednio z kafelka
-  const handlePaymentStatusChange = async (jobId: string, newStatus: PaymentStatus) => {
+  // Centralny handler z guard/confirm dla ręcznych zmian
+  const handlePaymentStatusChange = async (
+    jobId: string, 
+    newStatus: PaymentStatus,
+    source: 'manual' | 'auto' = 'manual'
+  ) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    
+    // Guard: sprawdź czy można zmienić (confirm dla nadpisania automatyki)
+    const canChange = checkPaymentStatusChange(job, newStatus, source);
+    if (!canChange) {
+      console.log('[Dashboard] Payment status change cancelled by user');
+      return;
+    }
+    
     // Optymistyczna aktualizacja UI
     setJobs(prevJobs => prevJobs.map(j => 
       j.id === jobId ? { ...j, paymentStatus: newStatus } : j
@@ -1673,6 +1675,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
     try {
       await jobsService.updateJob(jobId, { paymentStatus: newStatus });
       broadcastChange();
+      console.log(`[Dashboard] Payment status updated: ${job.paymentStatus} -> ${newStatus} (source: ${source})`);
     } catch (err) {
       console.error('Failed to update payment status:', err);
       loadJobs(); // Reload on error
@@ -2151,7 +2154,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                   : 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
               }`}
             >
-              Barter
+              Gotówka
             </button>
             <button
               onClick={() => setPaymentFilter(PaymentStatus.OVERDUE)}
@@ -2230,7 +2233,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
                     : 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
                 }`}
               >
-                Barter
+                Gotówka
               </button>
               <button
                 onClick={() => setArchivePaymentFilter(PaymentStatus.OVERDUE)}

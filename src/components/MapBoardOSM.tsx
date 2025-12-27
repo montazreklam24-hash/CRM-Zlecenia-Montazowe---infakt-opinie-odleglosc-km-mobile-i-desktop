@@ -5,17 +5,18 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Maximize2, Minimize2, RefreshCw } from 'lucide-react';
 
-// Fix icons
+// Fix icons for Vite/Bundlers
 import icon from 'leaflet/dist/images/marker-icon.png';
+import icon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
-let DefaultIcon = L.icon({
+// Override default icon URLs for Leaflet
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
     iconUrl: icon,
+    iconRetinaUrl: icon2x,
     shadowUrl: iconShadow,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41]
 });
-L.Marker.prototype.options.icon = DefaultIcon;
 
 interface MapBoardOSMProps {
   jobs: Job[];
@@ -37,7 +38,6 @@ const COLUMN_NAMES: Record<string, string> = {
 const geocodeWithNominatim = async (address: string): Promise<{ lat: number; lng: number } | null> => {
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Polska')}&limit=1`;
-    console.log('🌍 Nominatim request:', url);
     
     const response = await fetch(url, {
       headers: {
@@ -46,25 +46,20 @@ const geocodeWithNominatim = async (address: string): Promise<{ lat: number; lng
     });
     
     if (!response.ok) {
-      console.error('❌ Nominatim HTTP error:', response.status, response.statusText);
+      console.error('❌ Nominatim HTTP error:', response.status);
       return null;
     }
     
     const data = await response.json();
-    console.log('📥 Nominatim response:', { address, dataLength: data?.length, firstResult: data?.[0] });
     
     if (data && data.length > 0) {
-      const coords = {
+      return {
         lat: parseFloat(data[0].lat),
         lng: parseFloat(data[0].lon)
       };
-      console.log('✅ Nominatim success:', { address, coords });
-      return coords;
-    } else {
-      console.warn('⚠️ Nominatim: Brak wyników dla', address);
     }
   } catch (error) {
-    console.error('❌ Nominatim geocoding error:', error);
+    console.error('❌ Geocoding error:', error);
   }
   return null;
 };
@@ -74,12 +69,14 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
   const [selectedJobForList, setSelectedJobForList] = useState<Job | null>(null);
   const [jobsWithCoords, setJobsWithCoords] = useState<Map<string, { lat: number; lng: number }>>(new Map());
 
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
+    console.log('🗺️ MapBoardOSM: Inicjalizacja mapy');
     const map = L.map(mapContainerRef.current, {
       scrollWheelZoom: false // Disable by default
     }).setView([52.2297, 21.0122], 10);
@@ -89,6 +86,8 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
     }).addTo(map);
 
     mapInstanceRef.current = map;
+    markersLayerRef.current = L.layerGroup().addTo(map);
+    setMapReady(true);
     
     // Enable scroll zoom only with Ctrl key
     const container = mapContainerRef.current;
@@ -108,7 +107,6 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
     // Use passive: false to allow preventDefault
     container.addEventListener('wheel', handleWheel, { passive: false });
     document.addEventListener('keyup', handleKeyUp);
-    markersLayerRef.current = L.layerGroup().addTo(map);
 
     return () => {
       container.removeEventListener('wheel', handleWheel);
@@ -120,99 +118,93 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
 
   // Geokodowanie zleceń bez współrzędnych
   useEffect(() => {
+    let isMounted = true;
+
     const geocodeJobs = async () => {
-      const newCoords = new Map(jobsWithCoords);
-      let needsUpdate = false;
-      let geocodedCount = 0;
-      let skippedCount = 0;
-
-      console.log('🌍 MapBoardOSM: Rozpoczynam geokodowanie', {
-        totalJobs: jobs.length,
-        currentCacheSize: jobsWithCoords.size
-      });
-
+      // Najpierw dodaj wszystkie istniejące współrzędne
+      const coordsToAdd = new Map<string, { lat: number; lng: number }>();
+      
       for (const job of jobs) {
         if (job.data.coordinates) {
-          // Ma już współrzędne
-          if (!newCoords.has(job.id)) {
-            newCoords.set(job.id, job.data.coordinates);
-            needsUpdate = true;
-            console.log('✅ MapBoardOSM: Użyto współrzędnych z job.data', {
-              jobId: job.id,
-              friendlyId: job.friendlyId,
-              coords: job.data.coordinates
-            });
-          }
-        } else if (job.data.address && !newCoords.has(job.id)) {
-          // Brak współrzędnych - geokoduj
-          console.log('🔍 MapBoardOSM: Geokoduję adres', {
-            jobId: job.id,
-            friendlyId: job.friendlyId,
-            address: job.data.address
-          });
-          
-          const coords = await geocodeWithNominatim(job.data.address);
-          if (coords) {
-            newCoords.set(job.id, coords);
-            needsUpdate = true;
-            geocodedCount++;
-            console.log('✅ MapBoardOSM: Geokodowanie sukces', {
-              jobId: job.id,
-              friendlyId: job.friendlyId,
-              coords
-            });
-            
-            // Zapisz do API (opcjonalnie - cache w DB)
-            try {
-              await fetch(`/api/jobs.php/${job.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  data: {
-                    coordinates: coords
-                  }
-                })
-              });
-            } catch (e) {
-              console.error('❌ MapBoardOSM: Failed to save coordinates:', e);
-            }
-          } else {
-            skippedCount++;
-            console.warn('⚠️ MapBoardOSM: Geokodowanie nie powiodło się', {
-              jobId: job.id,
-              friendlyId: job.friendlyId,
-              address: job.data.address
-            });
-          }
-        } else {
-          skippedCount++;
+          coordsToAdd.set(job.id, job.data.coordinates);
         }
       }
 
-      console.log('📊 MapBoardOSM: Geokodowanie zakończone', {
-        geocoded: geocodedCount,
-        skipped: skippedCount,
-        needsUpdate
-      });
+      // Zaktualizuj state jednorazowo dla wszystkich istniejących współrzędnych
+      if (coordsToAdd.size > 0 && isMounted) {
+        setJobsWithCoords(prev => {
+          const updated = new Map(prev);
+          let hasChanges = false;
+          coordsToAdd.forEach((coords, jobId) => {
+            if (!updated.has(jobId)) {
+              updated.set(jobId, coords);
+              hasChanges = true;
+            }
+          });
+          console.log('📍 MapBoardOSM: Załadowano współrzędne z danych', { count: coordsToAdd.size });
+          return hasChanges ? updated : prev;
+        });
+      }
 
-      if (needsUpdate) {
-        setJobsWithCoords(newCoords);
+      // Następnie geokoduj brakujące adresy (po kolei z opóźnieniem)
+      for (const job of jobs) {
+        if (!isMounted) break;
+        
+        if (!job.data.coordinates && job.data.address) {
+          // Sprawdź czy już nie mamy w cache
+          let alreadyHas = false;
+          setJobsWithCoords(prev => {
+            alreadyHas = prev.has(job.id);
+            return prev;
+          });
+          
+          if (alreadyHas) continue;
+
+          // Opóźnienie dla rate limiting Nominatim
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          const coords = await geocodeWithNominatim(job.data.address);
+          
+          if (coords && isMounted) {
+            setJobsWithCoords(prev => {
+              const updated = new Map(prev);
+              updated.set(job.id, coords);
+              return updated;
+            });
+
+            // Zapisz do API w tle
+            fetch(`/api/jobs.php/${job.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                data: { coordinates: coords }
+              })
+            }).catch(e => console.error('❌ Nie udało się zapisać współrzędnych:', e));
+          }
+        }
       }
     };
 
-    geocodeJobs();
+    if (jobs.length > 0) {
+      geocodeJobs();
+    }
+
+    return () => {
+      isMounted = false;
+    };
   }, [jobs]);
 
   useEffect(() => {
-    if (!mapInstanceRef.current || !markersLayerRef.current) return;
+    if (!mapReady || !mapInstanceRef.current || !markersLayerRef.current) {
+      return;
+    }
 
     markersLayerRef.current.clearLayers();
     const bounds = L.latLngBounds([]);
 
-    console.log('🗺️ MapBoardOSM: Renderowanie markerów', {
-      totalJobs: jobs.length,
-      jobsWithCoords: jobsWithCoords.size,
-      jobsWithDataCoords: jobs.filter(j => j.data.coordinates).length
+    console.log('🗺️ Renderowanie markerów:', {
+      total: jobs.length,
+      withCoords: jobs.filter(j => j.data.coordinates || jobsWithCoords.get(j.id)).length
     });
 
     let markersAdded = 0;
@@ -220,25 +212,25 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
       // Użyj współrzędnych z cache lub z job.data
       const coords = job.data.coordinates || jobsWithCoords.get(job.id);
       if (!coords) {
-        console.log('⚠️ MapBoardOSM: Pomijam zlecenie bez współrzędnych', {
-          jobId: job.id,
-          friendlyId: job.friendlyId,
-          address: job.data.address,
-          hasDataCoords: !!job.data.coordinates,
-          hasCachedCoords: jobsWithCoords.has(job.id)
-        });
+        return;
+      }
+      
+      const lat = Number(coords.lat);
+      const lng = Number(coords.lng);
+
+      if (isNaN(lat) || isNaN(lng)) {
+        console.warn('⚠️ Nieprawidłowe współrzędne:', { jobId: job.id, coords });
         return;
       }
       
       markersAdded++;
       
-      const { lat, lng } = coords;
       const color = COLUMN_COLORS[job.columnId || 'PREPARE'] || '#475569';
       const colName = COLUMN_NAMES[job.columnId || 'PREPARE'];
 
       const svgIcon = L.divIcon({
-        className: '',
-        html: `<div style="filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));">
+        className: 'custom-marker-icon',
+        html: `<div style="display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}" width="32" height="32">
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
             <circle cx="12" cy="9" r="2.5" fill="white"/>
@@ -260,18 +252,23 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
       const popupContent = document.createElement('div');
       popupContent.className = 'custom-popup-card';
       popupContent.style.width = '160px';
+      
+      const jobTitle = job.data?.jobTitle || 'Bez nazwy';
+      const address = job.data?.address || 'Brak adresu';
+      const phoneNumber = job.data?.phoneNumber;
+      
       popupContent.innerHTML = `
         ${imgHtml}
         <div style="padding:0 2px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
             <span style="background:${color};color:white;font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;text-transform:uppercase;">${colName}</span>
-            <span style="font-size:9px;color:#64748b;font-weight:600;">${job.friendlyId}</span>
+            <span style="font-size:9px;color:#64748b;font-weight:600;">${job.friendlyId || ''}</span>
           </div>
-          <h3 style="margin:0 0 4px 0;font-size:12px;font-weight:800;line-height:1.3;color:#0f172a;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${job.data.jobTitle || 'Bez nazwy'}</h3>
-          <div style="font-size:10px;color:#475569;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📍 ${job.data.address || 'Brak'}</div>
+          <h3 style="margin:0 0 4px 0;font-size:12px;font-weight:800;line-height:1.3;color:#0f172a;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${jobTitle}</h3>
+          <div style="font-size:10px;color:#475569;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📍 ${address}</div>
           <div style="display:flex;gap:4px;margin-top:8px;">
-            ${job.data.address ? `<a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.data.address)}" target="_blank" style="flex:1;background:#3b82f6;color:white;text-decoration:none;font-size:10px;font-weight:700;text-align:center;padding:6px 0;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:4px;">🧭 Nawiguj</a>` : ''}
-            ${job.data.phoneNumber ? `<a href="tel:${job.data.phoneNumber}" style="flex:1;background:#22c55e;color:white;text-decoration:none;font-size:10px;font-weight:700;text-align:center;padding:6px 0;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:4px;">📞 Zadzwoń</a>` : ''}
+            ${address && address !== 'Brak adresu' ? `<a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}" target="_blank" style="flex:1;background:#3b82f6;color:white;text-decoration:none;font-size:10px;font-weight:700;text-align:center;padding:6px 0;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:4px;">🧭 Nawiguj</a>` : ''}
+            ${phoneNumber ? `<a href="tel:${phoneNumber}" style="flex:1;background:#22c55e;color:white;text-decoration:none;font-size:10px;font-weight:700;text-align:center;padding:6px 0;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:4px;">📞 Zadzwoń</a>` : ''}
           </div>
           <button class="btn-open" style="width:100%;margin-top:4px;background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;font-size:10px;font-weight:700;padding:6px 0;border-radius:6px;cursor:pointer;">Otwórz kartę</button>
         </div>
@@ -304,14 +301,12 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
       bounds.extend([lat, lng]);
     });
 
-    console.log('✅ MapBoardOSM: Dodano markerów', markersAdded);
+    console.log('✅ Dodano markerów:', markersAdded);
 
     if (bounds.isValid()) {
       mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
-    } else {
-      console.warn('⚠️ MapBoardOSM: Brak prawidłowych granic - nie można ustawić widoku');
     }
-  }, [jobs, jobsWithCoords]);
+  }, [jobs, jobsWithCoords, mapReady]);
 
   // Fullscreen handling
   useEffect(() => {
