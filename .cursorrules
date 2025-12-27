@@ -47,3 +47,9 @@
 4. git push
 5. **npm run build** (ZAWSZE!)
 6. Folder dist/ jest gotowy do wgrania na serwer
+
+## Zasady dla agenta (Terminal & CWD)
+- **Przed każdym poleceniem `npm` lub `git` sprawdź katalog roboczy**: Upewnij się, że jesteś w folderze głównym projektu (tam gdzie jest `package.json`).
+- Jeśli terminal startuje w `C:\Users\...` (user home) zamiast w projekcie - **zawsze** wykonaj `cd "D:\Programowanie\Cursor\CRM Zlecenia Montazowe - infakt, opinie, odleglosc km, mobile i desktop"` przed dalszą pracą.
+- **Nigdy** nie uruchamiaj komend w niewłaściwym folderze.
+- **Vite Port**: Zawsze używamy portu 3000. Jeśli zajęty - znajdź i ubij proces.

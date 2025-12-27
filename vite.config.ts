@@ -26,13 +26,14 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3000,
+    strictPort: true, // Wywalaj się, jeśli port zajęty - nie skacz na 3001/3002
     proxy: {
       '/api': {
-        target: 'http://192.168.1.50:8080',
+        target: 'http://localhost:8080',
         changeOrigin: true,
       },
       '/uploads': {
-        target: 'http://192.168.1.50:8080',
+        target: 'http://localhost:8080',
         changeOrigin: true,
       }
     }
