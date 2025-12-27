@@ -988,11 +988,15 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   }, [activeTab]);
   
   // Aktualizuj activeTab gdy initialTab się zmienia (np. po powrocie z karty zlecenia)
+  // lub gdy refreshTrigger zostanie wywołany (np. kliknięcie w logo)
   useEffect(() => {
     if (initialTab) {
       setActiveTab(initialTab);
+    } else if (refreshTrigger && refreshTrigger > 0) {
+      // Jeśli kliknięto logo, a initialTab nie jest jawnie podany, wróć do ACTIVE
+      setActiveTab('ACTIVE');
     }
-  }, [initialTab]);
+  }, [initialTab, refreshTrigger]);
   
   // Map provider - domyślnie OSM, zapamiętuje wybór
   const [mapProvider, setMapProvider] = useState<'GOOGLE' | 'OSM'>(() => {

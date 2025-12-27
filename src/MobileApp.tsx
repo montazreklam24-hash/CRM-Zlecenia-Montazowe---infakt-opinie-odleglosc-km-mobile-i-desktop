@@ -57,6 +57,8 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
   useEffect(() => {
     if (refreshTrigger !== undefined && refreshTrigger > 0) {
       loadJobs();
+      setView('DASHBOARD');
+      setSelectedJob(null);
     }
   }, [refreshTrigger, loadJobs]);
 
@@ -338,6 +340,7 @@ const MobileApp: React.FC<MobileAppProps> = ({ onCreateNew, onCreateNewSimple, r
           onArchive={handleArchive}
           isAdmin={isAdmin}
           showDemo={showDemo}
+          refreshTrigger={refreshTrigger}
         />
       )}
 

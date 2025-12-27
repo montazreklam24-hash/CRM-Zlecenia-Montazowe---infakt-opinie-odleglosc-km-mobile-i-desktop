@@ -8,6 +8,7 @@ import { User, UserRole } from '../types';
 
 interface LayoutProps {
   onLogout?: () => void;
+  onLogoClick?: () => void;
   user?: User;
 }
 
@@ -17,7 +18,7 @@ const ROLE_NAMES: Record<UserRole, string> = {
   [UserRole.PRINTER]: 'Drukarz'
 };
 
-const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
+const Layout: React.FC<LayoutProps> = ({ onLogout, onLogoClick, user }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const { isMobile } = useDeviceType();
@@ -34,6 +35,13 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
     } else {
       window.location.href = window.location.pathname + '?desktop=1';
     }
+  };
+
+  const handleLogoClick = () => {
+    if (onLogoClick) {
+      onLogoClick();
+    }
+    navigate('/');
   };
 
   const currentView = urlParams.get('mobile') === '1' ? 'mobile' : 'desktop';
@@ -57,7 +65,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, user }) => {
           </button>
           
           {/* Logo */}
-          <div className="flex items-center cursor-pointer relative h-16" onClick={() => navigate('/')}>
+          <div className="flex items-center cursor-pointer relative h-16" onClick={handleLogoClick}>
             <div className="relative h-full flex items-center">
                {/* Logo PNG wystające w dół */}
                <img 

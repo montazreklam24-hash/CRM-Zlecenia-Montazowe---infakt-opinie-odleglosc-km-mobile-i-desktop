@@ -188,6 +188,7 @@ interface MobileDashboardProps {
   onArchive: (jobId: string) => void;
   isAdmin?: boolean;
   showDemo?: boolean; // Show demo data for preview
+  refreshTrigger?: number;
 }
 
 // Payment filter options
@@ -214,6 +215,7 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({
   onArchive,
   isAdmin = true,
   showDemo = false,
+  refreshTrigger,
 }) => {
   // Use demo jobs if no real jobs or showDemo is true
   const jobs = (showDemo || realJobs.length === 0) ? DEMO_JOBS : realJobs;
@@ -234,6 +236,15 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({
     }
     return getTodayColumnId();
   });
+
+  // Reset to today's column when logo is clicked (refreshTrigger)
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      setSelectedColumn(getTodayColumnId());
+      setSearchQuery('');
+      setPaymentFilter('ALL');
+    }
+  }, [refreshTrigger]);
 
   // Save selected column to localStorage
   useEffect(() => {

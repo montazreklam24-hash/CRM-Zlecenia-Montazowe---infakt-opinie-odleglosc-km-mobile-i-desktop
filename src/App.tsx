@@ -157,6 +157,12 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, user: null, currentView: 'LOGIN' }));
   };
 
+  const handleLogoClick = () => {
+    localStorage.setItem('dashboard_active_tab', 'ACTIVE');
+    setState(prev => ({ ...prev, returnToArchive: false }));
+    setDashboardRefreshTrigger(prev => prev + 1);
+  };
+
   const closeModal = () => {
     // Usuń jobId z URL jeśli jest
     const params = new URLSearchParams(window.location.search);
@@ -306,7 +312,7 @@ const App: React.FC = () => {
   return (
     <>
       <Routes>
-        <Route element={<Layout onLogout={handleLogout} user={state.user || undefined} />}>
+        <Route element={<Layout onLogout={handleLogout} onLogoClick={handleLogoClick} user={state.user || undefined} />}>
           <Route path="/" element={
             <Dashboard 
               role={userRole} 
