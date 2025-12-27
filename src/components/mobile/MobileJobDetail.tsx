@@ -8,28 +8,18 @@ import {
 } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { jobsService } from '../../services/apiService';
+import { getPaymentStatusConfig, PAYMENT_STATUS_LIST } from '../../constants/paymentStatus';
+import { checkPaymentStatusChange } from '../../utils/paymentStatusGuard';
 
 // Payment status helpers
 const getPaymentStatusColor = (status: PaymentStatus): string => {
-  switch (status) {
-    case PaymentStatus.PAID: return '#22c55e';
-    case PaymentStatus.PROFORMA: return '#f97316';
-    case PaymentStatus.PARTIAL: return '#a855f7';
-    case PaymentStatus.CASH: return '#eab308';
-    case PaymentStatus.OVERDUE: return '#ef4444';
-    default: return '#64748b';
-  }
+  const cfg = getPaymentStatusConfig(status);
+  return cfg.color;
 };
 
 const getPaymentStatusLabel = (status: PaymentStatus): string => {
-  switch (status) {
-    case PaymentStatus.PAID: return 'OPŁACONE';
-    case PaymentStatus.PROFORMA: return 'PROFORMA';
-    case PaymentStatus.PARTIAL: return 'ZALICZKA';
-    case PaymentStatus.CASH: return 'BARTER';
-    case PaymentStatus.OVERDUE: return 'DO ZAPŁATY';
-    default: return 'BRAK';
-  }
+  const cfg = getPaymentStatusConfig(status);
+  return cfg.label.toUpperCase();
 };
 
 // Format address without postal code
@@ -82,6 +72,7 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(-1); // -1 = modal closed
+  const [showPaymentMenu, setShowPaymentMenu] = useState(false); // modal zmiany statusu płatności
   
   // Completion section state
   const [showCompletion, setShowCompletion] = useState(false);
@@ -128,6 +119,24 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
       console.error('Failed to save:', error);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handlePaymentStatusChange = async (newStatus: PaymentStatus) => {
+    // Guard: sprawdź czy można zmienić (confirm dla nadpisania automatyki)
+    const canChange = checkPaymentStatusChange(job, newStatus, 'manual');
+    if (!canChange) {
+      console.log('[MobileJobDetail] Payment status change cancelled by user');
+      setShowPaymentMenu(false);
+      return;
+    }
+    
+    try {
+      await onSave(job.id, { paymentStatus: newStatus });
+      setShowPaymentMenu(false);
+    } catch (error) {
+      console.error('Failed to update payment status:', error);
+      alert('Nie udało się zmienić statusu płatności');
     }
   };
 
@@ -286,12 +295,13 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
         
         <div className="flex-1 text-center px-4">
           <div className="text-xs text-slate-400 font-medium">{job.friendlyId}</div>
-          <div 
-            className="inline-block text-[10px] font-bold px-2 py-0.5 rounded text-white mt-0.5"
+          <button
+            onClick={() => setShowPaymentMenu(true)}
+            className="inline-block text-[10px] font-bold px-2 py-0.5 rounded text-white mt-0.5 active:scale-95"
             style={{ background: paymentColor }}
           >
             {paymentLabel}
-          </div>
+          </button>
         </div>
 
         {isEditing ? (
@@ -778,6 +788,44 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
           </div>
         )}
       </div>
+
+      {/* Payment Status Modal - Bottom Sheet */}
+      {showPaymentMenu && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/50 flex items-end"
+          onClick={() => setShowPaymentMenu(false)}
+        >
+          <div 
+            className="w-full bg-white rounded-t-3xl p-6 animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-1 bg-slate-300 rounded-full mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-slate-800 mb-4">Status płatności</h3>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              {PAYMENT_STATUS_LIST.map((cfg) => (
+                <button
+                  key={cfg.value}
+                  onClick={() => handlePaymentStatusChange(cfg.value)}
+                  className={`py-4 px-4 rounded-xl font-bold text-white text-sm transition-all active:scale-95 ${
+                    job.paymentStatus === cfg.value ? 'ring-4 ring-offset-2' : ''
+                  }`}
+                  style={{ 
+                    background: cfg.color
+                  }}
+                >
+                  {cfg.label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowPaymentMenu(false)}
+              className="w-full py-3 bg-slate-100 text-slate-600 rounded-xl font-bold"
+            >
+              Anuluj
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Fixed Bottom Actions - Navigate & Call */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 flex gap-3 shadow-lg z-40">

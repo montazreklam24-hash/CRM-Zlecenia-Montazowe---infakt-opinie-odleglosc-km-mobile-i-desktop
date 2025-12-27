@@ -1,5 +1,6 @@
 ﻿import React from 'react';
 import { PaymentStatus } from '../types';
+import { PAYMENT_STATUS_CONFIG, PAYMENT_STATUS_LIST, getPaymentStatusConfig } from '../constants/paymentStatus';
 
 interface PaymentStatusBadgeProps {
   status: PaymentStatus;
@@ -16,64 +17,7 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
   size = 'sm',
   showAmount = false
 }) => {
-  const config: Record<PaymentStatus, { 
-    bg: string; 
-    text: string; 
-    border: string;
-    icon: string; 
-    label: string;
-    gradient?: string;
-  }> = {
-    [PaymentStatus.NONE]: { 
-      bg: 'bg-slate-50', 
-      text: 'text-slate-500', 
-      border: 'border-slate-200',
-      icon: '', 
-      label: '' 
-    },
-    [PaymentStatus.PROFORMA]: { 
-      bg: 'bg-orange-50', 
-      text: 'text-orange-700', 
-      border: 'border-orange-200',
-      icon: '', 
-      label: 'Proforma',
-      gradient: 'from-orange-500 to-orange-600'
-    },
-    [PaymentStatus.PARTIAL]: { 
-      bg: 'bg-purple-50', 
-      text: 'text-purple-700', 
-      border: 'border-purple-200',
-      icon: '', 
-      label: 'Zaliczka',
-      gradient: 'from-purple-400 to-purple-500'
-    },
-    [PaymentStatus.PAID]: { 
-      bg: 'bg-green-50', 
-      text: 'text-green-700', 
-      border: 'border-green-200',
-      icon: '', 
-      label: 'Opłacone',
-      gradient: 'from-green-400 to-green-500'
-    },
-    [PaymentStatus.CASH]: { 
-      bg: 'bg-yellow-50', 
-      text: 'text-yellow-700', 
-      border: 'border-yellow-200',
-      icon: '', 
-      label: 'Barter',
-      gradient: 'from-yellow-400 to-yellow-500'
-    },
-    [PaymentStatus.OVERDUE]: { 
-      bg: 'bg-red-50', 
-      text: 'text-red-700', 
-      border: 'border-red-200',
-      icon: '', 
-      label: 'Przeterminowane',
-      gradient: 'from-red-400 to-red-500'
-    }
-  };
-
-  const cfg = config[status] || config[PaymentStatus.NONE];
+  const cfg = getPaymentStatusConfig(status);
 
   const sizeClasses = {
     sm: 'text-[10px] px-1.5 py-0.5',
@@ -97,10 +41,9 @@ const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({
   return (
     <div className={`
       inline-flex items-center gap-1 rounded-full font-bold uppercase tracking-wide
-      ${cfg.bg} ${cfg.text} border ${cfg.border}
+      ${cfg.bgClass} ${cfg.textClass} border ${cfg.borderClass}
       ${sizeClasses[size]}
     `}>
-      {cfg.icon && <span>{cfg.icon}</span>}
       <span>{cfg.label}</span>
       {showAmount && amount > 0 && (
         <span className="font-normal opacity-75 ml-1">
@@ -121,20 +64,11 @@ export const PaymentStatusBar: React.FC<{
   onClick?: (e: React.MouseEvent) => void;
   showLabel?: boolean;
 }> = ({ status, onClick, showLabel = true }) => {
-  const config: Record<PaymentStatus, { bg: string; label: string }> = {
-    [PaymentStatus.NONE]: { bg: 'bg-gradient-to-r from-slate-300 to-slate-400', label: 'BRAK' },
-    [PaymentStatus.PROFORMA]: { bg: 'bg-gradient-to-r from-orange-500 to-orange-600', label: 'PROFORMA' },
-    [PaymentStatus.PARTIAL]: { bg: 'bg-gradient-to-r from-purple-400 to-purple-500', label: 'ZALICZKA' },
-    [PaymentStatus.PAID]: { bg: 'bg-gradient-to-r from-green-400 to-green-500', label: 'OPŁACONE' },
-    [PaymentStatus.CASH]: { bg: 'bg-gradient-to-r from-yellow-400 to-yellow-500', label: 'BARTER' },
-    [PaymentStatus.OVERDUE]: { bg: 'bg-gradient-to-r from-red-400 to-red-500', label: 'DO ZAPŁATY' }
-  };
-
-  const cfg = config[status] || config[PaymentStatus.NONE];
+  const cfg = getPaymentStatusConfig(status);
 
   return (
     <div 
-      className={`${cfg.bg} flex items-center justify-center cursor-pointer hover:brightness-110 transition-all`}
+      className={`bg-gradient-to-r ${cfg.gradient} flex items-center justify-center cursor-pointer hover:brightness-110 transition-all`}
       style={{ 
         height: showLabel ? '25px' : '4px',
         minHeight: showLabel ? '25px' : '4px'
@@ -147,7 +81,7 @@ export const PaymentStatusBar: React.FC<{
           className={`font-bold uppercase tracking-wide ${status === PaymentStatus.NONE ? 'text-slate-600' : 'text-white'}`}
           style={{ fontSize: '10px', letterSpacing: '0.5px' }}
         >
-          {cfg.label}
+          {cfg.label.toUpperCase()}
         </span>
       )}
     </div>
@@ -182,15 +116,6 @@ export const PaymentStatusMiniMenu: React.FC<{
   onClose: () => void;
   position?: 'top' | 'bottom';
 }> = ({ currentStatus, onSelect, onClose, position = 'bottom' }) => {
-  const statuses: { value: PaymentStatus; label: string; bg: string }[] = [
-    { value: PaymentStatus.NONE, label: 'Brak', bg: 'bg-slate-400' },
-    { value: PaymentStatus.PROFORMA, label: 'Proforma', bg: 'bg-blue-600' },
-    { value: PaymentStatus.PARTIAL, label: 'Zaliczka', bg: 'bg-purple-500' },
-    { value: PaymentStatus.PAID, label: 'Opłacone', bg: 'bg-green-500' },
-    { value: PaymentStatus.CASH, label: 'Gotówka', bg: 'bg-yellow-500' },
-    { value: PaymentStatus.OVERDUE, label: 'Do zapłaty', bg: 'bg-red-500' },
-  ];
-
   return (
     <>
       {/* Backdrop - kliknięcie zamyka */}
@@ -208,15 +133,19 @@ export const PaymentStatusMiniMenu: React.FC<{
       >
         <div className="text-[9px] font-bold text-slate-400 uppercase px-2 py-1">Status płatności</div>
         <div className="grid grid-cols-2 gap-1">
-          {statuses.map((s) => (
+          {PAYMENT_STATUS_LIST.map((cfg) => (
             <button
-              key={s.value}
-              onClick={(e) => { e.stopPropagation(); onSelect(s.value); onClose(); }}
-              className={`px-2 py-1.5 rounded text-[10px] font-bold text-white transition-all ${s.bg} ${
-                currentStatus === s.value ? 'ring-2 ring-offset-1 ring-slate-600 scale-105' : 'opacity-80 hover:opacity-100'
+              key={cfg.value}
+              onClick={(e) => { e.stopPropagation(); onSelect(cfg.value); onClose(); }}
+              className={`px-2 py-1.5 rounded text-[10px] font-bold transition-all ${
+                currentStatus === cfg.value ? 'ring-2 ring-offset-1 ring-slate-600 scale-105' : 'opacity-80 hover:opacity-100'
               }`}
+              style={{ 
+                background: cfg.color, 
+                color: '#fff' 
+              }}
             >
-              {s.label}
+              {cfg.label}
             </button>
           ))}
         </div>
