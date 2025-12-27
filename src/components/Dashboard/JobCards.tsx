@@ -65,7 +65,6 @@ export const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
   };
 
   const [showClickHint, setShowClickHint] = useState(false);
-  const [showArrows, setShowArrows] = useState(false);
   const [showPaymentMenu, setShowPaymentMenu] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
 
@@ -92,18 +91,16 @@ export const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
     <div 
       className="relative group h-full"
       data-job-id={job.id}
-      onMouseEnter={() => setShowArrows(true)}
-      onMouseLeave={() => setShowArrows(false)}
     >
-        {/* LEFT arrow - zawsze widoczne */}
+        {/* LEFT arrow */}
         {(canMoveLeft || canMoveLeft === false) && (
           <button
             onClick={(e) => { e.stopPropagation(); if (canMoveLeft) onMoveLeft?.(job.id); }}
             disabled={!canMoveLeft}
-            className={`absolute top-1/2 -left-3 -translate-y-1/2 z-[100] p-1 rounded-full shadow-lg transition-all ${
+            className={`absolute top-1/2 -left-3 -translate-y-1/2 z-[100] p-1 rounded-full shadow-lg transition-all duration-200 opacity-0 group-hover:opacity-50 hover:!opacity-100 ${
               canMoveLeft 
-                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-125 cursor-pointer' 
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-50'
+                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-110 cursor-pointer' 
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
             }`}
             title={canMoveLeft ? "Przesuń o 1 w lewo" : "Pierwsza pozycja"}
           >
@@ -111,15 +108,15 @@ export const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
           </button>
         )}
         
-        {/* RIGHT arrow - zawsze widoczne */}
+        {/* RIGHT arrow */}
         {(canMoveRight || canMoveRight === false) && (
           <button
             onClick={(e) => { e.stopPropagation(); if (canMoveRight) onMoveRight?.(job.id); }}
             disabled={!canMoveRight}
-            className={`absolute top-1/2 -right-3 -translate-y-1/2 z-[100] p-1 rounded-full shadow-lg transition-all ${
+            className={`absolute top-1/2 -right-3 -translate-y-1/2 z-[100] p-1 rounded-full shadow-lg transition-all duration-200 opacity-0 group-hover:opacity-50 hover:!opacity-100 ${
               canMoveRight 
-                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-125 cursor-pointer' 
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-50'
+                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-110 cursor-pointer' 
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
             }`}
             title={canMoveRight ? "Przesuń o 1 w prawo" : "Ostatnia pozycja"}
           >
@@ -131,7 +128,7 @@ export const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
         {canMoveUp && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveUp?.(job.id); }}
-            className="absolute -top-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all"
+            className="absolute -top-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg transition-all duration-200 opacity-0 group-hover:opacity-50 hover:!opacity-100 hover:scale-110"
             title={currentColumnId === 'PREPARE' ? "Na sam początek" : "Przesuń w górę"}
           >
             <ChevronUp className="w-5 h-5" />
@@ -142,7 +139,7 @@ export const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
         {canMoveDown && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveDown?.(job.id); }}
-            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all"
+            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg transition-all duration-200 opacity-0 group-hover:opacity-50 hover:!opacity-100 hover:scale-110"
             title={currentColumnId === 'PREPARE' ? "Na sam koniec" : "Przesuń w dół"}
           >
             <ChevronDown className="w-5 h-5" />
@@ -381,7 +378,6 @@ export const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
   });
 
   const [showClickHint, setShowClickHint] = useState(false);
-  const [showArrows, setShowArrows] = useState(false);
   const [showPaymentMenu, setShowPaymentMenu] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
 
@@ -409,14 +405,12 @@ export const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
     <div 
       className="relative group"
       data-job-id={job.id}
-      onMouseEnter={() => setShowArrows(true)}
-      onMouseLeave={() => setShowArrows(false)}
     >
         {/* UP arrow */}
         {canMoveUp && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveUp?.(job.id); }}
-            className="absolute -top-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all"
+            className="absolute -top-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg transition-all duration-200 opacity-0 group-hover:opacity-50 hover:!opacity-100 hover:scale-110"
             title="Przesuń w górę"
           >
             <ChevronUp className="w-5 h-5" />
@@ -427,22 +421,22 @@ export const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
         {canMoveDown && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveDown?.(job.id); }}
-            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:scale-125 transition-all"
+            className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-[100] p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg transition-all duration-200 opacity-0 group-hover:opacity-50 hover:!opacity-100 hover:scale-110"
             title="Przesuń w dół"
           >
             <ChevronDown className="w-5 h-5" />
           </button>
         )}
 
-        {/* LEFT arrow - zawsze widoczne */}
+        {/* LEFT arrow */}
         {(canMoveLeft || canMoveLeft === false) && (
           <button
             onClick={(e) => { e.stopPropagation(); if (canMoveLeft) onMoveLeft?.(job.id); }}
             disabled={!canMoveLeft}
-            className={`absolute top-1/2 -left-3 -translate-y-1/2 z-[100] p-1 rounded-full shadow-lg transition-all ${
+            className={`absolute top-1/2 -left-3 -translate-y-1/2 z-[100] p-1 rounded-full shadow-lg transition-all duration-200 opacity-0 group-hover:opacity-50 hover:!opacity-100 ${
               canMoveLeft 
-                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-125 cursor-pointer' 
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-50'
+                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-110 cursor-pointer' 
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
             }`}
             title={canMoveLeft ? "Przesuń w lewo" : "Pierwsza pozycja"}
           >
@@ -450,15 +444,15 @@ export const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
           </button>
         )}
         
-        {/* RIGHT arrow - zawsze widoczne */}
+        {/* RIGHT arrow */}
         {(canMoveRight || canMoveRight === false) && (
           <button
             onClick={(e) => { e.stopPropagation(); if (canMoveRight) onMoveRight?.(job.id); }}
             disabled={!canMoveRight}
-            className={`absolute top-1/2 -right-3 -translate-y-1/2 z-[100] p-1 rounded-full shadow-lg transition-all ${
+            className={`absolute top-1/2 -right-3 -translate-y-1/2 z-[100] p-1 rounded-full shadow-lg transition-all duration-200 opacity-0 group-hover:opacity-50 hover:!opacity-100 ${
               canMoveRight 
-                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-125 cursor-pointer' 
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-50'
+                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-110 cursor-pointer' 
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
             }`}
             title={canMoveRight ? "Przesuń w prawo" : "Ostatnia pozycja"}
           >
