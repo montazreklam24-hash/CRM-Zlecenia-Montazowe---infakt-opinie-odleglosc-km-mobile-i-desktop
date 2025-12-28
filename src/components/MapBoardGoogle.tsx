@@ -180,8 +180,6 @@ const SmartPopup = ({ job, position, onClose, onSelect, mapContainer }: { job: J
     document.body
   );
 };
-  );
-};
 
 const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpdated, onChangeColumn }) => {
   const DEBUG = true;
