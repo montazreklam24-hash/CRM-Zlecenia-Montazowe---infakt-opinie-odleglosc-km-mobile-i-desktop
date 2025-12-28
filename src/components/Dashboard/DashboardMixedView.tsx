@@ -121,10 +121,10 @@ export const DashboardMixedView: React.FC<DashboardMixedViewProps> = ({
                           onArchive={handleArchive}
                           onPaymentStatusChange={handlePaymentStatusChange}
                           onMoveToColumn={handleMoveToColumn}
-                          onMoveLeft={handleMoveLeft}
-                          onMoveRight={handleMoveRight}
-                          onMoveUp={handleJumpToStart}
-                          onMoveDown={handleJumpToEnd}
+                          onMoveLeft={handleMoveUp}
+                          onMoveRight={handleMoveDown}
+                          onMoveUp={handleMoveLeft}
+                          onMoveDown={handleMoveRight}
                           canMoveLeft={canMoveLeft}
                           canMoveRight={canMoveRight}
                           canMoveUp={canMoveUp}
@@ -247,7 +247,7 @@ export const DashboardMixedView: React.FC<DashboardMixedViewProps> = ({
                   strategy={rectSortingStrategy}
                 >
                   {rowJobs.map((job) => {
-                    const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
+                    const { canMoveLeft, canMoveRight, canMoveUp, canMoveDown } = getJobMoveLeftRightInfo(job.id);
                     return (
                       <div key={job.id}>
                         <DraggableJobCard
@@ -258,10 +258,14 @@ export const DashboardMixedView: React.FC<DashboardMixedViewProps> = ({
                           onDuplicate={handleDuplicate}
                           onPaymentStatusChange={handlePaymentStatusChange}
                           onMoveToColumn={handleMoveToColumn}
-                          onMoveLeft={handleMoveLeft}
-                          onMoveRight={handleMoveRight}
+                          onMoveLeft={handleMoveUp}
+                          onMoveRight={handleMoveDown}
+                          onMoveUp={handleMoveLeft}
+                          onMoveDown={handleMoveRight}
                           canMoveLeft={canMoveLeft}
                           canMoveRight={canMoveRight}
+                          canMoveUp={canMoveUp}
+                          canMoveDown={canMoveDown}
                           onContextMenu={handleContextMenu}
                         />
                       </div>

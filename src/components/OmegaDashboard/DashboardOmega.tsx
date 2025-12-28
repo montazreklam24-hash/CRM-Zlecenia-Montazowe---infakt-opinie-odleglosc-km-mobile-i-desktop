@@ -35,8 +35,6 @@ import {
 import { getJobThumbnailUrl } from '../../utils/imageUtils';
 
 // --- CONFIGURATION ---
-const OMEGA_MODE_READ_ONLY = true;
-
 const ROWS_CONFIG = [
   { id: 'PREPARE', title: 'DO PRZYGOTOWANIA', headerBg: 'bg-slate-700', headerText: 'text-white', dotColor: 'text-slate-500' },
   { id: 'MON', title: 'PONIEDZIAŁEK', shortTitle: 'PON', headerBg: 'bg-blue-600', headerText: 'text-white', dotColor: 'text-blue-500' },
@@ -162,18 +160,7 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
     }
   };
 
-  // --- GUARDS ---
-  const checkReadOnly = (actionName: string) => {
-    if (OMEGA_MODE_READ_ONLY) {
-      console.warn(`[OMEGA] Akcja zablokowana (Tryb Read-Only): ${actionName}`);
-      alert(`[OMEGA] Ten widok jest w trybie podglądu (Read-Only). Akcja "${actionName}" została zablokowana.`);
-      return true;
-    }
-    return false;
-  };
-
   const handleDelete = async (id: string, e?: React.MouseEvent) => {
-    if (checkReadOnly('Usuwanie')) return;
     if (e) e.stopPropagation();
     const job = jobs.find(j => j.id === id);
     if (window.confirm(`🗑️ Czy na pewno chcesz USUNĄĆ zlecenie?\n\n"${job?.data.jobTitle}"`)) {
@@ -190,7 +177,6 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
   };
 
   const handleDuplicate = async (id: string, e?: React.MouseEvent) => {
-    if (checkReadOnly('Duplikowanie')) return;
     if (e) e.stopPropagation();
     await jobsService.duplicateJob(id);
     broadcastChange();
@@ -198,7 +184,6 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
   };
 
   const handleArchive = async (id: string, e?: React.MouseEvent) => {
-    if (checkReadOnly('Archiwizacja')) return;
     if (e) e.stopPropagation();
     const job = jobs.find(j => j.id === id);
     if (window.confirm(`📦 Czy na pewno chcesz zarchiwizować zlecenie?\n\n"${job?.data.jobTitle}"`)) {
@@ -213,7 +198,6 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
   };
 
   const handlePaymentStatusChange = async (jobId: string, newStatus: PaymentStatus, source: 'manual' | 'auto' = 'manual') => {
-    if (checkReadOnly('Zmiana statusu płatności')) return;
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
     const canChange = checkPaymentStatusChange(job, newStatus, source);
@@ -228,7 +212,6 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
   };
 
   const handleMoveToColumn = async (jobId: string, targetColumnId: JobColumnId) => {
-    if (checkReadOnly('Zmiana kolumny')) return;
     const job = jobs.find(j => j.id === jobId);
     if (!job || (job.columnId || 'PREPARE') === targetColumnId) return;
     const targetColumnJobs = jobs.filter(j => (j.columnId || 'PREPARE') === targetColumnId && j.id !== jobId);
@@ -248,7 +231,6 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
   };
 
   const handleToggleReviewRequest = async (e: React.MouseEvent, jobId: string) => {
-    if (checkReadOnly('Zmiana statusu opinii')) return;
     e.stopPropagation();
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
@@ -262,12 +244,125 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
   };
 
   // Reordering helpers (for manual arrows)
-  const handleMoveUp = async (jobId: string) => { if (checkReadOnly('Zmiana kolejności')) return; /* logic same as before... */ };
-  const handleMoveDown = async (jobId: string) => { if (checkReadOnly('Zmiana kolejności')) return; };
-  const handleMoveLeft = async (jobId: string) => { if (checkReadOnly('Zmiana kolumny')) return; };
-  const handleMoveRight = async (jobId: string) => { if (checkReadOnly('Zmiana kolumny')) return; };
-  const handleJumpToStart = async (jobId: string) => { if (checkReadOnly('Zmiana kolejności')) return; };
-  const handleJumpToEnd = async (jobId: string) => { if (checkReadOnly('Zmiana kolejności')) return; };
+  const handleMoveUp = async (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    
+    const columnId = job.columnId || 'PREPARE';
+    const columnJobs = jobs
+      .filter(j => (j.columnId || 'PREPARE') === columnId)
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    
+    const currentIndex = columnJobs.findIndex(j => j.id === jobId);
+    if (currentIndex <= 0) return;
+    
+    const jobAbove = columnJobs[currentIndex - 1];
+    const currentSortOrder = job.sortOrder || (currentIndex * 10);
+    const aboveSortOrder = jobAbove.sortOrder || ((currentIndex - 1) * 10);
+    
+    setJobs(prev => prev.map(j => {
+      if (j.id === jobId) return { ...j, sortOrder: aboveSortOrder };
+      if (j.id === jobAbove.id) return { ...j, sortOrder: currentSortOrder };
+      return j;
+    }));
+    
+    try {
+      await jobsService.updateJobPosition(jobId, columnId, aboveSortOrder);
+      await jobsService.updateJobPosition(jobAbove.id, columnId, currentSortOrder);
+      broadcastChange();
+    } catch (err) {
+      loadJobs();
+    }
+  };
+
+  const handleMoveDown = async (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    
+    const columnId = job.columnId || 'PREPARE';
+    const columnJobs = jobs
+      .filter(j => (j.columnId || 'PREPARE') === columnId)
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    
+    const currentIndex = columnJobs.findIndex(j => j.id === jobId);
+    if (currentIndex >= columnJobs.length - 1) return;
+    
+    const jobBelow = columnJobs[currentIndex + 1];
+    const currentSortOrder = job.sortOrder || (currentIndex * 10);
+    const belowSortOrder = jobBelow.sortOrder || ((currentIndex + 1) * 10);
+    
+    setJobs(prev => prev.map(j => {
+      if (j.id === jobId) return { ...j, sortOrder: belowSortOrder };
+      if (j.id === jobBelow.id) return { ...j, sortOrder: currentSortOrder };
+      return j;
+    }));
+    
+    try {
+      await jobsService.updateJobPosition(jobId, columnId, belowSortOrder);
+      await jobsService.updateJobPosition(jobBelow.id, columnId, currentSortOrder);
+      broadcastChange();
+    } catch (err) {
+      loadJobs();
+    }
+  };
+
+  const handleMoveLeft = async (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    
+    const columnId = job.columnId || 'PREPARE';
+    const order = getColumnOrder();
+    const currentIndex = order.indexOf(columnId);
+    if (currentIndex <= 0) return;
+    
+    const targetColumnId = order[currentIndex - 1] as JobColumnId;
+    handleMoveToColumn(jobId, targetColumnId);
+  };
+
+  const handleMoveRight = async (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    
+    const columnId = job.columnId || 'PREPARE';
+    const order = getColumnOrder();
+    const currentIndex = order.indexOf(columnId);
+    if (currentIndex < 0 || currentIndex >= order.length - 1) return;
+    
+    const targetColumnId = order[currentIndex + 1] as JobColumnId;
+    handleMoveToColumn(jobId, targetColumnId);
+  };
+
+  const handleJumpToStart = async (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    const columnId = job.columnId || 'PREPARE';
+    const columnJobs = jobs.filter(j => (j.columnId || 'PREPARE') === columnId).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    const minSortOrder = (columnJobs[0]?.sortOrder || 0) - 10;
+    
+    setJobs(prev => prev.map(j => j.id === jobId ? { ...j, sortOrder: minSortOrder } : j));
+    try {
+      await jobsService.updateJobPosition(jobId, columnId, minSortOrder);
+      broadcastChange();
+    } catch (err) {
+      loadJobs();
+    }
+  };
+
+  const handleJumpToEnd = async (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    const columnId = job.columnId || 'PREPARE';
+    const columnJobs = jobs.filter(j => (j.columnId || 'PREPARE') === columnId).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    const maxSortOrder = (columnJobs[columnJobs.length - 1]?.sortOrder || 0) + 10;
+    
+    setJobs(prev => prev.map(j => j.id === jobId ? { ...j, sortOrder: maxSortOrder } : j));
+    try {
+      await jobsService.updateJobPosition(jobId, columnId, maxSortOrder);
+      broadcastChange();
+    } catch (err) {
+      loadJobs();
+    }
+  };
 
   const getColumnOrder = () => ['PREPARE', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN', 'COMPLETED'];
   
@@ -283,17 +378,36 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
   const getJobMoveLeftRightInfo = (id: string) => {
     const job = jobs.find(j => j.id === id);
     if (!job) return { canMoveLeft: false, canMoveRight: false, canMoveUp: false, canMoveDown: false };
+    
     const columnId = job.columnId || 'PREPARE';
+    const isHorizontal = columnId === 'PREPARE' || columnId === 'COMPLETED';
+    
     const order = getColumnOrder();
     const colIdx = order.indexOf(columnId);
     const colJobs = jobs.filter(j => (j.columnId || 'PREPARE') === columnId).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
     const jobIdx = colJobs.findIndex(j => j.id === id);
-    return {
-      canMoveLeft: colIdx > 0,
-      canMoveRight: colIdx < order.length - 1,
-      canMoveUp: jobIdx > 0,
-      canMoveDown: jobIdx < colJobs.length - 1
-    };
+    
+    if (isHorizontal) {
+      // Dla wierszy poziomych (Przygotowanie, Wykonane):
+      // Lewo/Prawo porusza się wewnątrz wiersza (sortOrder)
+      // Góra/Dół porusza się między kolumnami (order)
+      return {
+        canMoveLeft: jobIdx > 0,
+        canMoveRight: jobIdx < colJobs.length - 1,
+        canMoveUp: colIdx > 0,
+        canMoveDown: colIdx < order.length - 1
+      };
+    } else {
+      // Dla kolumn pionowych (Dni tygodnia):
+      // Góra/Dół porusza się wewnątrz kolumny (sortOrder)
+      // Lewo/Prawo porusza się między kolumnami (order)
+      return {
+        canMoveLeft: colIdx > 0,
+        canMoveRight: colIdx < order.length - 1,
+        canMoveUp: jobIdx > 0,
+        canMoveDown: jobIdx < colJobs.length - 1
+      };
+    }
   };
 
   const findColumnForJob = (jobId: string): JobColumnId | null => {
@@ -302,7 +416,6 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
   };
 
   const handleDragStart = (event: DragStartEvent) => {
-    if (checkReadOnly('Przeciąganie')) return;
     const jobId = (event.active.data?.current as any)?.jobId || event.active.id.toString().split('-')[0];
     setActiveId(jobId); setOverId(null);
   };
@@ -316,7 +429,6 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
-    if (checkReadOnly('Przeciąganie')) { setActiveId(null); setOverId(null); return; }
     const { active, over } = event;
     setActiveId(null); setOverId(null);
     if (!over) return;
@@ -422,16 +534,75 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
           {viewMode === 'MIXED' && (
             <DndContext sensors={sensors} collisionDetection={cardFirstCollision} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
               <div className="space-y-6">
-                <PrepareSection row={ROWS_CONFIG[0]} rowJobs={getJobsForColumn('PREPARE')} activeId={activeId} isAdmin={isAdmin} onSelectJob={onSelectJob} handleDelete={handleDelete} handleDuplicate={handleDuplicate} handleArchive={handleArchive} handlePaymentStatusChange={handlePaymentStatusChange} handleMoveToColumn={handleMoveToColumn} handleMoveLeft={handleMoveLeft} handleMoveRight={handleMoveRight} handleJumpToStart={handleJumpToStart} handleJumpToEnd={handleJumpToEnd} getJobMoveLeftRightInfo={getJobMoveLeftRightInfo} jobMatchesPaymentFilter={jobMatchesPaymentFilter} handleContextMenu={handleContextMenu} />
+                <PrepareSection 
+                  row={ROWS_CONFIG[0]} 
+                  rowJobs={getJobsForColumn('PREPARE')} 
+                  activeId={activeId} 
+                  isAdmin={isAdmin} 
+                  onSelectJob={onSelectJob} 
+                  handleDelete={handleDelete} 
+                  handleDuplicate={handleDuplicate} 
+                  handleArchive={handleArchive} 
+                  handlePaymentStatusChange={handlePaymentStatusChange} 
+                  handleMoveToColumn={handleMoveToColumn} 
+                  handleMoveLeft={handleMoveUp} 
+                  handleMoveRight={handleMoveDown} 
+                  handleJumpToStart={handleMoveLeft} 
+                  handleJumpToEnd={handleMoveRight} 
+                  getJobMoveLeftRightInfo={getJobMoveLeftRightInfo} 
+                  jobMatchesPaymentFilter={jobMatchesPaymentFilter} 
+                  handleContextMenu={handleContextMenu} 
+                />
                 <WeekColumnsSection showWeekend={showWeekend} setShowWeekend={setShowWeekend} ROWS_CONFIG={[...ROWS_CONFIG]} getJobsForColumn={getJobsForColumn} activeId={activeId} isAdmin={isAdmin} onSelectJob={onSelectJob} handleDelete={handleDelete} handleDuplicate={handleDuplicate} handleArchive={handleArchive} handleMoveUp={handleMoveUp} handleMoveDown={handleMoveDown} getJobMoveInfo={getJobMoveInfo} getJobMoveLeftRightInfo={getJobMoveLeftRightInfo} handleMoveLeft={handleMoveLeft} handleMoveRight={handleMoveRight} handleContextMenu={handleContextMenu} handlePaymentStatusChange={handlePaymentStatusChange} handleMoveToColumn={handleMoveToColumn} jobMatchesPaymentFilter={jobMatchesPaymentFilter} />
                 <OmegaMap mapProvider={mapProvider} setMapProvider={setMapProvider} filteredJobs={filteredJobs} onSelectJob={onSelectJob} loadJobs={loadJobs} setJobs={setJobs} />
-                <CompletedSection row={ROWS_CONFIG[8]} rowJobs={getJobsForColumn('COMPLETED')} activeId={activeId} isAdmin={isAdmin} onSelectJob={onSelectJob} handleDelete={handleDelete} handleDuplicate={(job) => handleDuplicate(job.id)} handlePaymentStatusChange={handlePaymentStatusChange} handleMoveToColumn={handleMoveToColumn} handleMoveLeft={handleMoveLeft} handleMoveRight={handleMoveRight} getJobMoveLeftRightInfo={getJobMoveLeftRightInfo} jobMatchesPaymentFilter={jobMatchesPaymentFilter} handleContextMenu={handleContextMenu} />
+                <CompletedSection 
+                  row={ROWS_CONFIG[8]} 
+                  rowJobs={getJobsForColumn('COMPLETED')} 
+                  activeId={activeId} 
+                  isAdmin={isAdmin} 
+                  onSelectJob={onSelectJob} 
+                  handleDelete={handleDelete} 
+                  handleDuplicate={(job) => handleDuplicate(job.id)} 
+                  handlePaymentStatusChange={handlePaymentStatusChange} 
+                  handleMoveToColumn={handleMoveToColumn} 
+                  handleMoveLeft={handleMoveUp} 
+                  handleMoveRight={handleMoveDown} 
+                  handleMoveUp={handleMoveLeft} 
+                  handleMoveDown={handleMoveRight} 
+                  getJobMoveLeftRightInfo={getJobMoveLeftRightInfo} 
+                  jobMatchesPaymentFilter={jobMatchesPaymentFilter} 
+                  handleContextMenu={handleContextMenu} 
+                />
               </div>
             </DndContext>
           )}
 
           {viewMode === 'BOARD' && (
-            <BoardViewSection sensors={sensors} cardFirstCollision={cardFirstCollision} handleDragStart={handleDragStart} handleDragOver={handleDragOver} handleDragEnd={handleDragEnd} EXTENDED_ROWS_CONFIG={[...EXTENDED_ROWS_CONFIG]} getJobsForColumn={getJobsForColumn} activeId={activeId} isAdmin={isAdmin} onSelectJob={onSelectJob} handleDelete={handleDelete} handleDuplicate={handleDuplicate} handleArchive={handleArchive} handlePaymentStatusChange={handlePaymentStatusChange} handleMoveToColumn={handleMoveToColumn} handleMoveLeft={handleMoveLeft} handleMoveRight={handleMoveRight} handleJumpToStart={handleJumpToStart} handleJumpToEnd={handleJumpToEnd} getJobMoveLeftRightInfo={getJobMoveLeftRightInfo} jobMatchesPaymentFilter={jobMatchesPaymentFilter} handleContextMenu={handleContextMenu} jobs={jobs} />
+            <BoardViewSection 
+              sensors={sensors} 
+              cardFirstCollision={cardFirstCollision} 
+              handleDragStart={handleDragStart} 
+              handleDragOver={handleDragOver} 
+              handleDragEnd={handleDragEnd} 
+              EXTENDED_ROWS_CONFIG={[...EXTENDED_ROWS_CONFIG]} 
+              getJobsForColumn={getJobsForColumn} 
+              activeId={activeId} 
+              isAdmin={isAdmin} 
+              onSelectJob={onSelectJob} 
+              handleDelete={handleDelete} 
+              handleDuplicate={handleDuplicate} 
+              handleArchive={handleArchive} 
+              handlePaymentStatusChange={handlePaymentStatusChange} 
+              handleMoveToColumn={handleMoveToColumn} 
+              handleMoveLeft={handleMoveUp} 
+              handleMoveRight={handleMoveDown} 
+              handleJumpToStart={handleMoveLeft} 
+              handleJumpToEnd={handleMoveRight} 
+              getJobMoveLeftRightInfo={getJobMoveLeftRightInfo} 
+              jobMatchesPaymentFilter={jobMatchesPaymentFilter} 
+              handleContextMenu={handleContextMenu} 
+              jobs={jobs} 
+            />
           )}
 
           {viewMode === 'KANBAN' && (

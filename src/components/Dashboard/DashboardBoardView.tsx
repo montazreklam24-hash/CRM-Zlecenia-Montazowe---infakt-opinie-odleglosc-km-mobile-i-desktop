@@ -117,14 +117,14 @@ export const DashboardBoardView: React.FC<DashboardBoardViewProps> = ({
                               onArchive={handleArchive}
                               onPaymentStatusChange={handlePaymentStatusChange}
                               onMoveToColumn={handleMoveToColumn}
-                              onMoveLeft={handleMoveLeft}
-                              onMoveRight={handleMoveRight}
-                              onMoveUp={isPrepare ? handleJumpToStart : undefined}
-                              onMoveDown={isPrepare ? handleJumpToEnd : undefined}
+                              onMoveLeft={handleMoveLeft} // W widoku BOARD (lista pozioma) to jest handleMoveUp (zmiana kolejności)
+                              onMoveRight={handleMoveRight} // W widoku BOARD (lista pozioma) to jest handleMoveDown (zmiana kolejności)
+                              onMoveUp={handleJumpToStart} // Przeskok do poprzedniej kolumny
+                              onMoveDown={handleJumpToEnd} // Przeskok do następnej kolumny
                               canMoveLeft={canMoveLeft}
                               canMoveRight={canMoveRight}
-                              canMoveUp={isPrepare ? canMoveUp : undefined}
-                              canMoveDown={isPrepare ? canMoveDown : undefined}
+                              canMoveUp={canMoveUp}
+                              canMoveDown={canMoveDown}
                               onContextMenu={handleContextMenu}
                             />
                           </div>

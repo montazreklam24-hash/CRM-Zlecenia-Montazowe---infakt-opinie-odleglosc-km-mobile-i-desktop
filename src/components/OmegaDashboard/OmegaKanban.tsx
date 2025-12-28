@@ -539,7 +539,6 @@ export const BoardViewSection: React.FC<BoardViewSectionProps> = ({
                   rowJobs.map((job) => {
                     const { canMoveLeft, canMoveRight, canMoveUp, canMoveDown } = getJobMoveLeftRightInfo(job.id);
                     const matchesFilter = jobMatchesPaymentFilter(job);
-                    const isPrepare = (job.columnId || 'PREPARE') === 'PREPARE';
                     return (
                       <DraggableJobCard
                         key={job.id}
@@ -553,12 +552,12 @@ export const BoardViewSection: React.FC<BoardViewSectionProps> = ({
                         onMoveToColumn={handleMoveToColumn}
                         onMoveLeft={handleMoveLeft}
                         onMoveRight={handleMoveRight}
-                        onMoveUp={isPrepare ? handleJumpToStart : undefined}
-                        onMoveDown={isPrepare ? handleJumpToEnd : undefined}
+                        onMoveUp={handleJumpToStart}
+                        onMoveDown={handleJumpToEnd}
                         canMoveLeft={canMoveLeft}
                         canMoveRight={canMoveRight}
-                        canMoveUp={isPrepare ? canMoveUp : undefined}
-                        canMoveDown={isPrepare ? canMoveDown : undefined}
+                        canMoveUp={canMoveUp}
+                        canMoveDown={canMoveDown}
                         onContextMenu={handleContextMenu}
                         matchesFilter={matchesFilter}
                       />
@@ -764,6 +763,8 @@ export interface CompletedSectionProps {
   handleMoveToColumn: (id: string, columnId: JobColumnId) => Promise<void>;
   handleMoveLeft: (id: string) => void;
   handleMoveRight: (id: string) => void;
+  handleMoveUp?: (id: string) => void;
+  handleMoveDown?: (id: string) => void;
   getJobMoveLeftRightInfo: (id: string) => any;
   jobMatchesPaymentFilter: (job: Job) => boolean;
   handleContextMenu: (e: React.MouseEvent, job: Job) => void;
@@ -772,7 +773,7 @@ export interface CompletedSectionProps {
 export const CompletedSection: React.FC<CompletedSectionProps> = ({
   row, rowJobs, activeId, isAdmin, onSelectJob, handleDelete, handleDuplicate,
   handlePaymentStatusChange, handleMoveToColumn, handleMoveLeft, handleMoveRight,
-  getJobMoveLeftRightInfo, jobMatchesPaymentFilter, handleContextMenu
+  handleMoveUp, handleMoveDown, getJobMoveLeftRightInfo, jobMatchesPaymentFilter, handleContextMenu
 }) => {
   return (
     <div className="theme-surface transition-all" style={{ borderRadius: 'var(--radius-lg)', borderLeft: '4px solid', borderColor: row.dotColor?.replace('text-', '') || '#ddd' }}>
@@ -782,7 +783,7 @@ export const CompletedSection: React.FC<CompletedSectionProps> = ({
       </div>
       <DroppableRow id={row.id} activeId={activeId}>
         {rowJobs.map((job) => {
-          const { canMoveLeft, canMoveRight } = getJobMoveLeftRightInfo(job.id);
+          const { canMoveLeft, canMoveRight, canMoveUp, canMoveDown } = getJobMoveLeftRightInfo(job.id);
           const matchesFilter = jobMatchesPaymentFilter(job);
           return (
             <DraggableJobCard
@@ -796,8 +797,12 @@ export const CompletedSection: React.FC<CompletedSectionProps> = ({
               onMoveToColumn={handleMoveToColumn}
               onMoveLeft={handleMoveLeft}
               onMoveRight={handleMoveRight}
+              onMoveUp={handleMoveUp}
+              onMoveDown={handleMoveDown}
               canMoveLeft={canMoveLeft}
               canMoveRight={canMoveRight}
+              canMoveUp={canMoveUp}
+              canMoveDown={canMoveDown}
               onContextMenu={handleContextMenu}
               matchesFilter={matchesFilter}
             />
@@ -900,4 +905,6 @@ export const WeekColumnsSection: React.FC<WeekColumnsSectionProps> = ({
     </>
   );
 };
+
+
 
