@@ -91,6 +91,19 @@ const ClientModule: React.FC<ClientModuleProps> = ({ onSelectJob }) => {
     }
   };
 
+  const handleDeleteClient = async () => {
+    if (!formData.id || !window.confirm('Czy na pewno chcesz usunąć tego kontrahenta?')) return;
+    try {
+      await clientsService.deleteClient(formData.id);
+      setShowForm(false);
+      setFormData({});
+      setSelectedClient(null);
+      loadClients();
+    } catch (error) {
+      alert('Błąd usuwania kontrahenta');
+    }
+  };
+
   const handleEditClient = (client: Client) => {
     setFormData(client);
     setShowForm(true);
@@ -164,22 +177,6 @@ const ClientModule: React.FC<ClientModuleProps> = ({ onSelectJob }) => {
                   onChange={e => setFormData({...formData, address: e.target.value})}
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Kod pocztowy</label>
-                <input 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm"
-                  value={formData.address_postcode || ''}
-                  onChange={e => setFormData({...formData, address_postcode: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Miasto</label>
-                <input 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm"
-                  value={formData.address_city || ''}
-                  onChange={e => setFormData({...formData, address_city: e.target.value})}
-                />
-              </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Notatki</label>
                 <textarea 
@@ -192,6 +189,15 @@ const ClientModule: React.FC<ClientModuleProps> = ({ onSelectJob }) => {
             </div>
             
             <div className="flex justify-end gap-3 pt-4 border-t">
+              {formData.id && (
+                <button 
+                  type="button"
+                  onClick={handleDeleteClient}
+                  className="mr-auto flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                >
+                  <Trash2 className="w-4 h-4" /> USUŃ KONTRAHENTA
+                </button>
+              )}
               <button 
                 type="button"
                 onClick={() => { setShowForm(false); setFormData({}); }}
@@ -320,14 +326,7 @@ const ClientModule: React.FC<ClientModuleProps> = ({ onSelectJob }) => {
                         <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Adres</label>
                         <div className="flex items-center gap-3 mt-1 text-slate-700">
                           <MapPin className="w-4 h-4 text-slate-400" />
-                          <div>
-                            <div>{selectedClient.address || 'Brak adresu'}</div>
-                            {(selectedClient.address_postcode || selectedClient.address_city) && (
-                              <div className="text-sm text-slate-500">
-                                {selectedClient.address_postcode} {selectedClient.address_city}
-                              </div>
-                            )}
-                          </div>
+                          <span>{selectedClient.address || 'Brak adresu'}</span>
                         </div>
                       </div>
                     </div>
@@ -355,7 +354,7 @@ const ClientModule: React.FC<ClientModuleProps> = ({ onSelectJob }) => {
                             <span className="px-2 py-1 text-[10px] font-bold rounded bg-slate-100 text-slate-600 uppercase">
                               {job.status}
                             </span>
-                            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-orange-500 transition-colors" />
+                            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors" />
                           </div>
                         </div>
                       ))
@@ -372,18 +371,36 @@ const ClientModule: React.FC<ClientModuleProps> = ({ onSelectJob }) => {
                     {selectedClient.invoices && selectedClient.invoices.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {selectedClient.invoices.map((inv: any) => (
-                          <div key={inv.id} className="p-4 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center">
-                            <div>
-                              <div className="font-bold text-slate-800">{inv.infakt_number}</div>
-                              <div className="text-[10px] text-slate-400 uppercase font-black">{inv.type}</div>
+                          <div key={inv.id} className="p-4 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center group">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-slate-100 shadow-sm text-slate-400 group-hover:text-blue-500 transition-colors">
+                                <Receipt className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <div className="font-bold text-slate-800">{inv.infakt_number || inv.number}</div>
+                                <div className="text-[10px] text-slate-400 uppercase font-black">{inv.type}</div>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <div className="font-black text-slate-700">{inv.total_gross} zł</div>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                inv.status === 'paid' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'
-                              }`}>
-                                {inv.status === 'paid' ? 'OPŁACONA' : 'NIEOPŁACONA'}
-                              </span>
+                            <div className="flex items-center gap-6">
+                              <div className="text-right">
+                                <div className="font-black text-slate-700">{inv.total_gross} zł</div>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  inv.status === 'paid' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'
+                                }`}>
+                                  {inv.status === 'paid' ? 'OPŁACONA' : 'NIEOPŁACONA'}
+                                </span>
+                              </div>
+                              {inv.infakt_link && (
+                                <a 
+                                  href={inv.infakt_link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-2 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
+                                  title="Otwórz w inFakt"
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </a>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -441,9 +458,6 @@ const ClientModule: React.FC<ClientModuleProps> = ({ onSelectJob }) => {
                   <Users className="w-5 h-5 text-slate-400" />
                   <h3 className="font-bold text-slate-800">Kontakty</h3>
                 </div>
-                <button className="text-blue-600 hover:text-blue-800 p-1">
-                  <Plus className="w-4 h-4" />
-                </button>
               </div>
               <div className="p-4 space-y-4">
                 {selectedClient.contacts && selectedClient.contacts.length > 0 ? (
@@ -457,7 +471,33 @@ const ClientModule: React.FC<ClientModuleProps> = ({ onSelectJob }) => {
                     </div>
                   ))
                 ) : (
-                  <div className="text-center text-slate-400 text-sm py-4">Brak osób kontaktowych</div>
+                  <div className="text-center text-slate-400 text-sm py-4 italic">Brak osób kontaktowych</div>
+                )}
+              </div>
+            </div>
+
+            {/* Addresses */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+              <div className="p-4 border-b border-slate-50 flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-slate-400" />
+                <h3 className="font-bold text-slate-800">Adresy</h3>
+              </div>
+              <div className="p-4 space-y-4">
+                {selectedClient.addresses && selectedClient.addresses.length > 0 ? (
+                  selectedClient.addresses.map((addr: any) => (
+                    <div key={addr.id} className="text-sm p-3 rounded-lg bg-slate-50 border border-slate-100">
+                      <div className="font-black text-[10px] uppercase text-slate-400 mb-1">
+                        {addr.type === 'billing' ? 'Faktura' : addr.type === 'install' ? 'Montaż' : 'Inny'}
+                      </div>
+                      <div className="text-slate-800 font-medium">{addr.address_text}</div>
+                      {addr.note && <div className="text-slate-500 mt-1 italic text-xs">{addr.note}</div>}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm text-slate-700 p-3 rounded-lg bg-slate-50 border border-slate-100">
+                    <div className="font-black text-[10px] uppercase text-slate-400 mb-1">Główny adres</div>
+                    {selectedClient.address || 'Brak adresu'}
+                  </div>
                 )}
               </div>
             </div>

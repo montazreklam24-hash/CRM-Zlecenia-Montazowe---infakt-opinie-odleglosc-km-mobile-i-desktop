@@ -41,8 +41,6 @@ export interface Client {
   phone?: string;
   nip?: string;
   address?: string;
-  address_city?: string;
-  address_postcode?: string;
   notes?: string;
   infakt_id?: string;
   gmail_thread_id?: string;
