@@ -389,13 +389,13 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
     
     if (isHorizontal) {
       // Dla wierszy poziomych (Przygotowanie, Wykonane):
-      // Lewo/Prawo porusza się wewnątrz wiersza (sortOrder)
-      // Góra/Dół porusza się między kolumnami (order)
+      // Wszystkie strzałki poruszają się wewnątrz wiersza (sortOrder)
+      // Lewo/Prawo o 1 pozycję, Góra/Dół na początek/koniec
       return {
         canMoveLeft: jobIdx > 0,
         canMoveRight: jobIdx < colJobs.length - 1,
-        canMoveUp: colIdx > 0,
-        canMoveDown: colIdx < order.length - 1
+        canMoveUp: jobIdx > 0,
+        canMoveDown: jobIdx < colJobs.length - 1
       };
     } else {
       // Dla kolumn pionowych (Dni tygodnia):
@@ -547,8 +547,8 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
                   handleMoveToColumn={handleMoveToColumn} 
                   handleMoveLeft={handleMoveUp} 
                   handleMoveRight={handleMoveDown} 
-                  handleJumpToStart={handleMoveLeft} 
-                  handleJumpToEnd={handleMoveRight} 
+                  handleJumpToStart={handleJumpToStart} 
+                  handleJumpToEnd={handleJumpToEnd} 
                   getJobMoveLeftRightInfo={getJobMoveLeftRightInfo} 
                   jobMatchesPaymentFilter={jobMatchesPaymentFilter} 
                   handleContextMenu={handleContextMenu} 
@@ -567,8 +567,8 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
                   handleMoveToColumn={handleMoveToColumn} 
                   handleMoveLeft={handleMoveUp} 
                   handleMoveRight={handleMoveDown} 
-                  handleMoveUp={handleMoveLeft} 
-                  handleMoveDown={handleMoveRight} 
+                  handleMoveUp={handleJumpToStart} 
+                  handleMoveDown={handleJumpToEnd} 
                   getJobMoveLeftRightInfo={getJobMoveLeftRightInfo} 
                   jobMatchesPaymentFilter={jobMatchesPaymentFilter} 
                   handleContextMenu={handleContextMenu} 
@@ -596,8 +596,8 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
               handleMoveToColumn={handleMoveToColumn} 
               handleMoveLeft={handleMoveUp} 
               handleMoveRight={handleMoveDown} 
-              handleJumpToStart={handleMoveLeft} 
-              handleJumpToEnd={handleMoveRight} 
+              handleJumpToStart={handleJumpToStart} 
+              handleJumpToEnd={handleJumpToEnd} 
               getJobMoveLeftRightInfo={getJobMoveLeftRightInfo} 
               jobMatchesPaymentFilter={jobMatchesPaymentFilter} 
               handleContextMenu={handleContextMenu} 
