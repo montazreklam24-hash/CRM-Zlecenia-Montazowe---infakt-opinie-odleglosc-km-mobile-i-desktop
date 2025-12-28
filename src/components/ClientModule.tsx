@@ -6,10 +6,13 @@ import {
   MapPin, FileText, ChevronRight, Loader2,
   Trash2, Edit3, ArrowLeft, History, Users, 
   ExternalLink, LayoutList, Grid, Receipt,
-  Map as MapIcon, Layers
+  Map as MapIcon, Layers, Image as ImageIcon,
+  ThumbsUp, ThumbsDown, CheckCircle2, Clock
 } from 'lucide-react';
 import MapBoardGoogle from './MapBoardGoogle';
 import MapBoardOSM from './MapBoardOSM';
+import PaymentStatusBadge from './PaymentStatusBadge';
+import { PaymentStatus } from '../types';
 
 interface ClientModuleProps {
   onSelectJob?: (job: Job) => void;
@@ -346,30 +349,85 @@ const ClientModule: React.FC<ClientModuleProps> = ({ onSelectJob, refreshTrigger
                 )}
 
                 {activeTab === 'jobs' && (
-                  <div className="divide-y divide-slate-50 animate-fade-in">
+                  <div className="divide-y divide-slate-100 animate-fade-in">
                     {selectedClient.jobs && selectedClient.jobs.length > 0 ? (
-                      selectedClient.jobs.map((job: any) => (
-                        <div 
-                          key={job.id} 
-                          onClick={() => onSelectJob?.(job)}
-                          className="py-4 hover:bg-slate-50 transition-colors flex justify-between items-center group cursor-pointer"
-                        >
-                          <div>
-                            <div className="font-bold text-slate-800 group-hover:text-orange-600 transition-colors">{job.data?.jobTitle || 'Bez tytułu'}</div>
-                            <div className="text-xs text-slate-400 flex items-center gap-2 mt-1">
-                              <span>{job.friendlyId}</span>
-                              <span>•</span>
-                              <span>{new Date(job.createdAt).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                      selectedClient.jobs.map((job: Job) => {
+                        const imgUrl = job.projectImages?.[0] || job.completionImages?.[0];
+                        const isDone = job.columnId === 'COMPLETED' || job.columnId === 'ARCHIVE' || job.status === 'COMPLETED';
+                        const isArchived = job.columnId === 'ARCHIVE' || job.status === 'ARCHIVED';
+                        const reviewRequestSent = !!job.reviewRequestSentAt;
+
+                        return (
+                          <div 
+                            key={job.id} 
+                            onClick={() => onSelectJob?.(job)}
+                            className="py-4 flex gap-4 hover:bg-slate-50 transition-colors group cursor-pointer"
+                          >
+                            {/* Thumbnail */}
+                            <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                              {imgUrl ? (
+                                <img src={imgUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <ImageIcon className="w-6 h-6 text-slate-300" />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Job Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <div className="font-bold text-slate-800 group-hover:text-orange-600 transition-colors truncate">
+                                  {job.data?.jobTitle || 'Bez tytułu'}
+                                </div>
+                                {isArchived && (
+                                  <span className="px-1.5 py-0.5 text-[9px] font-black bg-slate-200 text-slate-600 rounded uppercase">
+                                    Archiwum
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <span className="font-mono">{job.friendlyId}</span>
+                                <span>•</span>
+                                <span>{new Date(job.createdAt).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                {isDone ? (
+                                  <span className="flex items-center gap-1 text-green-600 font-bold">
+                                    <CheckCircle2 className="w-3 h-3" /> WYKONANE
+                                  </span>
+                                ) : (
+                                  <span className="flex items-center gap-1 text-orange-500 font-bold">
+                                    <Clock className="w-3 h-3" /> DO ZROBIENIA
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Statuses */}
+                            <div className="flex items-center gap-3">
+                              {/* Review Status */}
+                              <div 
+                                className={`p-1.5 rounded-lg transition-all ${
+                                  reviewRequestSent 
+                                    ? 'bg-green-50 text-green-600' 
+                                    : 'bg-red-50 text-red-600'
+                                }`}
+                                title={reviewRequestSent ? 'Prośba o opinię wysłana' : 'Prośba o opinię nie wysłana'}
+                              >
+                                {reviewRequestSent ? (
+                                  <ThumbsUp className="w-4 h-4 fill-current" />
+                                ) : (
+                                  <ThumbsDown className="w-4 h-4 fill-current" />
+                                )}
+                              </div>
+
+                              {/* Payment Status */}
+                              <PaymentStatusBadge status={job.paymentStatus || ('' as any)} size="sm" />
+                              
+                              <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-slate-500 transition-colors" />
                             </div>
                           </div>
-                          <div className="flex items-center gap-4">
-                            <span className="px-2 py-1 text-[10px] font-bold rounded bg-slate-100 text-slate-600 uppercase">
-                              {job.status}
-                            </span>
-                            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors" />
-                          </div>
-                        </div>
-                      ))
+                        );
+                      })
                     ) : (
                       <div className="py-12 text-center text-slate-400 italic">
                         Brak zleceń dla tego klienta
