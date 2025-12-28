@@ -322,6 +322,13 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
 
         googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
 
+        // Kliknięcie w mapę zamyka dymek
+        googleMapRef.current.addListener('click', () => {
+          setHoveredJob(null);
+          setPopupPos(null);
+          currentHoveredMarkerRef.current = null;
+        });
+
         // Fix Ctrl+Scroll behavior: Enable scrollwheel only when Ctrl is pressed
         const mapDiv = mapRef.current;
         const handleWheel = (e: WheelEvent) => {
@@ -377,6 +384,7 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
     if (!googleMapRef.current || !jobs || !isApiLoaded) return;
 
     const updateMarkers = async () => {
+      Logger.log('Updating markers for', jobs.length, 'jobs');
       // Wyczyść stare pinezki
       markersRef.current.forEach(marker => marker.setMap(null));
       markersRef.current = [];
@@ -384,7 +392,6 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
       const bounds = new window.google.maps.LatLngBounds();
       let hasValidMarkersCount = 0;
 
-      // Używamy Promise.all dla szybkości lub pętli for dla geocodera (throttle)
       for (const job of jobs) {
         let position: { lat: number; lng: number } | null = null;
 
@@ -393,12 +400,26 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
         } else if (job.data.address && job.data.address.length > 5) {
           const geocoder = new window.google.maps.Geocoder();
           try {
-            const result = await geocoder.geocode({ address: job.data.address });
-            if (result.results && result.results[0]) {
-              const location = result.results[0].geometry.location;
+            // Google Geocoder może zwracać Promise lub wymagać callbacku
+            // Dla pewności obsługujemy oba przypadki
+            const result: any = await new Promise((resolve) => {
+              geocoder.geocode({ address: job.data.address + ', Polska' }, (results: any, status: any) => {
+                if (status === 'OK' && results && results[0]) {
+                  resolve(results[0]);
+                } else {
+                  resolve(null);
+                }
+              });
+            });
+
+            if (result) {
+              const location = result.geometry.location;
               position = { lat: location.lat(), lng: location.lng() };
+              Logger.log('Geocoded address:', job.data.address, '->', position);
             }
-          } catch (e) {}
+          } catch (e) {
+            Logger.error('Geocoding error for', job.data.address, e);
+          }
         }
 
         if (position) {
@@ -421,31 +442,43 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
             icon: svgMarker
           });
 
-          const handleHover = () => {
+          const handleInteraction = () => {
+            Logger.log('Marker interaction for job:', job.id);
+            
+            // Jeśli to już ten sam job, nie rób nic (zapobiega pętli przy kliknięciu po hoverze)
+            if (currentHoveredMarkerRef.current === marker && hoveredJob?.id === job.id && popupPos) {
+              return;
+            }
+
             if (overlayRef.current && googleMapRef.current) {
               currentHoveredMarkerRef.current = marker;
               setHoveredJob(job);
               
               // Zgodnie z zasadami repo: ZAWSZE środkuj mapę na markerze
+              // Najpierw panTo
               googleMapRef.current.panTo(marker.getPosition());
               
               // I dodatkowo przesuń, żeby karta była widoczna (wyśrodkowana)
-              // Karta ma ok. 220px wysokości. Przesuwamy marker o 120px w dół.
-              googleMapRef.current.panBy(0, -120);
-              
-              // Od razu zaktualizuj pozycję (balon pójdzie za markerem dzięki bounds_changed)
-              updatePopupPos(marker);
+              // Karta ma ok. 220px wysokości. Przesuwamy o 120px w górę (czyli marker o 120px w dół na ekranie)
+              // Używamy setTimeout, aby panBy nastąpiło PO panTo (Google Maps API panTo jest asynchroniczne/animowane)
+              setTimeout(() => {
+                if (currentHoveredMarkerRef.current === marker) {
+                  googleMapRef.current.panBy(0, -120);
+                }
+              }, 100);
             }
           };
 
-          marker.addListener('mouseover', handleHover);
-          marker.addListener('click', handleHover);
+          marker.addListener('mouseover', handleInteraction);
+          marker.addListener('click', handleInteraction);
 
           markersRef.current.push(marker);
           bounds.extend(position);
           hasValidMarkersCount++;
         }
       }
+
+      Logger.log('Added', hasValidMarkersCount, 'markers to map');
 
       // Dopasuj mapę tylko przy pierwszym załadowaniu
       if (hasValidMarkersCount > 0 && googleMapRef.current && !googleMapRef.current.getBounds()) {

@@ -118,8 +118,13 @@ const MobileGoogleMapView: React.FC<MobileGoogleMapViewProps> = ({ jobs, onBack,
         setSelectedJob(job);
         
         // Zgodnie z zasadami repo: ZAWSZE środkuj mapę na markerze
+        // Na mobile przesuwamy marker nieco do góry (panBy(0, 150)), 
+        // bo na dole wyskakuje karta o wysokości ok. 300px.
         if (googleMapRef.current && position) {
           googleMapRef.current.panTo(position);
+          setTimeout(() => {
+            googleMapRef.current.panBy(0, 150); // Przesuwa marker do góry
+          }, 100);
         }
       });
 
