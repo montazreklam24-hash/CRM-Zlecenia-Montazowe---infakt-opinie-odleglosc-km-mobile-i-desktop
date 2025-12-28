@@ -1,7 +1,8 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import Login from './components/Login';
-import Dashboard from './components/Dashboard';
+import DashboardLegacy from './components/DashboardLegacy';
+import DashboardOmega from './components/DashboardOmega';
 import InputForm from './components/InputForm';
 import JobCard from './components/JobCard';
 import { SimpleJobCard } from './components/SimpleJobCard';
@@ -140,6 +141,21 @@ const App: React.FC = () => {
   }, [state.user, state.activeModal]);
 
   const [dashboardRefreshTrigger, setDashboardRefreshTrigger] = useState(0);
+  
+  // Dashboard Variant logic (Legacy vs Omega)
+  const [dashVariant, setDashVariant] = useState<'legacy' | 'omega'>(() => {
+    const saved = localStorage.getItem('crm_dashboard_variant');
+    const urlParams = new URLSearchParams(window.location.search);
+    const fromUrl = urlParams.get('dash');
+    
+    if (fromUrl === 'omega') return 'omega';
+    if (fromUrl === 'legacy') return 'legacy';
+    return (saved as 'legacy' | 'omega') || 'legacy';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm_dashboard_variant', dashVariant);
+  }, [dashVariant]);
   
   // Mobile detection
   const { isMobile, isTablet, isTouchDevice } = useDeviceType();
@@ -333,16 +349,35 @@ const App: React.FC = () => {
   return (
     <>
       <Routes>
-        <Route element={<Layout onLogout={handleLogout} onLogoClick={handleLogoClick} user={state.user || undefined} />}>
+        <Route element={
+          <Layout 
+            onLogout={handleLogout} 
+            onLogoClick={handleLogoClick} 
+            user={state.user || undefined} 
+            dashVariant={dashVariant}
+            onDashVariantChange={setDashVariant}
+          />
+        }>
           <Route path="/" element={
-            <Dashboard 
-              role={userRole} 
-              onSelectJob={handleSelectJob}
-              onCreateNew={handleStartCreate}
-              onCreateNewSimple={handleStartCreateSimple}
-              initialTab={state.returnToArchive ? 'ARCHIVED' : 'ACTIVE'}
-              refreshTrigger={dashboardRefreshTrigger}
-            />
+            dashVariant === 'omega' ? (
+              <DashboardOmega 
+                role={userRole} 
+                onSelectJob={handleSelectJob}
+                onCreateNew={handleStartCreate}
+                onCreateNewSimple={handleStartCreateSimple}
+                initialTab={state.returnToArchive ? 'ARCHIVED' : 'ACTIVE'}
+                refreshTrigger={dashboardRefreshTrigger}
+              />
+            ) : (
+              <DashboardLegacy 
+                role={userRole} 
+                onSelectJob={handleSelectJob}
+                onCreateNew={handleStartCreate}
+                onCreateNewSimple={handleStartCreateSimple}
+                initialTab={state.returnToArchive ? 'ARCHIVED' : 'ACTIVE'}
+                refreshTrigger={dashboardRefreshTrigger}
+              />
+            )
           } />
           <Route path="/map" element={<MapPage onSelectJob={handleSelectJob} />} />
           <Route path="/invoices" element={<InvoicingPage />} />

@@ -950,7 +950,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
   );
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, onCreateNewSimple, initialTab, refreshTrigger }) => {
+const DashboardLegacy: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, onCreateNewSimple, initialTab, refreshTrigger }) => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   // Zapamiętuj aktywną zakładkę w localStorage i przywracaj przy odświeżeniu
@@ -3166,4 +3166,4 @@ const Dashboard: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateNew, o
   );
 };
 
-export default Dashboard;
+export default DashboardLegacy;

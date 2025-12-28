@@ -10,6 +10,8 @@ interface LayoutProps {
   onLogout?: () => void;
   onLogoClick?: () => void;
   user?: User;
+  dashVariant?: 'legacy' | 'omega';
+  onDashVariantChange?: (v: 'legacy' | 'omega') => void;
 }
 
 const ROLE_NAMES: Record<UserRole, string> = {
@@ -18,7 +20,13 @@ const ROLE_NAMES: Record<UserRole, string> = {
   [UserRole.PRINTER]: 'Drukarz'
 };
 
-const Layout: React.FC<LayoutProps> = ({ onLogout, onLogoClick, user }) => {
+const Layout: React.FC<LayoutProps> = ({ 
+  onLogout, 
+  onLogoClick, 
+  user,
+  dashVariant = 'legacy',
+  onDashVariantChange 
+}) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const { isMobile } = useDeviceType();
@@ -98,6 +106,36 @@ const Layout: React.FC<LayoutProps> = ({ onLogout, onLogoClick, user }) => {
         
         {/* Right: View Toggles + User */}
         <div className="flex items-center gap-3">
+          {/* Dashboard Variant Toggle */}
+          <div className="hidden md:flex rounded-lg p-1 border border-gray-700 bg-gray-900 mr-2">
+            <button
+              onClick={() => onDashVariantChange?.('legacy')}
+              className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
+                dashVariant === 'legacy' ? 'shadow-sm' : 'hover:opacity-80'
+              }`}
+              style={{
+                background: dashVariant === 'legacy' ? '#64748b' : 'transparent',
+                color: dashVariant === 'legacy' ? '#fff' : '#9ca3af'
+              }}
+              title="Klasyczny Dashboard"
+            >
+              Legacy
+            </button>
+            <button
+              onClick={() => onDashVariantChange?.('omega')}
+              className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
+                dashVariant === 'omega' ? 'shadow-sm' : 'hover:opacity-80'
+              }`}
+              style={{
+                background: dashVariant === 'omega' ? '#8b5cf6' : 'transparent',
+                color: dashVariant === 'omega' ? '#fff' : '#9ca3af'
+              }}
+              title="Nowy Dashboard Omega"
+            >
+              Omega
+            </button>
+          </div>
+
           {/* PC/Mobile Toggle */}
           <div className="hidden md:flex rounded-lg p-1 border border-gray-700 bg-gray-900">
             <button
