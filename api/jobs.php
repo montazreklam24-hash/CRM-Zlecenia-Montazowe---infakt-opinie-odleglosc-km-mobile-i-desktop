@@ -182,6 +182,23 @@ function createJob() {
         $clientId = isset($input['clientId']) ? $input['clientId'] : null;
         $nip = isset($data['nip']) ? preg_replace('/[^0-9]/', '', $data['nip']) : null;
         $email = isset($data['email']) ? trim($data['email']) : null;
+        $phone = isset($data['phoneNumber']) ? preg_replace('/[^0-9]/', '', $data['phoneNumber']) : (isset($data['phone']) ? preg_replace('/[^0-9]/', '', $data['phone']) : null);
+        
+        // Zabezpieczenie: nie szukaj po mailu firmowym ani telefonie firmowym
+        $isCompanyEmail = false;
+        if ($email) {
+            $domain = substr(strrchr($email, "@"), 1);
+            if (in_array($domain, defined('COMPANY_DOMAINS') ? COMPANY_DOMAINS : []) || (defined('SMTP_USERNAME') && $email === SMTP_USERNAME)) {
+                $isCompanyEmail = true;
+            }
+        }
+
+        $isCompanyPhone = false;
+        if ($phone && defined('COMPANY_PHONES')) {
+            if (in_array($phone, COMPANY_PHONES)) {
+                $isCompanyPhone = true;
+            }
+        }
         
         if (!$clientId && $nip && strlen($nip) === 10) {
             $stmt = $pdo->prepare('SELECT id FROM clients WHERE nip = ?');
@@ -190,29 +207,76 @@ function createJob() {
             if ($client) $clientId = $client['id'];
         }
         
-        if (!$clientId && $email) {
+        if (!$clientId && $email && !$isCompanyEmail) {
             $stmt = $pdo->prepare('SELECT id FROM clients WHERE email = ?');
             $stmt->execute([$email]);
             $client = $stmt->fetch();
             if ($client) $clientId = $client['id'];
         }
 
-        // Jeśli nadal brak clientId, a mamy dane - utwórz klienta
+        if (!$clientId && $phone && !$isCompanyPhone) {
+            $stmt = $pdo->prepare('SELECT id FROM clients WHERE phone = ?');
+            $stmt->execute([$phone]);
+            $client = $stmt->fetch();
+            if ($client) $clientId = $client['id'];
+        }
+
+        // Jeśli nadal brak clientId, a mamy dane - utwórz klienta (tylko jeśli to nie dane firmowe)
         if (!$clientId && (isset($data['clientName']) || isset($data['companyName']))) {
             try {
                 $cName = isset($data['clientName']) ? $data['clientName'] : $data['companyName'];
-                $stmt = $pdo->prepare('INSERT INTO clients (company_name, email, phone, nip, created_by) VALUES (?, ?, ?, ?, ?)');
-                $stmt->execute([
-                    $cName,
-                    $email,
-                    isset($data['phoneNumber']) ? $data['phoneNumber'] : (isset($data['phone']) ? $data['phone'] : null),
-                    $nip,
-                    $user['id']
-                ]);
-                $clientId = $pdo->lastInsertId();
+                
+                // Nie twórz klienta jeśli nazwa to tylko "Montaż Reklam 24" itp.
+                $isCompanyName = false;
+                if (defined('SMTP_FROM_NAME') && stripos($cName, SMTP_FROM_NAME) !== false) {
+                    $isCompanyName = true;
+                }
+
+                if (!$isCompanyName) {
+                    $stmt = $pdo->prepare('INSERT INTO clients (company_name, name, email, phone, nip, created_by) VALUES (?, ?, ?, ?, ?, ?)');
+                    $stmt->execute([
+                        $cName,
+                        $cName,
+                        $isCompanyEmail ? null : $email,
+                        $isCompanyPhone ? null : (isset($data['phoneNumber']) ? $data['phoneNumber'] : (isset($data['phone']) ? $data['phone'] : null)),
+                        $nip,
+                        $user['id']
+                    ]);
+                    $clientId = $pdo->lastInsertId();
+                }
             } catch (Exception $e) {
                 // Ignoruj błąd tworzenia klienta, nie przerywaj tworzenia zlecenia
                 error_log("Failed to auto-create client: " . $e->getMessage());
+            }
+        } elseif ($clientId) {
+            // Jeśli mamy clientId (znaleziony po NIP/Email), ale klient nie ma nazwy - uzupełnij ją
+            try {
+                $stmt = $pdo->prepare("SELECT company_name, name FROM clients WHERE id = ?");
+                $stmt->execute([$clientId]);
+                $existingClient = $stmt->fetch();
+                
+                if ($existingClient && (empty($existingClient['company_name']) || empty($existingClient['name']))) {
+                    $cName = isset($data['clientName']) ? $data['clientName'] : (isset($data['companyName']) ? $data['companyName'] : '');
+                    if (!empty($cName)) {
+                        $updateFields = [];
+                        $params = [];
+                        if (empty($existingClient['company_name'])) {
+                            $updateFields[] = "company_name = ?";
+                            $params[] = $cName;
+                        }
+                        if (empty($existingClient['name'])) {
+                            $updateFields[] = "name = ?";
+                            $params[] = $cName;
+                        }
+                        if (!empty($updateFields)) {
+                            $params[] = $clientId;
+                            $stmt = $pdo->prepare("UPDATE clients SET " . implode(', ', $updateFields) . " WHERE id = ?");
+                            $stmt->execute($params);
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                error_log("Failed to update missing client name: " . $e->getMessage());
             }
         }
 
