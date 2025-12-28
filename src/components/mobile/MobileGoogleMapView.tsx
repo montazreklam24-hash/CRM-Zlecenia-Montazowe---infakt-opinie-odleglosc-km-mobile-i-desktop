@@ -113,15 +113,14 @@ const MobileGoogleMapView: React.FC<MobileGoogleMapViewProps> = ({ jobs, onBack,
 
       // Obsługa kliknięcia w marker
       marker.addListener('click', (e: any) => {
-        // Stop propagation nie jest potrzebne w Google Maps API w ten sposób co w Leaflet,
-        // bo event markera jest osobny od eventu mapy (chyba że bubbles).
-        // Ale dla pewności:
         if (e && e.stop) e.stop(); 
         
         setSelectedJob(job);
         
-        // Opcjonalnie: Centruj mapę na markerze (lekko przesunięte w górę żeby karta nie zasłaniała)
-        // googleMapRef.current.panTo(position);
+        // Zgodnie z zasadami repo: ZAWSZE środkuj mapę na markerze
+        if (googleMapRef.current && position) {
+          googleMapRef.current.panTo(position);
+        }
       });
 
       markersRef.current.push(marker);

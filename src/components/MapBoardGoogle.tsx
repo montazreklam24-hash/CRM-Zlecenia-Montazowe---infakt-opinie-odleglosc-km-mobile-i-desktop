@@ -91,7 +91,6 @@ const SmartPopup = ({ job, position, onClose, onSelect, mapContainer }: { job: J
         width: '180px',
         animation: 'fadeIn 0.2s ease-out'
       }}
-      onMouseLeave={onClose}
     >
       {/* Zdjęcie */}
       <div className="p-2 pb-0">
@@ -230,14 +229,14 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
     const zoomListener = googleMapRef.current.addListener('zoom_changed', handleMapChange);
 
     return () => {
-      if (window.google && window.google.maps) {
+      if (window.google && window.google.maps && googleMapRef.current) {
         window.google.maps.event.removeListener(idleListener);
         window.google.maps.event.removeListener(boundsListener);
         window.google.maps.event.removeListener(zoomListener);
         cancelAnimationFrame(rafId);
       }
     };
-  }, [isApiLoaded, hoveredJob]);
+  }, [isApiLoaded]);
 
   // Sprawdzaj dostępność API
   useEffect(() => {
@@ -377,112 +376,84 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
   useEffect(() => {
     if (!googleMapRef.current || !jobs || !isApiLoaded) return;
 
-    // Wyczyść stare pinezki
-    markersRef.current.forEach(marker => marker.setMap(null));
-    markersRef.current = [];
+    const updateMarkers = async () => {
+      // Wyczyść stare pinezki
+      markersRef.current.forEach(marker => marker.setMap(null));
+      markersRef.current = [];
 
-    const bounds = new window.google.maps.LatLngBounds();
-    let hasValidMarkers = false;
+      const bounds = new window.google.maps.LatLngBounds();
+      let hasValidMarkersCount = 0;
 
-    jobs.forEach(async (job) => {
-      let position: { lat: number; lng: number } | null = null;
+      // Używamy Promise.all dla szybkości lub pętli for dla geocodera (throttle)
+      for (const job of jobs) {
+        let position: { lat: number; lng: number } | null = null;
 
-      if (job.data.coordinates && job.data.coordinates.lat && job.data.coordinates.lng) {
-        position = job.data.coordinates;
-      } else if (job.data.address && job.data.address.length > 5) {
-        const geocoder = new window.google.maps.Geocoder();
-        try {
-          const result = await geocoder.geocode({ address: job.data.address });
-          if (result.results && result.results[0]) {
-            const location = result.results[0].geometry.location;
-            position = { lat: location.lat(), lng: location.lng() };
-          }
-        } catch (e) {}
-      }
-
-      if (position) {
-        const color = COLUMN_COLORS[job.columnId || 'PREPARE'] || '#475569';
-        
-        const svgMarker = {
-          path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
-          fillColor: color,
-          fillOpacity: 1,
-          strokeWeight: 1.5,
-          strokeColor: "#FFFFFF",
-          rotation: 0,
-          scale: 1.8,
-          anchor: new window.google.maps.Point(12, 24),
-        };
-
-        const marker = new window.google.maps.Marker({
-          position: position,
-          map: googleMapRef.current,
-          icon: svgMarker,
-          // title: job.data.jobTitle || job.friendlyId, // Usunięto, aby uniknąć natywnego tooltipu
-          // animation: window.google.maps.Animation.DROP
-        });
-
-        const handleHover = () => {
-          if (overlayRef.current && googleMapRef.current) {
-            const markerPos = marker.getPosition();
-            const projection = overlayRef.current.getProjection();
-            
-            if (projection) {
-              const pixel = projection.fromLatLngToContainerPixel(markerPos);
-              const mapDiv = mapRef.current;
-              
-              if (mapDiv) {
-                Logger.log('Hover on job:', job.id, { 
-                  pixel, 
-                  jobId: job.id
-                });
-
-                currentHoveredMarkerRef.current = marker;
-                setHoveredJob(job);
-                
-                // Zgodnie z zasadami repo: ZAWSZE środkuj mapę tak, aby KARTA była na środku
-                setPopupPos(null);
-                
-                // 1. Wyśrodkuj na markerze
-                googleMapRef.current.panTo(marker.getPosition());
-                
-                // 2. Dodaj offset, aby wyśrodkować całą kartę (ok. 220px wysokości)
-                // Jeśli karta jest pod markerem (brak miejsca u góry), przesuwamy mapę w dół.
-                const margin = 20;
-                const popupHeight = 220;
-                const popupPadding = 15;
-                const spaceAbove = pixel.y - margin;
-                const totalPopupH = popupHeight + popupPadding;
-                
-                const offsetY = spaceAbove < totalPopupH ? 110 : -110;
-                googleMapRef.current.panBy(0, offsetY);
-                
-                // Pozycja dymka zostanie zaktualizowana po zakończeniu ruchu (idle)
-                window.google.maps.event.addListenerOnce(googleMapRef.current, 'idle', () => {
-                  if (currentHoveredMarkerRef.current === marker) {
-                    updatePopupPos(marker);
-                  }
-                });
-              }
+        if (job.data.coordinates && job.data.coordinates.lat && job.data.coordinates.lng) {
+          position = job.data.coordinates;
+        } else if (job.data.address && job.data.address.length > 5) {
+          const geocoder = new window.google.maps.Geocoder();
+          try {
+            const result = await geocoder.geocode({ address: job.data.address });
+            if (result.results && result.results[0]) {
+              const location = result.results[0].geometry.location;
+              position = { lat: location.lat(), lng: location.lng() };
             }
-          }
-        };
+          } catch (e) {}
+        }
 
-        marker.addListener('mouseover', handleHover);
-        marker.addListener('click', handleHover); // Dla mobile
+        if (position) {
+          const color = COLUMN_COLORS[job.columnId || 'PREPARE'] || '#475569';
+          
+          const svgMarker = {
+            path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
+            fillColor: color,
+            fillOpacity: 1,
+            strokeWeight: 1.5,
+            strokeColor: "#FFFFFF",
+            rotation: 0,
+            scale: 1.8,
+            anchor: new window.google.maps.Point(12, 24),
+          };
 
-        markersRef.current.push(marker);
-        bounds.extend(position);
-        hasValidMarkers = true;
+          const marker = new window.google.maps.Marker({
+            position: position,
+            map: googleMapRef.current,
+            icon: svgMarker
+          });
+
+          const handleHover = () => {
+            if (overlayRef.current && googleMapRef.current) {
+              currentHoveredMarkerRef.current = marker;
+              setHoveredJob(job);
+              
+              // Zgodnie z zasadami repo: ZAWSZE środkuj mapę na markerze
+              googleMapRef.current.panTo(marker.getPosition());
+              
+              // I dodatkowo przesuń, żeby karta była widoczna (wyśrodkowana)
+              // Karta ma ok. 220px wysokości. Przesuwamy marker o 120px w dół.
+              googleMapRef.current.panBy(0, -120);
+              
+              // Od razu zaktualizuj pozycję (balon pójdzie za markerem dzięki bounds_changed)
+              updatePopupPos(marker);
+            }
+          };
+
+          marker.addListener('mouseover', handleHover);
+          marker.addListener('click', handleHover);
+
+          markersRef.current.push(marker);
+          bounds.extend(position);
+          hasValidMarkersCount++;
+        }
       }
-    });
 
-    // Dopasuj mapę tylko przy pierwszym załadowaniu lub dużej zmianie (opcjonalne)
-    // Tu zostawiamy logikę "fitBounds" tylko jeśli to pierwsze ładowanie lub użytkownik wymusi
-    if (hasValidMarkers && googleMapRef.current && markersRef.current.length > 0 && !googleMapRef.current.getBounds()) {
-       googleMapRef.current.fitBounds(bounds);
-    }
+      // Dopasuj mapę tylko przy pierwszym załadowaniu
+      if (hasValidMarkersCount > 0 && googleMapRef.current && !googleMapRef.current.getBounds()) {
+        googleMapRef.current.fitBounds(bounds);
+      }
+    };
 
+    updateMarkers();
   }, [jobs, isApiLoaded]);
 
   return (
