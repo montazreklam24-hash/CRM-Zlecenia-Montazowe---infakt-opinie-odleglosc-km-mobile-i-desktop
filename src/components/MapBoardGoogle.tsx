@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Job, JobColumnId } from '../types';
 import { getJobThumbnailUrl } from '../utils/imageUtils';
 import { Locate, Loader2 } from 'lucide-react';
@@ -26,7 +27,7 @@ declare global {
   }
 }
 
-// Komponent dymka z inteligentnym pozycjonowaniem
+// Komponent dymka z inteligentnym pozycjonowaniem i Portalem (aby uniknąć ucinania)
 const SmartPopup = ({ job, position, onClose, onSelect, mapContainer }: { job: Job, position: { x: number, y: number }, onClose: () => void, onSelect: () => void, mapContainer: HTMLDivElement | null }) => {
   const popupRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
@@ -35,106 +36,41 @@ const SmartPopup = ({ job, position, onClose, onSelect, mapContainer }: { job: J
   useLayoutEffect(() => {
     if (!popupRef.current || !mapContainer) return;
     
-    const popupRect = popupRef.current.getBoundingClientRect();
     const mapRect = mapContainer.getBoundingClientRect();
     const MARKER_HEIGHT = 40;
-    const PADDING = 15; // Większy padding wewnętrzny kontenera
-    const VIEWPORT_PADDING = 20; // Większy padding od krawędzi viewport
+    const PADDING = 10;
+    const VIEWPORT_PADDING = 20;
 
-    // Jeśli popup nie ma jeszcze wymiarów, użyj domyślnych
-    const popupWidth = popupRef.current.offsetWidth || 180;
-    const popupHeight = popupRef.current.offsetHeight || 220;
+    const popupWidth = 180; // Stała szerokość
+    const popupHeight = 220; // Przybliżona wysokość
 
-    // Przelicz pozycję markera na współrzędne względem kontenera mapy
-    const markerX = position.x;
-    const markerY = position.y;
+    // Współrzędne markera względem viewport
+    const markerViewportX = mapRect.left + position.x;
+    const markerViewportY = mapRect.top + position.y;
 
     // Viewport dimensions
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
 
-    // Pozycja względem kontenera mapy (absolute positioning) - wyśrodkowany nad markerem
-    let top = markerY - popupHeight - PADDING; // Domyślnie nad markerem
-    let left = markerX - (popupWidth / 2); // Wyśrodkowany względem markera
+    // Domyślnie nad markerem
+    let top = markerViewportY - popupHeight - PADDING;
+    let left = markerViewportX - (popupWidth / 2);
     let newPlacement: 'top' | 'bottom' = 'top';
 
-    // Oblicz pozycje absolutne względem viewport
-    let absoluteLeft = mapRect.left + left;
-    let absoluteTop = mapRect.top + top;
-    let absoluteRight = absoluteLeft + popupWidth;
-    let absoluteBottom = absoluteTop + popupHeight;
-
-    // Sprawdź czy mieści się u góry kontenera i viewport
-    if (top < PADDING || absoluteTop < VIEWPORT_PADDING) {
-      top = markerY + MARKER_HEIGHT + PADDING; // Pokaż pod markerem
+    // Jeśli nie mieści się u góry, daj pod markerem
+    if (top < VIEWPORT_PADDING) {
+      top = markerViewportY + MARKER_HEIGHT + PADDING;
       newPlacement = 'bottom';
-      absoluteTop = mapRect.top + top;
-      absoluteBottom = absoluteTop + popupHeight;
     }
 
-    // Sprawdź czy mieści się z lewej strony (zarówno kontener jak i viewport)
-    const minLeft = Math.max(PADDING, VIEWPORT_PADDING - mapRect.left);
-    if (left < minLeft || absoluteLeft < VIEWPORT_PADDING) {
-      left = minLeft;
-      absoluteLeft = mapRect.left + left;
-      absoluteRight = absoluteLeft + popupWidth;
-    }
+    // Korekta pozioma (żeby nie wychodziło poza ekran)
+    if (left < VIEWPORT_PADDING) left = VIEWPORT_PADDING;
+    if (left + popupWidth > vw - VIEWPORT_PADDING) left = vw - popupWidth - VIEWPORT_PADDING;
 
-    // Sprawdź czy mieści się z prawej strony (zarówno kontener jak i viewport)
-    const maxLeft = Math.min(
-      mapRect.width - popupWidth - PADDING,
-      viewportWidth - mapRect.left - popupWidth - VIEWPORT_PADDING
-    );
-    if (left + popupWidth > mapRect.width - PADDING || absoluteRight > viewportWidth - VIEWPORT_PADDING) {
-      left = maxLeft;
-      absoluteLeft = mapRect.left + left;
-      absoluteRight = absoluteLeft + popupWidth;
-    }
-
-    // Jeśli nadal wychodzi poza viewport z prawej, przesuń bardziej w lewo
-    if (absoluteRight > viewportWidth - VIEWPORT_PADDING) {
-      left = Math.max(minLeft, viewportWidth - mapRect.left - popupWidth - VIEWPORT_PADDING);
-      absoluteLeft = mapRect.left + left;
-      absoluteRight = absoluteLeft + popupWidth;
-    }
-
-    // Jeśli nadal wychodzi poza viewport z lewej, przesuń bardziej w prawo
-    if (absoluteLeft < VIEWPORT_PADDING) {
-      left = Math.min(maxLeft, VIEWPORT_PADDING - mapRect.left);
-      absoluteLeft = mapRect.left + left;
-      absoluteRight = absoluteLeft + popupWidth;
-    }
-
-    // Jeśli wychodzi poza viewport z dołu, przesuń wyżej
-    if (absoluteBottom > viewportHeight - VIEWPORT_PADDING && newPlacement === 'bottom') {
-      top = markerY - popupHeight - PADDING;
+    // Korekta pionowa (żeby nie wychodziło poza ekran na dole)
+    if (top + popupHeight > vh - VIEWPORT_PADDING && newPlacement === 'bottom') {
+      top = markerViewportY - popupHeight - PADDING;
       newPlacement = 'top';
-      absoluteTop = mapRect.top + top;
-      absoluteBottom = absoluteTop + popupHeight;
-    }
-
-    // Jeśli wychodzi poza viewport z góry, przesuń niżej
-    if (absoluteTop < VIEWPORT_PADDING && newPlacement === 'top') {
-      top = markerY + MARKER_HEIGHT + PADDING;
-      newPlacement = 'bottom';
-      absoluteTop = mapRect.top + top;
-      absoluteBottom = absoluteTop + popupHeight;
-    }
-
-    // Ostateczne sprawdzenie - jeśli marker jest zbyt blisko krawędzi, przesuń popup bardziej na środek
-    const markerAbsoluteX = mapRect.left + markerX;
-    const markerAbsoluteY = mapRect.top + markerY;
-    
-    // Jeśli marker jest blisko lewej krawędzi, przesuń popup bardziej w prawo
-    if (markerAbsoluteX < viewportWidth * 0.3 && absoluteLeft < VIEWPORT_PADDING + 50) {
-      left = Math.max(minLeft, markerX - popupWidth * 0.3);
-      absoluteLeft = mapRect.left + left;
-    }
-    
-    // Jeśli marker jest blisko prawej krawędzi, przesuń popup bardziej w lewo
-    if (markerAbsoluteX > viewportWidth * 0.7 && absoluteRight > viewportWidth - VIEWPORT_PADDING - 50) {
-      left = Math.min(maxLeft, markerX - popupWidth * 0.7);
-      absoluteLeft = mapRect.left + left;
     }
 
     setCoords({ top, left });
@@ -145,10 +81,10 @@ const SmartPopup = ({ job, position, onClose, onSelect, mapContainer }: { job: J
   const colName = COLUMN_NAMES[job.columnId || 'PREPARE'];
   const imgUrl = getJobThumbnailUrl(job.projectImages?.[0]);
 
-  return (
+  return createPortal(
     <div 
       ref={popupRef}
-      className="absolute bg-white rounded-lg shadow-xl border border-slate-200 z-50 pointer-events-auto flex flex-col"
+      className="fixed bg-white rounded-lg shadow-2xl border border-slate-200 z-[9999] pointer-events-auto flex flex-col overflow-visible"
       style={{ 
         top: coords.top, 
         left: coords.left,
@@ -218,7 +154,7 @@ const SmartPopup = ({ job, position, onClose, onSelect, mapContainer }: { job: J
         </div>
 
         <button 
-          onClick={onSelect}
+          onClick={(e) => { e.stopPropagation(); onSelect(); }}
           className="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold py-1.5 rounded border border-slate-200 transition-colors"
         >
           Otwórz kartę
@@ -232,17 +168,18 @@ const SmartPopup = ({ job, position, onClose, onSelect, mapContainer }: { job: J
           left: '50%',
           marginLeft: '-6px',
           [placement === 'top' ? 'bottom' : 'top']: '-5px',
-          [placement === 'top' ? 'borderTop' : 'borderBottom']: 'none',
-          [placement === 'top' ? 'borderLeft' : 'borderRight']: 'none',
           backgroundColor: 'white',
           borderBottom: placement === 'top' ? '1px solid #e2e8f0' : 'none',
           borderRight: placement === 'top' ? '1px solid #e2e8f0' : 'none',
           borderTop: placement === 'bottom' ? '1px solid #e2e8f0' : 'none',
           borderLeft: placement === 'bottom' ? '1px solid #e2e8f0' : 'none',
-          [placement === 'top' ? 'boxShadow' : 'boxShadow']: '2px 2px 2px rgba(0, 0, 0, 0.05)'
+          zIndex: -1
         }}
       />
-    </div>
+    </div>,
+    document.body
+  );
+};
   );
 };
 

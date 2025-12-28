@@ -42,7 +42,7 @@ const WARSAW_COORDS = { lat: 52.2297, lng: 21.0122 };
 const MAX_DISTANCE_KM = 100;
 
 // Domyślne pozycje dla montażu reklam
-const PRESET_ITEMS: Partial<InvoiceItem>[] = [
+const DEFAULT_PRESET_ITEMS: Partial<InvoiceItem>[] = [
   { name: 'Montaż kasetonu reklamowego', unit: 'szt.', unitPriceNet: 500, vatRate: 23 },
   { name: 'Montaż szyldu/tablicy', unit: 'szt.', unitPriceNet: 300, vatRate: 23 },
   { name: 'Montaż banneru', unit: 'm²', unitPriceNet: 50, vatRate: 23 },
@@ -90,6 +90,25 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
   const [sendEmail, setSendEmail] = useState(true);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [distanceWarning, setDistanceWarning] = useState<string | null>(null);
+  const [customPresets, setCustomPresets] = useState<Partial<InvoiceItem>[]>(() => {
+    const saved = localStorage.getItem('crm_invoice_presets');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const allPresets = [...DEFAULT_PRESET_ITEMS, ...customPresets];
+
+  const handleSaveAsPreset = (item: InvoiceItem) => {
+    const newPreset: Partial<InvoiceItem> = {
+      name: item.name,
+      unit: item.unit,
+      unitPriceNet: item.unitPriceNet,
+      vatRate: item.vatRate
+    };
+    const updated = [...customPresets, newPreset];
+    setCustomPresets(updated);
+    localStorage.setItem('crm_invoice_presets', JSON.stringify(updated));
+    alert('Pozycja zapisana jako stały element');
+  };
   
   // Dane do FAKTURY (adres siedziby firmy - z GUS)
   // Mapuj billing na InvoiceClientData jeśli jest przekazany
@@ -169,10 +188,10 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
   const { totalNet, totalGross: calculatedGross, totalVat } = calculateTotals();
 
   // Pobierz dane firmy po NIP (adres SIEDZIBY do faktury)
-  const handleNipLookup = async () => {
-    const nip = clientData.nip?.replace(/[^0-9]/g, '');
+  const handleNipLookup = async (forcedNip?: string) => {
+    const nip = (forcedNip || clientData.nip)?.replace(/[^0-9]/g, '');
     if (!nip || nip.length !== 10) {
-      setLookupError('NIP musi mieć 10 cyfr');
+      if (forcedNip) setLookupError('NIP musi mieć 10 cyfr');
       return;
     }
 
@@ -205,29 +224,66 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
         
         // Aktualizuj stan - wszystkie dane firmowe z GUS, zachowaj tylko email i telefon
         setClientData(prev => ({
+          ...prev,
           ...gusData,
-          email: prev.email,
-          phone: prev.phone,
         }));
         
         // Powiadom rodzica o zmianie danych (do zapisania w zleceniu)
         if (onClientDataChange) {
           onClientDataChange({
+            ...clientData,
             ...gusData,
-            email: clientData.email,
-            phone: clientData.phone,
           });
         }
         
         // Pokaż info o źródle danych
         console.log(`✅ Dane pobrane z: ${source}`);
       } else {
-        setLookupError(result.error || 'Nie znaleziono firmy o podanym NIP');
+        if (forcedNip) setLookupError(result.error || 'Nie znaleziono firmy o podanym NIP');
       }
     } catch (error: any) {
-      setLookupError(error.message || 'Błąd podczas wyszukiwania');
+      if (forcedNip) setLookupError(error.message || 'Błąd podczas wyszukiwania');
     } finally {
       setIsLookingUp(false);
+    }
+  };
+
+  // Auto-lookup po wpisaniu 10 cyfr
+  useEffect(() => {
+    const cleanNip = clientData.nip?.replace(/[^0-9]/g, '') || '';
+    if (cleanNip.length === 10) {
+      const timer = setTimeout(() => {
+        handleNipLookup(cleanNip);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [clientData.nip]);
+
+  // Funkcja kopiowania proformy na fakturę
+  const handleCopyFromProforma = async (proforma: Invoice) => {
+    setIsLoading(true);
+    try {
+      const result = await invoiceService.getInvoice(proforma.infaktId || proforma.id);
+      if (result.success && result.invoice) {
+        const infaktInv = result.invoice;
+        // Mapuj pozycje z inFakt (uwaga: inFakt zwraca ceny w groszach lub netto/brutto zależnie od pola)
+        if (infaktInv.services && Array.isArray(infaktInv.services)) {
+          const newItems: InvoiceItem[] = infaktInv.services.map((s: any) => ({
+            name: s.name,
+            quantity: parseFloat(s.quantity),
+            unit: s.unit || 'szt.',
+            unitPriceNet: parseFloat(s.unit_net_price) / 100, // inFakt API v3 zwraca w groszach
+            vatRate: parseInt(s.tax_symbol) || 23
+          }));
+          setItems(newItems);
+          setInvoiceType('invoice');
+          alert('Pozycje z proformy zostały skopiowane. Możesz je teraz edytować i wystawić Fakturę VAT.');
+        }
+      }
+    } catch (error) {
+      alert('Błąd pobierania danych proformy');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -517,6 +573,15 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
                         <Send className="w-4 h-4" />
                       </button>
                     )}
+                    {inv.type === 'proforma' && (
+                      <button 
+                        className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                        title="Wystaw FV na podstawie tej proformy"
+                        onClick={() => handleCopyFromProforma(inv)}
+                      >
+                        <Receipt className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -675,7 +740,7 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
                     {/* Dropdown z presetami */}
                     {showPresets && (
                       <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2 space-y-1 max-h-72 overflow-y-auto">
-                        {PRESET_ITEMS.map((preset, i) => (
+                        {allPresets.map((preset, i) => (
                           <button
                             key={i}
                             onClick={() => addItem(preset)}
@@ -702,7 +767,7 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
                 {/* Lista pozycji */}
                 {items.length === 0 ? (
                   <div className="text-center py-6 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-xl">
-                    Kliknij "Dodaj pozycję" aby rozpocząć
+                    Kliknij "Dodaj pozycję" lub "+ Pusta pozycja" aby rozpocząć
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -776,16 +841,33 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
                             </select>
                           </div>
                         </div>
-                        <div className="text-right text-sm">
-                          <span className="text-slate-400">Wartość: </span>
-                          <span className="font-bold text-slate-700">
-                            {(item.quantity * item.unitPriceNet * (1 + item.vatRate / 100)).toFixed(2)} zł brutto
-                          </span>
+                        <div className="text-right text-sm flex justify-between items-center">
+                          <button
+                            onClick={() => handleSaveAsPreset(item)}
+                            className="text-[10px] text-indigo-500 hover:text-indigo-700 font-bold uppercase tracking-wider"
+                            title="Zapisz tę pozycję na stałe do listy"
+                          >
+                            💾 Zapisz jako stałą
+                          </button>
+                          <div>
+                            <span className="text-slate-400">Wartość: </span>
+                            <span className="font-bold text-slate-700">
+                              {(item.quantity * item.unitPriceNet * (1 + item.vatRate / 100)).toFixed(2)} zł brutto
+                            </span>
+                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
+                
+                {/* Szybki przycisk dodawania pustej pozycji */}
+                <button
+                  onClick={() => addItem()}
+                  className="w-full py-2 border-2 border-dashed border-indigo-200 rounded-xl text-indigo-600 hover:bg-indigo-50 hover:border-indigo-400 transition-all text-xs font-bold flex items-center justify-center gap-2 mt-2"
+                >
+                  <Plus size={14} /> + PUSTA POZYCJA
+                </button>
               </div>
 
               {/* Podsumowanie */}

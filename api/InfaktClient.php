@@ -180,8 +180,8 @@ class InfaktClient {
         $payload = array(
             'client' => array(
                 'company_name' => $companyName,
-                'first_name' => $isCompany ? '' : (isset($clientData['first_name']) ? $clientData['first_name'] : ''),
-                'last_name' => $isCompany ? '' : (isset($clientData['last_name']) ? $clientData['last_name'] : ''),
+                'first_name' => isset($clientData['first_name']) ? $clientData['first_name'] : '',
+                'last_name' => isset($clientData['last_name']) ? $clientData['last_name'] : '',
                 'email' => isset($clientData['email']) ? $clientData['email'] : '',
                 'phone' => isset($clientData['phone']) ? $clientData['phone'] : '',
                 'street' => isset($clientData['street']) ? $clientData['street'] : '',
@@ -217,8 +217,8 @@ class InfaktClient {
         $payload = array(
             'client' => array(
                 'company_name' => $companyName,
-                'first_name' => $isCompany ? '' : (isset($clientData['first_name']) ? $clientData['first_name'] : ''),
-                'last_name' => $isCompany ? '' : (isset($clientData['last_name']) ? $clientData['last_name'] : ''),
+                'first_name' => isset($clientData['first_name']) ? $clientData['first_name'] : '',
+                'last_name' => isset($clientData['last_name']) ? $clientData['last_name'] : '',
                 'email' => isset($clientData['email']) ? $clientData['email'] : '',
                 'phone' => isset($clientData['phone']) ? $clientData['phone'] : '',
                 'street' => isset($clientData['street']) ? $clientData['street'] : '',

@@ -160,6 +160,19 @@ function handleGemini() {
 }
 
 /**
+ * Helper do analizy treści maila (wywoływany np. przez webhook Gmail)
+ */
+function analyzeEmailContent($content) {
+    try {
+        $result = callGeminiAPI($content, array());
+        return array('success' => true, 'data' => $result);
+    } catch (Exception $e) {
+        error_log('[Gemini analyzeEmailContent Error] ' . $e->getMessage());
+        return array('error' => $e->getMessage());
+    }
+}
+
+/**
  * Wywołanie Gemini API
  */
 function callGeminiAPI($text, $images = array()) {

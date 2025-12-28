@@ -43,6 +43,7 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
   const [completionImages, setCompletionImages] = useState<string[]>(job?.completionImages || []);
   const [attachments, setAttachments] = useState<JobAttachment[]>(job?.attachments || []);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLookingUpGus, setIsLookingUpGus] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
@@ -203,6 +204,61 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
     }
   };
   
+  const handleNipLookup = async (forcedNip?: string) => {
+    const nip = (forcedNip || formData.nip)?.replace(/[^0-9]/g, '');
+    if (!nip || nip.length !== 10) return;
+
+    setIsLookingUpGus(true);
+    try {
+      const response = await fetch(`/api/gus/nip/${nip}`);
+      const data = await response.json();
+      
+      if (data.success && data.company) {
+        const company = data.company;
+        
+        setFormData(prev => ({
+          ...prev,
+          companyName: company.name || prev.companyName,
+          // Jeśli to firma, czyścimy imię i nazwisko (opcjonalnie)
+          address: `${company.street}, ${company.postCode} ${company.city}`.trim(),
+          nip: company.nip || nip
+        }));
+        
+        // Jeśli udało się pobrać adres, spróbuj go wygeokodować
+        const fullAddress = `${company.street}, ${company.postCode} ${company.city}`.trim();
+        if (fullAddress) {
+          const geoRes = await fetch('/api/geocode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ address: fullAddress })
+          });
+          const geoData = await geoRes.json();
+          if (geoData.success && geoData.results?.[0]) {
+            setFormData(prev => ({
+              ...prev,
+              coordinates: geoData.results[0].coordinates
+            }));
+          }
+        }
+      }
+    } catch (error) {
+      console.error('GUS lookup error:', error);
+    } finally {
+      setIsLookingUpGus(false);
+    }
+  };
+
+  // Auto-lookup po wpisaniu 10 cyfr NIP
+  useEffect(() => {
+    const cleanNip = formData.nip?.replace(/[^0-9]/g, '') || '';
+    if (cleanNip.length === 10) {
+      const timer = setTimeout(() => {
+        handleNipLookup(cleanNip);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [formData.nip]);
+
   const handleSave = async () => {
     if (isSaving) return;
     setIsSaving(true);
@@ -351,15 +407,22 @@ export const SimpleJobCard: React.FC<SimpleJobCardProps> = ({
             
             <div className="col-span-2">
               <label className="block text-sm font-semibold text-slate-700 mb-2">
-                NIP
+                NIP {isLookingUpGus && <span className="text-xs text-indigo-500 animate-pulse ml-2">Pobieranie z GUS...</span>}
               </label>
-              <input
-                type="text"
-                value={formData.nip}
-                onChange={(e) => handleChange('nip', e.target.value)}
-                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-green-400 outline-none"
-                placeholder="123-456-78-90"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formData.nip}
+                  onChange={(e) => handleChange('nip', e.target.value)}
+                  className={`w-full px-4 py-3 border-2 ${isLookingUpGus ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200'} rounded-xl focus:border-green-400 outline-none transition-all`}
+                  placeholder="123-456-78-90"
+                />
+                {isLookingUpGus && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           

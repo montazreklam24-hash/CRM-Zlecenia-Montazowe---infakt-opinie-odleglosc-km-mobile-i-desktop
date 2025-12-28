@@ -112,6 +112,7 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
   const healingDoneRef = useRef(false);
   const [liveRefresh, setLiveRefresh] = useState(false);
   const [paymentFilter, setPaymentFilter] = useState<PaymentStatus | 'ALL'>('ALL');
+  const [reviewFilter, setReviewFilter] = useState<'all' | 'sent' | 'not_sent'>('all');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; job: Job } | null>(null);
   const [archivePaymentFilter, setArchivePaymentFilter] = useState<PaymentStatus | 'all'>('all');
   const [archiveReviewFilter, setArchiveReviewFilter] = useState<'all' | 'sent' | 'not_sent'>('all');
@@ -476,6 +477,7 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
   const filteredJobs = jobs.filter(job => {
     const matchesTab = activeTab === 'ACTIVE' ? job.status !== JobStatus.ARCHIVED : job.status === JobStatus.ARCHIVED;
     const matchesSearch = !searchQuery || [job.data.jobTitle, job.data.clientName, job.data.address, job.friendlyId].some(f => f?.toLowerCase().includes(searchQuery.toLowerCase()));
+    
     let matchesArchiveFilters = true;
     if (activeTab === 'ARCHIVED') {
       if (archivePaymentFilter !== 'all') matchesArchiveFilters = matchesArchiveFilters && (job.paymentStatus === archivePaymentFilter);
@@ -483,7 +485,17 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
         const reviewSent = !!job.reviewRequestSentAt;
         matchesArchiveFilters = matchesArchiveFilters && (archiveReviewFilter === 'sent' ? reviewSent : !reviewSent);
       }
+    } else {
+      // Filtry dla tablicy aktywnej
+      if (paymentFilter !== 'ALL') {
+        matchesArchiveFilters = matchesArchiveFilters && ((job.paymentStatus || PaymentStatus.NONE) === paymentFilter);
+      }
+      if (reviewFilter !== 'all') {
+        const reviewSent = !!job.reviewRequestSentAt;
+        matchesArchiveFilters = matchesArchiveFilters && (reviewFilter === 'sent' ? reviewSent : !reviewSent);
+      }
     }
+    
     return matchesTab && matchesSearch && matchesArchiveFilters;
   });
 
@@ -517,6 +529,7 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
       <OmegaHeader 
         activeTab={activeTab} setActiveTab={setActiveTab} jobs={jobs} liveRefresh={liveRefresh} setLiveRefresh={setLiveRefresh}
         loadJobs={loadJobs} isAdmin={isAdmin} onCreateNew={() => setShowTypeModal(true)} paymentFilter={paymentFilter} setPaymentFilter={setPaymentFilter}
+        reviewFilter={reviewFilter} setReviewFilter={setReviewFilter}
         archivePaymentFilter={archivePaymentFilter} setArchivePaymentFilter={setArchivePaymentFilter} archiveReviewFilter={archiveReviewFilter}
         setArchiveReviewFilter={setArchiveReviewFilter} searchQuery={searchQuery} setSearchQuery={setSearchQuery} viewMode={viewMode}
         setViewMode={setViewMode} handleBackup={() => {}} 

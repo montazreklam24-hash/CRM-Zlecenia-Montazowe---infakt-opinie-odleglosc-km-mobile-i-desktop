@@ -62,6 +62,13 @@ const MobileGoogleMapView: React.FC<MobileGoogleMapViewProps> = ({ jobs, onBack,
       googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
       setIsLoading(false);
 
+      // Trigger resize after a short delay to fix rendering issues on PC browsers
+      setTimeout(() => {
+        if (window.google && window.google.maps && googleMapRef.current) {
+          window.google.maps.event.trigger(googleMapRef.current, 'resize');
+        }
+      }, 500);
+
       // Kliknięcie w tło mapy zamyka kartę
       googleMapRef.current.addListener('click', () => {
         setSelectedJob(null);

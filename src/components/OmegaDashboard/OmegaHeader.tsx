@@ -5,6 +5,7 @@ import {
   ThumbsUp, ThumbsDown 
 } from 'lucide-react';
 import { Job, JobStatus, PaymentStatus } from '../../types';
+import { getPaymentStatusConfig } from '../../constants/paymentStatus';
 
 interface OmegaHeaderProps {
   activeTab: 'ACTIVE' | 'ARCHIVED';
@@ -17,6 +18,8 @@ interface OmegaHeaderProps {
   onCreateNew: () => void;
   paymentFilter: PaymentStatus | 'ALL';
   setPaymentFilter: (v: PaymentStatus | 'ALL') => void;
+  reviewFilter: 'all' | 'sent' | 'not_sent';
+  setReviewFilter: (v: 'all' | 'sent' | 'not_sent') => void;
   archivePaymentFilter: PaymentStatus | 'all';
   setArchivePaymentFilter: (v: PaymentStatus | 'all') => void;
   archiveReviewFilter: 'all' | 'sent' | 'not_sent';
@@ -33,108 +36,55 @@ interface OmegaHeaderProps {
 const OmegaHeader: React.FC<OmegaHeaderProps> = ({
   activeTab, setActiveTab, jobs, liveRefresh, setLiveRefresh, loadJobs,
   isAdmin, onCreateNew, paymentFilter, setPaymentFilter,
+  reviewFilter, setReviewFilter,
   archivePaymentFilter, setArchivePaymentFilter,
   archiveReviewFilter, setArchiveReviewFilter,
   searchQuery, setSearchQuery, viewMode, setViewMode, handleBackup,
   dashVariant, onDashVariantChange
 }) => {
+  const paymentStatuses = [
+    'ALL',
+    PaymentStatus.PROFORMA,
+    PaymentStatus.PAID,
+    PaymentStatus.CASH,
+    PaymentStatus.OVERDUE,
+    PaymentStatus.PARTIAL,
+    PaymentStatus.NONE
+  ] as const;
+
   return (
-    <div className="flex flex-col gap-3 mb-4 mt-11">
-      {/* Row 1: Tabs + New button + Variant Switcher */}
+    <div className="flex flex-col gap-4 mb-6 mt-11">
+      {/* Row 1: Tabs + Right Side Actions */}
       <div className="flex justify-between items-center gap-2">
-        <div className="flex items-center gap-4">
-          <div className="theme-surface flex p-1 flex-shrink-0" style={{ borderRadius: 'var(--radius-lg)' }}>
+        <div className="flex items-center gap-3">
+          <div className="theme-surface flex p-1 shadow-sm" style={{ borderRadius: 'var(--radius-lg)' }}>
             <button 
-              onClick={() => {
-                setActiveTab('ACTIVE');
-                localStorage.setItem('dashboard_active_tab', 'ACTIVE');
-              }}
-              className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold transition-all"
-              style={{ 
-                borderRadius: 'var(--radius-md)',
-                background: activeTab === 'ACTIVE' ? 'var(--accent-primary)' : 'transparent',
-                color: activeTab === 'ACTIVE' ? 'var(--text-inverse)' : 'var(--text-secondary)'
-              }}
+              onClick={() => { setActiveTab('ACTIVE'); localStorage.setItem('dashboard_active_tab', 'ACTIVE'); }}
+              className={`px-4 py-2 text-sm font-bold transition-all ${activeTab === 'ACTIVE' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
+              style={{ borderRadius: 'var(--radius-md)' }}
             >
               AKTYWNE ({jobs.filter(j => j.status !== JobStatus.ARCHIVED).length})
             </button>
             <button 
-              onClick={() => {
-                setActiveTab('ARCHIVED');
-                localStorage.setItem('dashboard_active_tab', 'ARCHIVED');
-              }}
-              className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold transition-all"
-              style={{ 
-                borderRadius: 'var(--radius-md)',
-                background: activeTab === 'ARCHIVED' ? 'var(--bg-surface)' : 'transparent',
-                color: activeTab === 'ARCHIVED' ? 'var(--text-primary)' : 'var(--text-secondary)'
-              }}
+              onClick={() => { setActiveTab('ARCHIVED'); localStorage.setItem('dashboard_active_tab', 'ARCHIVED'); }}
+              className={`px-4 py-2 text-sm font-bold transition-all ${activeTab === 'ARCHIVED' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              style={{ borderRadius: 'var(--radius-md)' }}
             >
               ARCHIWUM
             </button>
           </div>
-
-          {/* Development Variant Switcher */}
-          {onDashVariantChange && (
-            <div className="hidden lg:flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 ml-2">
-              <button
-                onClick={() => onDashVariantChange('legacy')}
-                className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider transition-all rounded ${
-                  dashVariant === 'legacy' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-                }`}
-              >
-                Legacy
-              </button>
-              <button
-                onClick={() => onDashVariantChange('omega')}
-                className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider transition-all rounded ${
-                  dashVariant === 'omega' ? 'bg-orange-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'
-                }`}
-              >
-                Omega v2
-              </button>
-            </div>
-          )}
         </div>
         
         <div className="flex items-center gap-2">
-          {/* Live Refresh Toggle */}
-          <button
-            onClick={() => setLiveRefresh(!liveRefresh)}
-            className={`px-3 py-2 font-bold flex items-center gap-2 transition-all rounded-lg ${
-              liveRefresh 
-                ? 'bg-green-500 text-white shadow-md' 
-                : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-            }`}
-            title={liveRefresh ? 'Wyłącz live odświeżanie' : 'Włącz live odświeżanie'}
-          >
+          <button onClick={() => setLiveRefresh(!liveRefresh)} className={`px-3 py-2 font-bold flex items-center gap-2 transition-all rounded-lg ${liveRefresh ? 'bg-green-500 text-white shadow-md' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`} title={liveRefresh ? 'Wyłącz live odświeżanie' : 'Włącz live odświeżanie'}>
             <Radio className={`w-4 h-4 ${liveRefresh ? 'fill-white' : ''}`} />
             <span className="hidden sm:inline text-xs">LIVE</span>
           </button>
-
-          {/* Refresh Button */}
-          <button
-            onClick={() => loadJobs()}
-            className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 font-bold flex items-center gap-2 transition-all rounded-lg border border-slate-300 shadow-sm"
-            title="Odśwież ręcznie"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-
-          {isAdmin && (
-            <button
-              onClick={handleBackup}
-              className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold flex items-center gap-2 transition-all rounded-lg shadow-sm"
-              title="Pobierz backup danych"
-            >
-              <Download className="w-4 h-4" />
-              <span className="hidden lg:inline text-xs">BACKUP</span>
-            </button>
-          )}
-
+          <button onClick={() => loadJobs()} className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 font-bold flex items-center gap-2 transition-all rounded-lg border border-slate-300 shadow-sm"><span className="hidden sm:inline text-xs">ODŚWIEŻ</span><RefreshCw className="w-4 h-4" /></button>
+          {isAdmin && <button onClick={handleBackup} className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold flex items-center gap-2 transition-all rounded-lg shadow-sm" title="Pobierz backup danych"><Download className="w-4 h-4" /><span className="hidden lg:inline text-xs">BACKUP</span></button>}
           <button 
-            onClick={onCreateNew}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center gap-2 transition-all rounded-lg shadow-md"
+            onClick={onCreateNew} 
+            className="px-3 sm:px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold flex items-center gap-2 transition-all active:scale-95 rounded-lg shadow-md"
           >
             <Plus className="w-5 h-5" />
             <span className="hidden sm:inline text-sm">NOWE ZLECENIE</span>
@@ -142,94 +92,107 @@ const OmegaHeader: React.FC<OmegaHeaderProps> = ({
         </div>
       </div>
 
-      {/* Row 2: Filters & Search */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          {activeTab === 'ACTIVE' ? (
-            <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-100">
-              <span className="text-[10px] font-bold text-slate-400 px-2 uppercase tracking-tight">Płatność:</span>
-              {(['ALL', PaymentStatus.NONE, PaymentStatus.PROFORMA, PaymentStatus.PAID, PaymentStatus.CASH] as const).map(f => (
-                <button
-                  key={f}
-                  onClick={() => setPaymentFilter(f)}
-                  className={`px-2.5 py-1.5 text-[10px] font-black rounded transition-all uppercase tracking-tighter ${
-                    paymentFilter === f 
-                      ? 'bg-blue-600 text-white shadow-sm scale-105' 
-                      : 'text-slate-500 hover:bg-slate-200'
-                  }`}
-                >
-                  {f === 'ALL' ? 'WSZYSTKIE' : f}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
-                <span className="text-[10px] font-bold text-slate-400 px-2 uppercase tracking-tight">Płatność:</span>
-                {(['all', PaymentStatus.PAID, PaymentStatus.PROFORMA, PaymentStatus.NONE] as const).map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setArchivePaymentFilter(f)}
-                    className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${
-                      archivePaymentFilter === f ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
-                    {f === 'all' ? 'Wszystkie' : f}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
-                <span className="text-[10px] font-bold text-slate-400 px-2 uppercase tracking-tight">Opinia:</span>
-                {(['all', 'sent', 'not_sent'] as const).map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setArchiveReviewFilter(f)}
-                    className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${
-                      archiveReviewFilter === f ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
-                    {f === 'all' ? 'Wszystkie' : f === 'sent' ? <ThumbsUp className="w-3 h-3" /> : <ThumbsDown className="w-3 h-3" />}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+      {/* Row 2: Payment & Review Filters (Chips Style) */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">Płatność:</span>
+            <div className="flex flex-wrap gap-2">
+              {paymentStatuses.map(f => {
+                const isActive = activeTab === 'ACTIVE' ? paymentFilter === f : archivePaymentFilter === (f === 'ALL' ? 'all' : f);
+                const cfg = f === 'ALL' ? null : getPaymentStatusConfig(f);
+                
+                // Styles for active chips
+                let activeStyle = {};
+                if (isActive) {
+                  if (f === 'ALL') activeStyle = { background: '#2563eb', color: '#fff' };
+                  else activeStyle = { background: cfg?.color, color: '#fff' };
+                }
 
-          {/* View Mode Switcher */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-lg ml-auto sm:ml-0">
-            <button
-              onClick={() => setViewMode('BOARD')}
-              className={`p-1.5 rounded transition-all ${viewMode === 'BOARD' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-              title="Widok tablicy"
-            >
-              <LayoutDashboard size={16} />
-            </button>
-            <button
-              onClick={() => setViewMode('KANBAN')}
-              className={`p-1.5 rounded transition-all ${viewMode === 'KANBAN' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-              title="Widok Kanban"
-            >
-              <Kanban size={16} />
-            </button>
-            <button
-              onClick={() => setViewMode('MIXED')}
-              className={`p-1.5 rounded transition-all ${viewMode === 'MIXED' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-              title="Widok mieszany (Lista + Kanban)"
-            >
-              <StretchHorizontal size={16} />
-            </button>
+                return (
+                  <button
+                    key={f}
+                    onClick={() => {
+                      if (activeTab === 'ACTIVE') setPaymentFilter(f);
+                      else setArchivePaymentFilter(f === 'ALL' ? 'all' : (f as PaymentStatus));
+                    }}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all border ${
+                      isActive 
+                        ? 'shadow-sm scale-105 border-transparent' 
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400'
+                    }`}
+                    style={isActive ? activeStyle : { 
+                      color: !isActive && f !== 'ALL' ? cfg?.color : undefined,
+                      borderColor: !isActive && f !== 'ALL' ? `${cfg?.color}44` : undefined 
+                    }}
+                  >
+                    {f === 'ALL' ? 'Wszystkie' : cfg?.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="h-4 w-[1px] bg-slate-200 hidden md:block" />
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">Opinia Google:</span>
+            <div className="flex flex-wrap gap-2">
+              {(['all', 'sent', 'not_sent'] as const).map(f => {
+                const isActive = activeTab === 'ACTIVE' ? reviewFilter === f : archiveReviewFilter === f;
+                const colors = {
+                  all: { bg: '#2563eb', text: '#2563eb' },
+                  sent: { bg: '#22c55e', text: '#22c55e' },
+                  not_sent: { bg: '#ef4444', text: '#ef4444' }
+                };
+
+                return (
+                  <button
+                    key={f}
+                    onClick={() => {
+                      if (activeTab === 'ACTIVE') setReviewFilter(f);
+                      else setArchiveReviewFilter(f);
+                    }}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all border ${
+                      isActive ? 'text-white shadow-sm scale-105 border-transparent' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400'
+                    }`}
+                    style={{
+                      background: isActive ? colors[f].bg : 'transparent',
+                      color: !isActive ? colors[f].text : '#fff',
+                      borderColor: !isActive ? `${colors[f].text}44` : 'transparent'
+                    }}
+                  >
+                    {f === 'all' ? 'Wszystkie' : (f === 'sent' ? 'Wysłana' : 'Nie wysłana')}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
+      </div>
 
-        <div className="relative w-full sm:w-64">
+      {/* Row 3: Search + View Modes */}
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
             placeholder="Szukaj zlecenia..."
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+        </div>
+
+        <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+          <button onClick={() => setViewMode('BOARD')} className={`p-2 rounded-lg transition-all ${viewMode === 'BOARD' ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`} title="Widok tablicy"><LayoutDashboard size={18} /></button>
+          <button onClick={() => setViewMode('KANBAN')} className={`p-2 rounded-lg transition-all ${viewMode === 'KANBAN' ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`} title="Widok Kanban"><Kanban size={18} /></button>
+          <button onClick={() => setViewMode('MIXED')} className={`p-2 rounded-lg transition-all ${viewMode === 'MIXED' ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`} title="Widok mieszany"><StretchHorizontal size={18} /></button>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <button onClick={() => loadJobs()} className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all shadow-sm" title="Odśwież"><RefreshCw size={18} /></button>
+          <button onClick={handleBackup} className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all shadow-sm" title="Backup"><Download size={18} /></button>
         </div>
       </div>
     </div>
