@@ -27,6 +27,8 @@ interface DashboardBoardViewProps {
   handleMoveToColumn: (jobId: string, columnId: JobColumnId) => Promise<void>;
   handleMoveLeft: (jobId: string) => Promise<void>;
   handleMoveRight: (jobId: string) => Promise<void>;
+  handleMoveUp: (jobId: string) => Promise<void>;
+  handleMoveDown: (jobId: string) => Promise<void>;
   handleJumpToStart: (jobId: string) => Promise<void>;
   handleJumpToEnd: (jobId: string) => Promise<void>;
   getJobMoveLeftRightInfo: (jobId: string) => { canMoveLeft: boolean; canMoveRight: boolean; canMoveUp?: boolean; canMoveDown?: boolean };
@@ -56,6 +58,8 @@ export const DashboardBoardView: React.FC<DashboardBoardViewProps> = ({
   handleMoveToColumn,
   handleMoveLeft,
   handleMoveRight,
+  handleMoveUp,
+  handleMoveDown,
   handleJumpToStart,
   handleJumpToEnd,
   getJobMoveLeftRightInfo,
@@ -117,8 +121,8 @@ export const DashboardBoardView: React.FC<DashboardBoardViewProps> = ({
                               onArchive={handleArchive}
                               onPaymentStatusChange={handlePaymentStatusChange}
                               onMoveToColumn={handleMoveToColumn}
-                              onMoveLeft={handleMoveUp} 
-                              onMoveRight={handleMoveDown} 
+                              onMoveLeft={handleMoveLeft} 
+                              onMoveRight={handleMoveRight} 
                               onMoveUp={handleJumpToStart} 
                               onMoveDown={handleJumpToEnd} 
                               canMoveLeft={canMoveLeft}
