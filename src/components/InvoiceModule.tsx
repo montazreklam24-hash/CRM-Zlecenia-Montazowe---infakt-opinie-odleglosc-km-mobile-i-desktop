@@ -635,7 +635,7 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
                     <Building2 className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                   </div>
                   <button
-                    onClick={handleNipLookup}
+                    onClick={() => handleNipLookup()}
                     disabled={isLookingUp}
                     className="px-4 py-2 bg-indigo-500 text-white rounded-lg font-bold text-sm hover:bg-indigo-600 disabled:opacity-50 flex items-center gap-2"
                   >
