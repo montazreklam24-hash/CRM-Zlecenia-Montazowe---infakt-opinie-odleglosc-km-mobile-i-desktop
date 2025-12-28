@@ -295,7 +295,7 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
 
       marker.on('mouseover', handleInteraction);
       marker.on('click', handleInteraction);
-      marker.on('mouseout', function (this: L.Marker) { this.closePopup(); }); // Zamknij po zjechaniu myszką
+      // Dymek zostaje otwarty po zjechaniu myszką (zgodnie z życzeniem)
 
       markersLayerRef.current?.addLayer(marker);
       bounds.extend([lat, lng]);
