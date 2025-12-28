@@ -49,7 +49,7 @@
 6. Folder dist/ jest gotowy do wgrania na serwer
 
 ## Zasady dla agenta (Terminal & CWD)
-- **Przed każdym poleceniem `npm` lub `git` sprawdź katalog roboczy**: Upewnij się, że jesteś w folderze głównym projektu (tam gdzie jest `package.json`).
-- Jeśli terminal startuje w `C:\Users\...` (user home) zamiast w projekcie - **zawsze** wykonaj `cd "D:\Programowanie\Cursor\CRM Zlecenia Montazowe - infakt, opinie, odleglosc km, mobile i desktop"` przed dalszą pracą.
-- **Nigdy** nie uruchamiaj komend w niewłaściwym folderze.
+- **ABSOLUTNY ZAKAZ pracy na dysku C:** Projekt znajduje się na dysku D. Przed każdą komendą `npm` lub `git` upewnij się, że jesteś na dysku D w poprawnym folderze.
+- **Zawsze wymuszaj ścieżkę:** Jeśli terminal startuje w `C:\Users\...`, wykonaj `d:; cd "D:\Programowanie\Cursor\CRM Zlecenia Montazowe - infakt, opinie, odleglosc km, mobile i desktop"`.
+- **Weryfikacja:** Po każdym buildzie sprawdź `Get-Location` lub `pwd` aby mieć pewność, że pliki powstały w `D:\...\dist`.
 - **Vite Port**: Zawsze używamy portu 3000. Jeśli zajęty - znajdź i ubij proces.

@@ -27,6 +27,7 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 3000,
     strictPort: true, // Wywalaj się, jeśli port zajęty - nie skacz na 3001/3002
+    allowedHosts: ['host.docker.internal', 'localhost', '127.0.0.1'],
     proxy: {
       '/api': {
         target: 'http://localhost:8080',

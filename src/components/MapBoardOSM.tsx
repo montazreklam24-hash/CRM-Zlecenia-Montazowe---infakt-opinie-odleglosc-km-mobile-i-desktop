@@ -251,7 +251,7 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
 
       const popupContent = document.createElement('div');
       popupContent.className = 'custom-popup-card';
-      popupContent.style.width = '160px';
+      popupContent.style.width = '200px';
       
       const jobTitle = job.data?.jobTitle || 'Bez nazwy';
       const address = job.data?.address || 'Brak adresu';
@@ -289,7 +289,16 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
       const handleInteraction = function(this: L.Marker) {
         this.openPopup();
         if (mapInstanceRef.current) {
-          mapInstanceRef.current.panTo(this.getLatLng());
+          const latLng = this.getLatLng();
+          // Zgodnie z zasadami repo: ZAWSZE środkuj mapę tak, aby KARTA była na środku
+          // Przeliczamy współrzędne na punkty kontenera, aby dodać offset w pikselach
+          const containerPoint = mapInstanceRef.current.latLngToContainerPoint(latLng);
+          // Karta ma ok. 280-300px wysokości i jest nad markerem. 
+          // Przesuwamy punkt docelowy o ok. 130px w górę, aby po wyśrodkowaniu karta była na środku.
+          const targetPoint = L.point(containerPoint.x, containerPoint.y - 130);
+          const targetLatLng = mapInstanceRef.current.containerPointToLatLng(targetPoint);
+          
+          mapInstanceRef.current.panTo(targetLatLng, { animate: true });
         }
       };
 
@@ -371,10 +380,15 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
                   onClick={() => {
                     setSelectedJobForList(job);
                     onSelectJob(job);
-                    // Centruj mapę na markerze
+                    // Centruj mapę na markerze z offsetem na kartę
                     const coords = job.data.coordinates || jobsWithCoords.get(job.id);
                     if (coords && mapInstanceRef.current) {
-                      mapInstanceRef.current.panTo([coords.lat, coords.lng]);
+                      const latLng = L.latLng(coords.lat, coords.lng);
+                      const containerPoint = mapInstanceRef.current.latLngToContainerPoint(latLng);
+                      const targetPoint = L.point(containerPoint.x, containerPoint.y - 130);
+                      const targetLatLng = mapInstanceRef.current.containerPointToLatLng(targetPoint);
+                      
+                      mapInstanceRef.current.panTo(targetLatLng, { animate: true });
                     }
                   }}
                   className={`p-2 rounded-lg border-2 cursor-pointer transition-all ${

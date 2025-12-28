@@ -42,8 +42,8 @@ const SmartPopup = ({ job, position, onClose, onSelect, mapContainer }: { job: J
     const VIEWPORT_PADDING = 20; // Większy padding od krawędzi viewport
 
     // Jeśli popup nie ma jeszcze wymiarów, użyj domyślnych
-    const popupWidth = popupRect.width || 180;
-    const popupHeight = popupRect.height || 200;
+    const popupWidth = popupRef.current.offsetWidth || 180;
+    const popupHeight = popupRef.current.offsetHeight || 220;
 
     // Przelicz pozycję markera na współrzędne względem kontenera mapy
     const markerX = position.x;
@@ -247,17 +247,62 @@ const SmartPopup = ({ job, position, onClose, onSelect, mapContainer }: { job: J
 };
 
 const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpdated, onChangeColumn }) => {
+  const DEBUG = true;
+  const Logger = {
+    log: (...args: any[]) => DEBUG && console.log('[MapBoardGoogle]', ...args),
+    warn: (...args: any[]) => DEBUG && console.warn('[MapBoardGoogle]', ...args),
+    error: (...args: any[]) => DEBUG && console.error('[MapBoardGoogle]', ...args)
+  };
+
   const mapRef = useRef<HTMLDivElement>(null);
   const googleMapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const overlayRef = useRef<any>(null); // Helper do przeliczania współrzędnych
+  const currentHoveredMarkerRef = useRef<any>(null);
 
   // Stan dla dymka
   const [hoveredJob, setHoveredJob] = useState<Job | null>(null);
   const [popupPos, setPopupPos] = useState<{x: number, y: number} | null>(null);
   const [isApiLoaded, setIsApiLoaded] = useState(false);
-
   const [isLocating, setIsLocating] = useState(false);
+
+  // Helper do aktualizacji pozycji popupu
+  const updatePopupPos = (marker: any) => {
+    if (!overlayRef.current || !marker) return;
+    const projection = overlayRef.current.getProjection();
+    if (projection) {
+      const pixel = projection.fromLatLngToContainerPixel(marker.getPosition());
+      setPopupPos({ x: pixel.x, y: pixel.y });
+    }
+  };
+
+  // Synchronizacja popupu przy ruchu mapy
+  useEffect(() => {
+    if (!googleMapRef.current || !isApiLoaded) return;
+
+    let rafId: number;
+    const handleMapChange = () => {
+      if (currentHoveredMarkerRef.current) {
+        cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => {
+          updatePopupPos(currentHoveredMarkerRef.current);
+        });
+      }
+    };
+
+    const idleListener = googleMapRef.current.addListener('idle', handleMapChange);
+    const boundsListener = googleMapRef.current.addListener('bounds_changed', handleMapChange);
+    const zoomListener = googleMapRef.current.addListener('zoom_changed', handleMapChange);
+
+    return () => {
+      if (window.google && window.google.maps) {
+        window.google.maps.event.removeListener(idleListener);
+        window.google.maps.event.removeListener(boundsListener);
+        window.google.maps.event.removeListener(zoomListener);
+        cancelAnimationFrame(rafId);
+      }
+    };
+  }, [isApiLoaded, hoveredJob]);
 
   // Sprawdzaj dostępność API
   useEffect(() => {
@@ -438,21 +483,51 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
           position: position,
           map: googleMapRef.current,
           icon: svgMarker,
-          title: job.data.jobTitle || job.friendlyId,
-          // animation: window.google.maps.Animation.DROP // Wyłączamy animację drop przy każdym odświeżeniu, bo irytuje
+          // title: job.data.jobTitle || job.friendlyId, // Usunięto, aby uniknąć natywnego tooltipu
+          // animation: window.google.maps.Animation.DROP
         });
 
         const handleHover = () => {
-          if (overlayRef.current) {
+          if (overlayRef.current && googleMapRef.current) {
+            const markerPos = marker.getPosition();
             const projection = overlayRef.current.getProjection();
+            
             if (projection) {
-              const pixel = projection.fromLatLngToContainerPixel(marker.getPosition());
-              setPopupPos({ x: pixel.x, y: pixel.y });
-              setHoveredJob(job);
+              const pixel = projection.fromLatLngToContainerPixel(markerPos);
+              const mapDiv = mapRef.current;
               
-              // Zawsze centrujemy mapę na markerze, żeby dymek był widoczny
-              if (googleMapRef.current) {
+              if (mapDiv) {
+                Logger.log('Hover on job:', job.id, { 
+                  pixel, 
+                  jobId: job.id
+                });
+
+                currentHoveredMarkerRef.current = marker;
+                setHoveredJob(job);
+                
+                // Zgodnie z zasadami repo: ZAWSZE środkuj mapę tak, aby KARTA była na środku
+                setPopupPos(null);
+                
+                // 1. Wyśrodkuj na markerze
                 googleMapRef.current.panTo(marker.getPosition());
+                
+                // 2. Dodaj offset, aby wyśrodkować całą kartę (ok. 220px wysokości)
+                // Jeśli karta jest pod markerem (brak miejsca u góry), przesuwamy mapę w dół.
+                const margin = 20;
+                const popupHeight = 220;
+                const popupPadding = 15;
+                const spaceAbove = pixel.y - margin;
+                const totalPopupH = popupHeight + popupPadding;
+                
+                const offsetY = spaceAbove < totalPopupH ? 110 : -110;
+                googleMapRef.current.panBy(0, offsetY);
+                
+                // Pozycja dymka zostanie zaktualizowana po zakończeniu ruchu (idle)
+                window.google.maps.event.addListenerOnce(googleMapRef.current, 'idle', () => {
+                  if (currentHoveredMarkerRef.current === marker) {
+                    updatePopupPos(marker);
+                  }
+                });
               }
             }
           }
@@ -485,7 +560,11 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
           job={hoveredJob}
           position={popupPos}
           mapContainer={mapRef.current}
-          onClose={() => setHoveredJob(null)}
+          onClose={() => {
+            setHoveredJob(null);
+            setPopupPos(null);
+            currentHoveredMarkerRef.current = null;
+          }}
           onSelect={() => onSelectJob(hoveredJob)}
         />
       )}
