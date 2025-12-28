@@ -381,7 +381,7 @@ const App: React.FC = () => {
           } />
           <Route path="/map" element={<MapPage onSelectJob={handleSelectJob} />} />
           <Route path="/invoices" element={<InvoicingPage />} />
-          <Route path="/clients" element={<ClientModule onSelectJob={handleSelectJob} />} />
+          <Route path="/clients" element={<ClientModule onSelectJob={handleSelectJob} refreshTrigger={dashboardRefreshTrigger} />} />
         </Route>
       </Routes>
 

@@ -13,9 +13,10 @@ import MapBoardOSM from './MapBoardOSM';
 
 interface ClientModuleProps {
   onSelectJob?: (job: Job) => void;
+  refreshTrigger?: number;
 }
 
-const ClientModule: React.FC<ClientModuleProps> = ({ onSelectJob }) => {
+const ClientModule: React.FC<ClientModuleProps> = ({ onSelectJob, refreshTrigger }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -36,6 +37,15 @@ const ClientModule: React.FC<ClientModuleProps> = ({ onSelectJob }) => {
     loadClients();
   }, [search]);
 
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      loadClients();
+      if (selectedClient) {
+        handleSelectClient(selectedClient, true);
+      }
+    }
+  }, [refreshTrigger]);
+
   const loadClients = async () => {
     setLoading(true);
     try {
@@ -48,11 +58,13 @@ const ClientModule: React.FC<ClientModuleProps> = ({ onSelectJob }) => {
     }
   };
 
-  const handleSelectClient = async (client: Client) => {
+  const handleSelectClient = async (client: Client, keepTab: boolean = false) => {
     try {
       const fullClient = await clientsService.getClient(client.id);
       setSelectedClient(fullClient);
-      setActiveTab('info');
+      if (!keepTab) {
+        setActiveTab('info');
+      }
     } catch (error) {
       console.error('Failed to load client details:', error);
     }
@@ -84,7 +96,7 @@ const ClientModule: React.FC<ClientModuleProps> = ({ onSelectJob }) => {
       setFormData({});
       loadClients();
       if (selectedClient && formData.id === selectedClient.id) {
-        handleSelectClient(selectedClient);
+        handleSelectClient(selectedClient, true);
       }
     } catch (error) {
       alert('Błąd zapisu kontrahenta');

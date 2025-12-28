@@ -685,6 +685,7 @@ function mapJobToFrontend($job) {
         'type' => 'ai', // Domyślny typ dla kompatybilności (deprecated)
         'createdAt' => strtotime($job['created_at']) * 1000,
         'status' => $job['status'] ? $job['status'] : 'NEW',
+        'clientId' => isset($job['client_id']) ? intval($job['client_id']) : null,
         'paymentStatus' => isset($job['payment_status']) ? $job['payment_status'] : 'none',
         'columnId' => $job['column_id'] ? $job['column_id'] : 'PREPARE',
         'columnOrder' => intval($job['column_order']),
