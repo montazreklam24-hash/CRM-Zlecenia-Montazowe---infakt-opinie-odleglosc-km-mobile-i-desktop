@@ -1,4 +1,5 @@
-import { Job, JobOrderData, ChecklistItem, JobColumnId, User, JobStatus, PaymentType, PaymentStatus } from '../types';
+import { Job, JobOrderData, ChecklistItem, JobColumnId, User, JobStatus, PaymentType, PaymentStatus, Client } from '../types';
+export type { Client };
 import { normalizePaymentStatus } from '../constants/paymentStatus';
 
 // TRYB DEMO - bez backendu
@@ -234,7 +235,8 @@ export const jobsService = {
     data: JobOrderData,
     images: string[],
     adminNotes?: string,
-    checklist?: ChecklistItem[]
+    checklist?: ChecklistItem[],
+    clientId?: number
   ): Promise<Job> {
     if (DEMO_MODE) {
       // ... demo logic ...
@@ -248,6 +250,7 @@ export const jobsService = {
         projectImages: images,
         adminNotes,
         checklist,
+        clientId,
       }),
     });
     
@@ -457,6 +460,42 @@ export const jobsService = {
         error: errorMessage,
       };
     }
+  },
+};
+
+// =====================================================
+// CLIENTS API
+// =====================================================
+
+export const clientsService = {
+  async getClients(search?: string): Promise<Client[]> {
+    const query = search ? `?search=${encodeURIComponent(search)}` : '';
+    const response = await apiRequest<{ success: boolean; clients: Client[] }>(`/clients${query}`);
+    return response.clients;
+  },
+
+  async getClient(id: number): Promise<Client> {
+    const response = await apiRequest<{ success: boolean; client: Client }>(`/clients/${id}`);
+    return response.client;
+  },
+
+  async createClient(data: Partial<Client>): Promise<number> {
+    const response = await apiRequest<{ success: boolean; id: number }>('/clients', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return response.id;
+  },
+
+  async updateClient(id: number, data: Partial<Client>): Promise<void> {
+    await apiRequest(`/clients/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteClient(id: number): Promise<void> {
+    await apiRequest(`/clients/${id}`, { method: 'DELETE' });
   },
 };
 

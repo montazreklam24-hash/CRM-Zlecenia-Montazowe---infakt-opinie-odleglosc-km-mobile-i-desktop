@@ -35,36 +35,51 @@ export type JobColumnId = 'PREPARE' | 'ANYTIME' | 'MON' | 'TUE' | 'WED' | 'THU' 
 
 export interface Client {
   id: number;
-  type: 'company' | 'person';
-  companyName: string | null;
-  firstName: string | null;
-  lastName: string | null;
-  displayName: string;
-  nip: string | null;
-  regon: string | null;
-  email: string | null;
-  phone: string | null;
-  phone2: string | null;
-  website: string | null;
-  street: string | null;
-  buildingNo: string | null;
-  apartmentNo: string | null;
-  city: string | null;
-  postCode: string | null;
-  country: string;
-  fullAddress: string;
-  paymentMethod: 'transfer' | 'cash' | 'card';
-  paymentDays: number;
-  notes: string | null;
-  tags: string | null;
-  source: string | null;
-  rating: number | null;
-  isActive: boolean;
-  infaktId: number | null;
-  createdAt: number;
-  jobsCount?: number;
-  invoicesCount?: number;
-  totalPaid?: number;
+  company_name?: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  nip?: string;
+  address?: string;
+  notes?: string;
+  infakt_id?: string;
+  jobs_count?: number;
+  created_at?: string;
+  updated_at?: string;
+  // Relacje
+  contacts?: ClientContact[];
+  addresses?: ClientAddress[];
+  notes_list?: ClientNote[];
+  jobs?: any[];
+}
+
+export interface ClientContact {
+  id: number;
+  client_id: number;
+  name: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+  created_at?: string;
+}
+
+export interface ClientAddress {
+  id: number;
+  client_id: number;
+  type: 'billing' | 'install' | 'other';
+  address_text: string;
+  lat?: number;
+  lng?: number;
+  note?: string;
+  created_at?: string;
+}
+
+export interface ClientNote {
+  id: number;
+  client_id: number;
+  note: string;
+  created_by?: number;
+  created_at?: string;
 }
 
 // =========================================================================

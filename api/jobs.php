@@ -179,11 +179,11 @@ function createJob() {
         $friendlyId = generateFriendlyId();
 
         // ZNAJDŹ LUB UTWÓRZ KLIENTA
-        $clientId = null;
+        $clientId = isset($input['clientId']) ? $input['clientId'] : null;
         $nip = isset($data['nip']) ? preg_replace('/[^0-9]/', '', $data['nip']) : null;
         $email = isset($data['email']) ? trim($data['email']) : null;
         
-        if ($nip && strlen($nip) === 10) {
+        if (!$clientId && $nip && strlen($nip) === 10) {
             $stmt = $pdo->prepare('SELECT id FROM clients WHERE nip = ?');
             $stmt->execute([$nip]);
             $client = $stmt->fetch();
@@ -403,6 +403,32 @@ function updateJob($id) {
         }
         
         // Pola bezpośrednie
+        if (isset($input['clientId'])) {
+            $updates[] = "client_id = ?";
+            $params[] = $input['clientId'];
+        } elseif (isset($data['email']) || isset($data['nip'])) {
+            // Spróbuj dopasować klienta jeśli nie podano clientId a zmieniono email/nip
+            $clientId = null;
+            $nip = isset($data['nip']) ? preg_replace('/[^0-9]/', '', $data['nip']) : null;
+            $email = isset($data['email']) ? trim($data['email']) : null;
+            
+            if ($nip && strlen($nip) === 10) {
+                $stmt = $pdo->prepare('SELECT id FROM clients WHERE nip = ?');
+                $stmt->execute([$nip]);
+                $client = $stmt->fetch();
+                if ($client) $clientId = $client['id'];
+            }
+            if (!$clientId && $email) {
+                $stmt = $pdo->prepare('SELECT id FROM clients WHERE email = ?');
+                $stmt->execute([$email]);
+                $client = $stmt->fetch();
+                if ($client) $clientId = $client['id'];
+            }
+            if ($clientId) {
+                $updates[] = "client_id = ?";
+                $params[] = $clientId;
+            }
+        }
         if (isset($input['adminNotes'])) {
             $updates[] = "notes = ?";
             $params[] = $input['adminNotes'];

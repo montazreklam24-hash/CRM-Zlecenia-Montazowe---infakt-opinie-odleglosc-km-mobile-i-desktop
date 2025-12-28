@@ -51,7 +51,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
         { icon: <LayoutDashboard size={18} />, label: 'Pulpit', to: '/' },
         { icon: <Map size={18} />, label: 'Mapa', to: '/map' },
         { icon: <Receipt size={18} />, label: 'Faktury', to: '/invoices' },
-        { icon: <Users size={18} />, label: 'Klienci', to: '/clients' },
+        { icon: <Users size={18} />, label: 'Kontrahenci', to: '/clients' },
       ]
     },
     {

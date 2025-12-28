@@ -8,7 +8,10 @@ import {
   Receipt
 } from 'lucide-react';
 import { Job, JobOrderData, JobStatus, UserRole, ChecklistItem, PaymentStatus, JobColumnId } from '../types';
-import { jobsService, geminiService } from '../services/apiService';
+import { jobsService, geminiService, clientsService, Client } from '../services/apiService';
+import { 
+  Building2, Users
+} from 'lucide-react';
 import invoiceService from '../services/invoiceService';
 import { rotateImage90, compressImage, processImageFile } from '../utils/imageUtils';
 import InvoiceModule from './InvoiceModule';
@@ -224,6 +227,27 @@ const JobCard: React.FC<JobCardProps> = ({
     city: 'Warszawa',
     postCode: ''
   });
+
+  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const loadClients = async () => {
+      try {
+        const data = await clientsService.getClients();
+        setClients(data);
+      } catch (err) {
+        console.error('Failed to load clients:', err);
+      }
+    };
+    loadClients();
+  }, []);
+
+  useEffect(() => {
+    if (job?.clientId) {
+      setSelectedClientId(job.clientId);
+    }
+  }, [job]);
   
   // Voice Input
   const { isListening, transcript, resetTranscript, startListening, stopListening, isSupported } = useVoiceInput();
@@ -392,6 +416,25 @@ const JobCard: React.FC<JobCardProps> = ({
       if (field === 'address') {
         newData.coordinates = undefined;
       }
+      
+      // Auto-assign client if email or NIP changes and matches
+      if (!selectedClientId && (field === 'email' || field === 'nip')) {
+        const val = typeof value === 'string' ? value.trim() : value;
+        if (val) {
+          const found = clients.find(c => 
+            (field === 'email' && c.email?.toLowerCase() === val.toLowerCase()) ||
+            (field === 'nip' && c.nip?.replace(/[^\d]/g, '') === val.replace(/[^\d]/g, ''))
+          );
+          if (found) {
+            setSelectedClientId(found.id);
+            // Optionally update other fields if they are empty
+            if (!newData.clientName) newData.clientName = found.company_name || found.name;
+            if (!newData.phoneNumber) newData.phoneNumber = found.phone || '';
+            if (!newData.address) newData.address = found.address || '';
+          }
+        }
+      }
+      
       return newData;
     });
   };
@@ -550,7 +593,8 @@ const JobCard: React.FC<JobCardProps> = ({
         const updates: any = { 
           data: data, 
           adminNotes, 
-          checklist
+          checklist,
+          clientId: selectedClientId
         };
         
         // Tylko wysyłaj projectImages jeśli:
@@ -569,7 +613,7 @@ const JobCard: React.FC<JobCardProps> = ({
         alert('Zapisano!');
         setIsEditing(false);
       } else {
-        await jobsService.createJob(data, projectImages, adminNotes, checklist);
+        await jobsService.createJob(data, projectImages, adminNotes, checklist, selectedClientId || undefined);
         if (onJobSaved) onJobSaved();
       }
     } catch (e) { 
@@ -1399,6 +1443,86 @@ const JobCard: React.FC<JobCardProps> = ({
                     </span>
                   )}
                 </span>
+              </div>
+            )}
+          </div>
+
+          {/* Client Database Link */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-orange-500" /> BAZA KONTRAHENTÓW
+              </p>
+              {selectedClientId && (
+                <button 
+                  onClick={() => setSelectedClientId(null)}
+                  className="text-[10px] text-red-500 hover:text-red-700 font-bold uppercase"
+                >
+                  Odłącz
+                </button>
+              )}
+            </div>
+            
+            {isEditing ? (
+              <div className="space-y-3">
+                <select 
+                  className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                  value={selectedClientId || ''}
+                  onChange={(e) => {
+                    const id = e.target.value ? parseInt(e.target.value) : null;
+                    setSelectedClientId(id);
+                    if (id) {
+                      const client = clients.find(c => c.id === id);
+                      if (client) {
+                        setEditedData(prev => ({
+                          ...prev,
+                          clientName: client.company_name || client.name,
+                          phoneNumber: client.phone || prev.phoneNumber,
+                          email: client.email || prev.email,
+                          nip: client.nip || prev.nip,
+                          address: client.address || prev.address
+                        }));
+                      }
+                    }
+                  }}
+                >
+                  <option value="">-- Wybierz kontrahenta z bazy --</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.company_name || c.name} {c.nip ? `(NIP: ${c.nip})` : ''}
+                    </option>
+                  ))}
+                </select>
+                {!selectedClientId && (
+                  <p className="text-[10px] text-slate-400 italic px-1">
+                    Wybierz kontrahenta, aby automatycznie uzupełnić dane poniżej.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-slate-100 shadow-sm">
+                    <Building2 className="w-5 h-5 text-slate-400" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-800 leading-tight">
+                      {selectedClientId ? clients.find(c => c.id === selectedClientId)?.company_name || editedData.clientName : 'Zlecenie wolne (brak powiązania)'}
+                    </p>
+                    {selectedClientId && <p className="text-[10px] text-slate-400 font-medium mt-0.5">Powiązany z bazą kontrahentów</p>}
+                  </div>
+                </div>
+                {selectedClientId && (
+                  <button 
+                    className="p-2 text-slate-400 hover:text-blue-600 transition-all"
+                    title="Zobacz kartę klienta"
+                    onClick={() => {
+                      window.location.hash = `/clients?id=${selectedClientId}`;
+                    }}
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             )}
           </div>

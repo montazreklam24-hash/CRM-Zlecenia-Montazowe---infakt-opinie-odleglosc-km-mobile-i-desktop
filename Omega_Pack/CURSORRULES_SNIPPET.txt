@@ -1,0 +1,9 @@
+# === Naprawa CRM / Omega — zasady dla AI (dołączone przez omega_cursor_pack) ===
+# Priorytet: brak fantazji, minimalne zmiany, zachowanie DOM+className przy refaktorze.
+
+- Always verify claims by inspecting the codebase (files, commits, logs). If you can't find evidence, say so and ask for the exact file/line or reproduce steps.
+- Make minimal, localized changes. Do not refactor “while you are there”.
+- When splitting React components, preserve DOM structure and className 1:1. Avoid extra wrapper divs; prefer React.Fragment.
+- Before fixing an error, read: recent git commits, browser console/network logs, and server PHP error logs if present.
+- After changes: run build and provide a short manual test checklist.
+# === end ===
