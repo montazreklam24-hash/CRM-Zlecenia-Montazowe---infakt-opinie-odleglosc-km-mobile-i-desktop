@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { clientsService, Client } from '../services/apiService';
+import { Job } from '../types';
 import { 
   Search, Plus, User, Building2, Mail, Phone, 
   MapPin, FileText, ChevronRight, Loader2,
@@ -10,7 +11,11 @@ import {
 import MapBoardGoogle from './MapBoardGoogle';
 import MapBoardOSM from './MapBoardOSM';
 
-const ClientModule: React.FC = () => {
+interface ClientModuleProps {
+  onSelectJob?: (job: Job) => void;
+}
+
+const ClientModule: React.FC<ClientModuleProps> = ({ onSelectJob }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -159,6 +164,22 @@ const ClientModule: React.FC = () => {
                   onChange={e => setFormData({...formData, address: e.target.value})}
                 />
               </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Kod pocztowy</label>
+                <input 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm"
+                  value={formData.address_postcode || ''}
+                  onChange={e => setFormData({...formData, address_postcode: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Miasto</label>
+                <input 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm"
+                  value={formData.address_city || ''}
+                  onChange={e => setFormData({...formData, address_city: e.target.value})}
+                />
+              </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Notatki</label>
                 <textarea 
@@ -299,7 +320,14 @@ const ClientModule: React.FC = () => {
                         <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Adres</label>
                         <div className="flex items-center gap-3 mt-1 text-slate-700">
                           <MapPin className="w-4 h-4 text-slate-400" />
-                          <span>{selectedClient.address || 'Brak adresu'}</span>
+                          <div>
+                            <div>{selectedClient.address || 'Brak adresu'}</div>
+                            {(selectedClient.address_postcode || selectedClient.address_city) && (
+                              <div className="text-sm text-slate-500">
+                                {selectedClient.address_postcode} {selectedClient.address_city}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -310,9 +338,13 @@ const ClientModule: React.FC = () => {
                   <div className="divide-y divide-slate-50 animate-fade-in">
                     {selectedClient.jobs && selectedClient.jobs.length > 0 ? (
                       selectedClient.jobs.map((job: any) => (
-                        <div key={job.id} className="py-4 hover:bg-slate-50 transition-colors flex justify-between items-center group">
+                        <div 
+                          key={job.id} 
+                          onClick={() => onSelectJob?.(job)}
+                          className="py-4 hover:bg-slate-50 transition-colors flex justify-between items-center group cursor-pointer"
+                        >
                           <div>
-                            <div className="font-bold text-slate-800">{job.data?.jobTitle || 'Bez tytułu'}</div>
+                            <div className="font-bold text-slate-800 group-hover:text-orange-600 transition-colors">{job.data?.jobTitle || 'Bez tytułu'}</div>
                             <div className="text-xs text-slate-400 flex items-center gap-2 mt-1">
                               <span>{job.friendlyId}</span>
                               <span>•</span>
@@ -323,7 +355,7 @@ const ClientModule: React.FC = () => {
                             <span className="px-2 py-1 text-[10px] font-bold rounded bg-slate-100 text-slate-600 uppercase">
                               {job.status}
                             </span>
-                            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors" />
+                            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-orange-500 transition-colors" />
                           </div>
                         </div>
                       ))
@@ -383,14 +415,14 @@ const ClientModule: React.FC = () => {
                     {mapProvider === 'GOOGLE' ? (
                       <MapBoardGoogle 
                         jobs={selectedClient.jobs || []} 
-                        onSelectJob={() => {}} 
+                        onSelectJob={(job) => onSelectJob?.(job)} 
                         onJobsUpdated={() => {}}
                         onChangeColumn={async () => {}}
                       />
                     ) : (
                       <MapBoardOSM 
                         jobs={selectedClient.jobs || []} 
-                        onSelectJob={() => {}} 
+                        onSelectJob={(job) => onSelectJob?.(job)} 
                         onJobsUpdated={() => {}}
                       />
                     )}
