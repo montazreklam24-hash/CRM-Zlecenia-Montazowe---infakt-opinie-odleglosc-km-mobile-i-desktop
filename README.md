@@ -163,6 +163,29 @@ Po imporcie bazy danych:
 - Kliknij pinezkę aby zobaczyć szczegóły
 - Nawiguj bezpośrednio do Google Maps
 
+## 🔄 Integracja inFakt i Synchronizacja
+
+System CRM posiada pełną integrację z inFakt (statusy płatności + baza klientów).
+
+### Konfiguracja API
+W `api/config.php` (lub pliku `.env`) ustaw:
+- `INFAKT_API_KEY` - Twój klucz API inFakt
+- `CRM_API_SECRET` - Tajny token do autoryzacji zadań CRON
+
+### Automatyczna synchronizacja (CRON)
+Aby statusy płatności faktur i dane klientów aktualizowały się automatycznie, należy dodać wpis do harmonogramu zadań serwera (CRON).
+
+**Przykład dla hostingu (Linux/cPanel):**
+```bash
+# Uruchamiaj co godzinę
+0 * * * * php /sciezka/do/crm/api/sync_infakt.php
+```
+
+**Uruchamianie przez URL (jeśli CRON nie ma dostępu do PHP CLI):**
+`https://twoja-domena.pl/api/sync_infakt.php?token=TWOJ_CRM_API_SECRET`
+
+> **Uwaga (Docker):** W środowisku deweloperskim Docker uruchomienie CRON nie jest obecnie priorytetem. Pełną synchronizację można wywołać ręcznie przyciskiem w module "Fakturowanie".
+
 ## 📄 Licencja
 
 Własność prywatna © 2024 Montaż Reklam 24
