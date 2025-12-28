@@ -1,6 +1,19 @@
 # Dokumentacja Wersji Projektu - CRM Montaż Reklam 24
 
-## 📦 Wersja Alpha v1.0 (Obecna)
+## 📦 Wersja Gamma v2.2 (Ukończona)
+**Data:** 28 grudnia 2025, 10:20
+**Status:** W pełni działająca wersja Gamma
+
+---
+
+### ✅ Nowości i Poprawki (Gamma)
+*   **Optymalizacja Map OSM:** Naprawiono wyśrodkowanie kart dymków (popups) z odpowiednim offsetem, zapobiegając ich ucinaniu na małych ekranach.
+*   **Synchronizacja Google/OSM:** Ujednolicono mechanizm centrowania na dymkach dla obu dostawców map.
+*   **UI/UX:** Zwiększono szerokość kart na mapie dla lepszej czytelności danych zlecenia.
+
+---
+
+## 📦 Wersja Alpha v1.0 (Archiwalna)
 **Data:** 18 grudnia 2025
 **Status:** Produkcyjna (Alpha)
 
