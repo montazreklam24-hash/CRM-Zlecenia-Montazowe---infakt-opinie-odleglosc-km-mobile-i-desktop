@@ -43,6 +43,8 @@ export interface Client {
   address?: string;
   notes?: string;
   infakt_id?: string;
+  gmail_thread_id?: string;
+  logo_url?: string;
   jobs_count?: number;
   created_at?: string;
   updated_at?: string;
@@ -51,6 +53,8 @@ export interface Client {
   addresses?: ClientAddress[];
   notes_list?: ClientNote[];
   jobs?: any[];
+  jobs_data?: Job[];
+  invoices?: Invoice[];
 }
 
 export interface ClientContact {

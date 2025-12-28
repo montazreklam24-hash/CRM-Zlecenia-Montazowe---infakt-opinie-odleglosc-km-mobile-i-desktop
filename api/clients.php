@@ -5,7 +5,7 @@
 
 require_once __DIR__ . '/config.php';
 
-function handleClients($method, $id = null) {
+function handleClients($method, $id = null, $action = null) {
     switch ($method) {
         case 'GET':
             if ($id) {
@@ -15,7 +15,11 @@ function handleClients($method, $id = null) {
             }
             break;
         case 'POST':
-            createClient();
+            if ($id && $action === 'sync_infakt') {
+                syncClientInfakt($id);
+            } else {
+                createClient();
+            }
             break;
         case 'PUT':
             if (!$id) jsonResponse(['error' => 'Client ID required'], 400);
@@ -28,6 +32,55 @@ function handleClients($method, $id = null) {
         default:
             jsonResponse(['error' => 'Method not allowed'], 405);
     }
+}
+
+function syncClientInfakt($id) {
+    $user = requireAuth();
+    $pdo = getDB();
+    
+    $stmt = $pdo->prepare("SELECT * FROM clients WHERE id = ?");
+    $stmt->execute([$id]);
+    $client = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$client) jsonResponse(['error' => 'Klient nie istnieje'], 404);
+    if (empty($client['nip'])) jsonResponse(['error' => 'Brak numeru NIP dla tego klienta'], 400);
+    
+    require_once __DIR__ . '/InfaktClient.php';
+    $config = require __DIR__ . '/config.php';
+    
+    $infaktKey = isset($config['infakt_api_key']) ? $config['infakt_api_key'] : null;
+    if (!$infaktKey) jsonResponse(['error' => 'Brak klucza API inFakt w konfiguracji'], 500);
+    
+    $infakt = new InfaktClient($infaktKey);
+    $infaktClient = $infakt->findClientByNip($client['nip']);
+    
+    if (!$infaktClient) {
+        jsonResponse(['error' => 'Nie znaleziono klienta o tym numerze NIP w inFakt'], 404);
+    }
+    
+    // Zaktualizuj dane w bazie CRM
+    $updates = [
+        'company_name' => $infaktClient['company_name'] ?: $client['company_name'],
+        'infakt_id' => $infaktClient['id'],
+        'email' => $infaktClient['email'] ?: $client['email'],
+        'phone' => $infaktClient['phone'] ?: $client['phone'],
+        'address' => trim($infaktClient['street'] . ' ' . $infaktClient['house_no'] . ' ' . $infaktClient['flat_no']),
+        'address_city' => $infaktClient['city'] ?: $client['address_city'],
+        'address_postcode' => $infaktClient['zip_code'] ?: $client['address_postcode']
+    ];
+    
+    $updateFields = [];
+    $params = [];
+    foreach ($updates as $f => $v) {
+        $updateFields[] = "$f = ?";
+        $params[] = $v;
+    }
+    $params[] = $id;
+    
+    $stmt = $pdo->prepare("UPDATE clients SET " . implode(', ', $updateFields) . " WHERE id = ?");
+    $stmt->execute($params);
+    
+    jsonResponse(['success' => true, 'client' => $updates]);
 }
 
 function getClients() {
@@ -86,9 +139,17 @@ function getClient($id) {
     $client['notes'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Historia zleceń
-    $stmt = $pdo->prepare("SELECT id, friendly_id, title, status, created_at FROM jobs_ai WHERE client_id = ? ORDER BY created_at DESC");
+    $stmt = $pdo->prepare("SELECT * FROM jobs_ai WHERE client_id = ? ORDER BY created_at DESC");
     $stmt->execute([$id]);
-    $client['jobs'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $jobs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    require_once __DIR__ . '/jobs.php';
+    $client['jobs'] = array_map('mapJobToFrontend', $jobs);
+    
+    // Faktury
+    $stmt = $pdo->prepare("SELECT * FROM invoices WHERE client_id = ? ORDER BY created_at DESC");
+    $stmt->execute([$id]);
+    $client['invoices'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     jsonResponse(['success' => true, 'client' => $client]);
 }
@@ -99,8 +160,8 @@ function createClient() {
     $input = getJsonInput();
     
     $stmt = $pdo->prepare("
-        INSERT INTO clients (company_name, name, email, phone, nip, address, notes, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO clients (company_name, name, email, phone, nip, address, notes, infakt_id, gmail_thread_id, logo_url, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     
     $stmt->execute([
@@ -111,6 +172,9 @@ function createClient() {
         $input['nip'] ?? null,
         $input['address'] ?? null,
         $input['notes'] ?? null,
+        $input['infakt_id'] ?? null,
+        $input['gmail_thread_id'] ?? null,
+        $input['logo_url'] ?? null,
         $user['id']
     ]);
     
@@ -123,7 +187,7 @@ function updateClient($id) {
     $pdo = getDB();
     $input = getJsonInput();
     
-    $fields = ['company_name', 'name', 'email', 'phone', 'nip', 'address', 'notes'];
+    $fields = ['company_name', 'name', 'email', 'phone', 'nip', 'address', 'notes', 'infakt_id', 'gmail_thread_id', 'logo_url'];
     $updates = [];
     $params = [];
     

@@ -313,6 +313,12 @@ function createJob() {
         ));
         
         $jobId = $pdo->lastInsertId();
+
+        // AKTUALIZACJA KLIENTA (Gmail Thread ID)
+        if ($clientId && $gmailThreadId) {
+            $stmt = $pdo->prepare('UPDATE clients SET gmail_thread_id = ? WHERE id = ?');
+            $stmt->execute([$gmailThreadId, $clientId]);
+        }
         
         // Zapisz obrazy
         if (isset($input['projectImages']) && is_array($input['projectImages'])) {
@@ -368,6 +374,7 @@ function updateJob($id) {
             'address' => 'address',
             'scopeWorkText' => 'description',
             'description' => 'description',
+            'gmailThreadId' => 'gmail_thread_id',
         );
         
         foreach ($fieldMap as $frontendField => $dbField) {
@@ -716,6 +723,7 @@ function mapJobToFrontend($job) {
         'completionNotes' => isset($job['completion_notes']) ? $job['completion_notes'] : null,
         'reviewRequestSentAt' => !empty($job['review_request_sent_at']) ? strtotime($job['review_request_sent_at']) * 1000 : null,
         'reviewRequestEmail' => isset($job['review_request_email']) ? $job['review_request_email'] : null,
+        'gmailThreadId' => isset($job['gmail_thread_id']) ? $job['gmail_thread_id'] : null,
         // Pobieramy faktury
         'invoices' => $invoices
     );

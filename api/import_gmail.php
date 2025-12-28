@@ -244,7 +244,11 @@ try {
   }
 
   debugImport("=== IMPORT COMPLETE (Saved: " . count($saved) . ") ===");
-  echo json_encode(['success' => true, 'attachments' => $saved]);
+  echo json_encode([
+      'success' => true, 
+      'attachments' => $saved,
+      'threadId' => $threadId
+  ]);
 
 } catch (Exception $e) {
   debugImport("ERROR: " . $e->getMessage());

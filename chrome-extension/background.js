@@ -516,11 +516,14 @@ async function importAttachments(selectedAttachments, gmailMessageId) {
       paths: filteredPaths
     });
     
-    return filteredPaths;
+    return {
+      paths: filteredPaths,
+      threadId: data.threadId || null
+    };
     
   } catch (e) {
     await logDebug('error', 'import', 'Exception during import', e.message);
-    return [];
+    return { paths: [], threadId: null };
   }
 }
 
@@ -591,7 +594,12 @@ async function createJobInCRM(jobData) {
             gmailMessageId: finalMessageId
         });
         try {
-            projectImages = await importAttachments(jobData.selectedAttachments, finalMessageId);
+            const importResult = await importAttachments(jobData.selectedAttachments, finalMessageId);
+            projectImages = importResult.paths;
+            if (importResult.threadId) {
+                jobData.gmailThreadId = importResult.threadId;
+                await logDebug('info', 'createJob', 'Got threadId from PHP', { threadId: importResult.threadId });
+            }
             await logDebug('info', 'createJob', 'Gmail attachments imported', { paths: projectImages });
         } catch (e) { 
             attachmentWarning = "Błąd importu: " + e.message;
@@ -618,6 +626,7 @@ async function createJobInCRM(jobData) {
       address: jobData.fullAddress,
       scopeWorkText: jobData.description,
       gmailMessageId: finalMessageId || null,
+      gmailThreadId: jobData.gmailThreadId || null,
       projectImages: projectImages, 
       columnId: 'PREPARE',
       

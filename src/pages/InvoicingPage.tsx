@@ -1,20 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, ExternalLink, Loader2, CheckCircle2, Search, Filter, ArrowUpRight, RefreshCw } from 'lucide-react';
+import { FileText, Download, ExternalLink, Loader2, CheckCircle2, Search, Filter, ArrowUpRight, RefreshCw, Users, Database } from 'lucide-react';
 import invoiceService from '../services/invoiceService';
+import { settingsService } from '../services/apiService';
 import { Invoice } from '../types';
 
 const InvoicingPage: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [fullSyncing, setFullSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState<string | null>(null);
   const [filterType, setTypeFilter] = useState<'all' | 'proforma' | 'vat'>('all');
   const [search, setSearch] = useState('');
 
   useEffect(() => {
     fetchInvoices();
-    // Automatyczna synchronizacja przy pierwszym załadowaniu
+    fetchLastSync();
+    // Automatyczna synchronizacja statusów przy pierwszym załadowaniu
     syncStatus();
   }, [filterType]);
+
+  const fetchLastSync = async () => {
+    try {
+      const settings = await settingsService.getSettings();
+      if (settings.last_infakt_sync) {
+        setLastSync(settings.last_infakt_sync);
+      }
+    } catch (error) {
+      console.error('Failed to fetch last sync time:', error);
+    }
+  };
 
   const syncStatus = async () => {
     setSyncing(true);
@@ -24,13 +39,31 @@ const InvoicingPage: React.FC = () => {
         // Odśwież listę faktur po synchronizacji
         await fetchInvoices();
         if (result.updated > 0) {
-          alert(`Zsynchronizowano ${result.updated} faktur z inFakt`);
+          // alert(`Zsynchronizowano ${result.updated} faktur z inFakt`);
         }
       }
     } catch (error) {
       console.error('Sync error:', error);
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleFullSync = async () => {
+    if (!window.confirm('Czy chcesz uruchomić pełną synchronizację? Spowoduje to aktualizację statusów płatności oraz bazy klientów na podstawie inFakt.')) return;
+    
+    setFullSyncing(true);
+    try {
+      const result = await invoiceService.fullSync();
+      if (result.success) {
+        await fetchInvoices();
+        await fetchLastSync();
+        alert(result.results.message);
+      }
+    } catch (error: any) {
+      alert('Błąd synchronizacji: ' + error.message);
+    } finally {
+      setFullSyncing(false);
     }
   };
 
@@ -87,6 +120,11 @@ const InvoicingPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Fakturowanie</h1>
           <p className="text-slate-500 text-sm">Zarządzaj proformami i fakturami VAT z inFakt</p>
+          {lastSync && (
+            <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-wider">
+              Ostatnia pełna synchronizacja: {new Date(lastSync).toLocaleString('pl-PL')}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-2 w-full md:w-auto">
@@ -101,12 +139,26 @@ const InvoicingPage: React.FC = () => {
             />
           </div>
           <button
+            onClick={handleFullSync}
+            disabled={fullSyncing || syncing || loading}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+            title="Pełna synchronizacja faktur i klientów"
+          >
+            {fullSyncing ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Database size={16} />
+            )}
+            {fullSyncing ? 'Synchronizacja...' : 'Pełna Synchronizacja'}
+          </button>
+          <button
             onClick={syncStatus}
-            disabled={syncing || loading}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={syncing || fullSyncing || loading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-bold hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Szybkie odświeżenie statusów płatności"
           >
             <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
-            {syncing ? 'Synchronizacja...' : 'Odśwież status'}
+            Odśwież statusy
           </button>
         </div>
       </div>

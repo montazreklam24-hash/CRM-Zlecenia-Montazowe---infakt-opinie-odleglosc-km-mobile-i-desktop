@@ -497,6 +497,13 @@ export const clientsService = {
   async deleteClient(id: number): Promise<void> {
     await apiRequest(`/clients/${id}`, { method: 'DELETE' });
   },
+
+  async syncInfakt(id: number): Promise<Partial<Client>> {
+    const response = await apiRequest<{ success: boolean; client: Partial<Client> }>(`/clients/${id}/sync_infakt`, {
+      method: 'POST',
+    });
+    return response.client;
+  },
 };
 
 // =====================================================

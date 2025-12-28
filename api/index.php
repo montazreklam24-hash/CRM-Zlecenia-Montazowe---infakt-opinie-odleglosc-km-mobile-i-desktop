@@ -81,7 +81,7 @@ switch ($endpoint) {
         
     case 'clients':
         require_once __DIR__ . '/clients.php';
-        handleClients($method, $id);
+        handleClients($method, $subEndpoint, $id);
         break;
         
     case 'invoices':

@@ -413,10 +413,26 @@ class InfaktClient {
         
         try {
             $result = $this->request('GET', $endpoint);
-            return isset($result['entities']) ? $result['entities'] : array();
+            return isset($result['entities']) ? $result : array('entities' => array(), 'metainfo' => array());
         } catch (Exception $e) {
             $this->log("Get invoices failed: " . $e->getMessage());
-            return array();
+            return array('entities' => array(), 'metainfo' => array());
+        }
+    }
+
+    /**
+     * Lista klientów
+     */
+    public function getClients($params = array()) {
+        $query = http_build_query($params);
+        $endpoint = '/clients.json' . ($query ? '?' . $query : '');
+        
+        try {
+            $result = $this->request('GET', $endpoint);
+            return isset($result['entities']) ? $result : array('entities' => array(), 'metainfo' => array());
+        } catch (Exception $e) {
+            $this->log("Get clients failed: " . $e->getMessage());
+            return array('entities' => array(), 'metainfo' => array());
         }
     }
 }

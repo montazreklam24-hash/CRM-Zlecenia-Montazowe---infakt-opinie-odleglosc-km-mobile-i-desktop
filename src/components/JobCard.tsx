@@ -5,7 +5,7 @@ import {
   ListTodo, Plus, Trash2, Copy, MessageSquare, Star, FileText,
   X, Share2, ScrollText, ScanEye, Navigation, Phone, ExternalLink,
   Mic, MicOff, RotateCw, Calendar, Archive, ChevronDown, Clock,
-  Receipt
+  Receipt, Mail
 } from 'lucide-react';
 import { Job, JobOrderData, JobStatus, UserRole, ChecklistItem, PaymentStatus, JobColumnId } from '../types';
 import { jobsService, geminiService, clientsService, Client } from '../services/apiService';
@@ -66,13 +66,14 @@ interface AttachmentPreviewProps {
   setCoverImage: (index: number) => void;
   rotateProjectImage: (index: number) => void;
   removeProjectImage: (index: number) => void;
+  setAsClientLogo?: (url: string) => void;
   isSelected?: boolean;
   onToggleSelect?: (index: number) => void;
 }
 
 const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({ 
   url, idx, isEditing, isAdmin, onClick, setCoverImage, rotateProjectImage, removeProjectImage,
-  isSelected, onToggleSelect
+  setAsClientLogo, isSelected, onToggleSelect
 }) => {
   const [imgError, setImgError] = useState(false);
   const extension = getFileExtension(url);
@@ -134,6 +135,16 @@ const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({
               <Star className={`w-5 h-5 ${idx === 0 ? 'fill-current' : ''}`} />
             </button>
             <div className="flex gap-1">
+              {/* Ustaw jako logo klienta - nowa opcja */}
+              {setAsClientLogo && isImageFile(url) && (
+                <button 
+                  onClick={(e) => {e.stopPropagation(); setAsClientLogo(url)}} 
+                  className="p-2 bg-orange-500 text-white rounded-lg shadow-md hover:bg-orange-600"
+                  title="Ustaw jako logo kontrahenta"
+                >
+                  <Building2 className="w-5 h-5" />
+                </button>
+              )}
               {/* Obróć - tylko dla obrazów, nie PDF */}
               {isImageFile(url) && (
                 <button 
@@ -891,6 +902,25 @@ const JobCard: React.FC<JobCardProps> = ({
     }
   };
 
+  const setAsClientLogo = async (url: string) => {
+    if (!selectedClientId) {
+      alert('Najpierw przypisz kontrahenta do tego zlecenia.');
+      return;
+    }
+    if (!window.confirm('Czy ustawić to zdjęcie jako logo kontrahenta?')) return;
+    
+    setIsProcessing(true);
+    try {
+      await clientsService.updateClient(selectedClientId, { logo_url: url });
+      alert('Logo zostało zaktualizowane.');
+      if (onJobSaved) onJobSaved();
+    } catch (error) {
+      alert('Błąd aktualizacji logo.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const AttachmentThumbnail = ({ url, onClick, isImage }: { url: string; onClick: () => void; isImage: boolean }) => {
     const [error, setError] = useState(false);
     const ext = getFileExtension(url);
@@ -1576,6 +1606,31 @@ const JobCard: React.FC<JobCardProps> = ({
                   <p className="font-semibold text-slate-800">{editedData.clientName || '-'}</p>
                 )}
               </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Email</label>
+                {isEditing ? (
+                  <input 
+                    value={editedData.email || ''} 
+                    onChange={(e) => handleDataChange('email', e.target.value)} 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm mt-1"
+                  />
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-slate-800">{editedData.email || '-'}</p>
+                    {job?.gmailThreadId && (
+                      <a 
+                        href={`https://mail.google.com/mail/u/0/#inbox/${job.gmailThreadId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                        title="Otwórz w Gmail"
+                      >
+                        <Mail className="w-4 h-4" />
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -2046,6 +2101,7 @@ const JobCard: React.FC<JobCardProps> = ({
                       setCoverImage={setCoverImage}
                       rotateProjectImage={rotateProjectImage}
                       removeProjectImage={removeProjectImage}
+                      setAsClientLogo={setAsClientLogo}
                       isSelected={selectedForDeletion.includes(idx)}
                       onToggleSelect={toggleImageSelection}
                     />

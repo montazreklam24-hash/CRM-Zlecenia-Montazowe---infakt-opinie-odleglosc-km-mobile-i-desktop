@@ -2,7 +2,7 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import Login from './components/Login';
 import DashboardLegacy from './components/DashboardLegacy';
-import DashboardOmega from './components/DashboardOmega';
+import DashboardOmega from './components/OmegaDashboard/DashboardOmega';
 import InputForm from './components/InputForm';
 import JobCard from './components/JobCard';
 import { SimpleJobCard } from './components/SimpleJobCard';

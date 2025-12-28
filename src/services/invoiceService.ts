@@ -259,6 +259,22 @@ export const invoiceService = {
   },
 
   /**
+   * Pełna synchronizacja (statusy faktur + baza klientów)
+   */
+  async fullSync(): Promise<{
+    success: boolean;
+    results: {
+      invoices: { total: number; updated: number; errors: number };
+      clients: { total: number; created: number; updated: number; errors: number };
+      message: string;
+    };
+  }> {
+    return apiRequest<any>('/invoices/full-sync', {
+      method: 'POST',
+    });
+  },
+
+  /**
    * Podepnij istniejącą fakturę z inFakt do zlecenia
    */
   async attachInvoice(

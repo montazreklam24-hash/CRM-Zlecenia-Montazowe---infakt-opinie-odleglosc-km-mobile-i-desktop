@@ -704,6 +704,126 @@ function handleSyncStatus() {
 }
 
 /**
+ * POST /api/invoices/full-sync
+ * Pełna synchronizacja: statusy faktur + baza klientów
+ */
+function handleFullSync() {
+    $user = requireAuth();
+    $results = runFullSync($user['id']);
+    jsonResponse(array('success' => true, 'results' => $results));
+}
+
+/**
+ * Core function for full sync (can be called by API or CRON)
+ */
+function runFullSync($userId = null) {
+    $pdo = getDB();
+    
+    $results = array(
+        'invoices' => array('total' => 0, 'updated' => 0, 'errors' => 0),
+        'clients' => array('total' => 0, 'created' => 0, 'updated' => 0, 'errors' => 0),
+        'message' => ''
+    );
+    
+    $infakt = getInfaktClient();
+    
+    // 1. SYNCHRONIZACJA STATUSÓW FAKTUR
+    $stmt = $pdo->prepare("SELECT id, infakt_id, status FROM invoices WHERE status NOT IN ('paid', 'cancelled') AND infakt_id IS NOT NULL AND infakt_id > 0");
+    $stmt->execute();
+    $pendingInvoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    $results['invoices']['total'] = count($pendingInvoices);
+    
+    foreach ($pendingInvoices as $inv) {
+        try {
+            $infaktInvoice = $infakt->getInvoice($inv['infakt_id']);
+            if ($infaktInvoice) {
+                $paymentStatus = isset($infaktInvoice['payment_status']) ? $infaktInvoice['payment_status'] : 'unpaid';
+                $localStatus = ($paymentStatus === 'paid') ? 'paid' : 'pending';
+                
+                if ($inv['status'] !== $localStatus) {
+                    $upd = $pdo->prepare("UPDATE invoices SET status = ? WHERE id = ?");
+                    $upd->execute(array($localStatus, $inv['id']));
+                    $results['invoices']['updated']++;
+                    
+                    if ($localStatus === 'paid') {
+                        $jobUpd = $pdo->prepare("UPDATE jobs_ai SET payment_status = 'paid' WHERE id = (SELECT job_id FROM invoices WHERE id = ?)");
+                        $jobUpd->execute(array($inv['id']));
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            $results['invoices']['errors']++;
+        }
+    }
+    
+    // 2. SYNCHRONIZACJA BAZY KLIENTÓW
+    $infaktClientsRes = $infakt->getClients(array('limit' => 100));
+    $infaktClients = isset($infaktClientsRes['entities']) ? $infaktClientsRes['entities'] : array();
+    
+    $results['clients']['total'] = count($infaktClients);
+    
+    foreach ($infaktClients as $ic) {
+        try {
+            $nip = !empty($ic['nip']) ? preg_replace('/[^0-9]/', '', $ic['nip']) : null;
+            $email = !empty($ic['email']) ? trim($ic['email']) : null;
+            
+            $clientId = null;
+            if ($nip && strlen($nip) === 10) {
+                $stmt = $pdo->prepare("SELECT id FROM clients WHERE nip = ?");
+                $stmt->execute(array($nip));
+                $found = $stmt->fetch();
+                if ($found) $clientId = $found['id'];
+            }
+            if (!$clientId && $email) {
+                $stmt = $pdo->prepare("SELECT id FROM clients WHERE email = ?");
+                $stmt->execute(array($email));
+                $found = $stmt->fetch();
+                if ($found) $clientId = $found['id'];
+            }
+            
+            $companyName = !empty($ic['company_name']) ? $ic['company_name'] : trim($ic['first_name'] . ' ' . $ic['last_name']);
+            if (empty($companyName)) $companyName = $ic['email'];
+            
+            $address = trim($ic['street'] . ' ' . $ic['house_no'] . ' ' . $ic['flat_no']);
+            $infaktId = $ic['id'];
+            $phone = isset($ic['phone']) ? $ic['phone'] : null;
+            
+            if ($clientId) {
+                $upd = $pdo->prepare("
+                    UPDATE clients SET 
+                    company_name = COALESCE(company_name, ?),
+                    nip = COALESCE(nip, ?),
+                    email = COALESCE(email, ?),
+                    phone = COALESCE(phone, ?),
+                    address = COALESCE(address, ?),
+                    infakt_id = ?
+                    WHERE id = ?
+                ");
+                $upd->execute(array($companyName, $nip, $email, $phone, $address, $infaktId, $clientId));
+                $results['clients']['updated']++;
+            } else {
+                $ins = $pdo->prepare("
+                    INSERT INTO clients (company_name, nip, email, phone, address, infakt_id, created_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ");
+                $ins->execute(array($companyName, $nip, $email, $phone, $address, $infaktId, $userId));
+                $results['clients']['created']++;
+            }
+        } catch (Exception $e) {
+            $results['clients']['errors']++;
+        }
+    }
+    
+    $pdo->prepare("INSERT INTO settings (`key`, `value`) VALUES ('last_infakt_sync', NOW()) ON DUPLICATE KEY UPDATE `value` = NOW()")->execute();
+    
+    $results['message'] = "Zsynchronizowano statusy {$results['invoices']['updated']} faktur. " .
+                         "Zaktualizowano {$results['clients']['updated']} i utworzono {$results['clients']['created']} klientów.";
+                         
+    return $results;
+}
+
+/**
  * Pobierz faktury dla zlecenia
  */
 function handleGetJobInvoices($jobId) {
@@ -881,6 +1001,9 @@ function handleInvoices($method, $id = null) {
             case 'attach':
                 handleAttachInvoice();
                 break;
+            case 'full-sync':
+                handleFullSync();
+                break;
             default:
                 // Domyślnie POST bez akcji = proforma
                 handleCreateProforma();
@@ -934,6 +1057,8 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'invoices.php') {
             handleSyncStatus();
         } elseif ($uri === 'attach' || $uri === 'invoices/attach') {
             handleAttachInvoice();
+        } elseif ($uri === 'full-sync' || $uri === 'invoices/full-sync') {
+            handleFullSync();
         } else {
             handleCreateProforma();
         }
