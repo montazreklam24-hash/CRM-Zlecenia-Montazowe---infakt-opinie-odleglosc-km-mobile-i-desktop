@@ -245,9 +245,13 @@ const UserModule: React.FC = () => {
                   <tr key={user.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-6 py-4">
                       {user.is_active ? (
-                        <CheckCircle2 className="w-5 h-5 text-green-500" title="Aktywny" />
+                        <span title="Aktywny">
+                          <CheckCircle2 className="w-5 h-5 text-green-500" />
+                        </span>
                       ) : (
-                        <XCircle className="w-5 h-5 text-slate-300" title="Nieaktywny" />
+                        <span title="Nieaktywny">
+                          <XCircle className="w-5 h-5 text-slate-300" />
+                        </span>
                       )}
                     </td>
                     <td className="px-6 py-4">
