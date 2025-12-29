@@ -507,6 +507,41 @@ export const clientsService = {
 };
 
 // =====================================================
+// USERS API
+// =====================================================
+
+export const usersService = {
+  async getUsers(): Promise<User[]> {
+    const response = await apiRequest<{ success: boolean; users: User[] }>('/users');
+    return response.users;
+  },
+
+  async getUser(id: number): Promise<User> {
+    const response = await apiRequest<{ success: boolean; user: User }>(`/users/${id}`);
+    return response.user;
+  },
+
+  async createUser(data: Partial<User> & { password?: string }): Promise<User> {
+    const response = await apiRequest<{ success: boolean; user: User }>('/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return response.user;
+  },
+
+  async updateUser(id: number, data: Partial<User>): Promise<void> {
+    await apiRequest(`/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteUser(id: number): Promise<void> {
+    await apiRequest(`/users/${id}`, { method: 'DELETE' });
+  },
+};
+
+// =====================================================
 // GEMINI API
 // =====================================================
 

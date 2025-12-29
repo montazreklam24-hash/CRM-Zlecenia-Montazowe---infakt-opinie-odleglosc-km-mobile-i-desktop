@@ -1239,6 +1239,7 @@ const JobCard: React.FC<JobCardProps> = ({
               totalGross={job.totalGross || 0}
               paidAmount={job.paidAmount || 0}
               invoices={job.invoices || []}
+              quoteItems={editedData.quoteItems}
               isAdmin={isAdmin}
               onStatusChange={async (status, source = 'manual') => {
                 if (onPaymentStatusChange) {
@@ -1866,6 +1867,49 @@ const JobCard: React.FC<JobCardProps> = ({
                   {editedData.scopeWorkText || "Brak opisu."}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Wycena z maila (AI) - widoczna tylko dla Admina */}
+          {isAdmin && editedData.quoteItems && editedData.quoteItems.length > 0 && (
+            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-5 shadow-sm">
+              <p className="text-xs font-bold text-emerald-600 uppercase tracking-wide mb-3 flex items-center gap-2">
+                💰 WYCENA SZACUNKOWA (Z MAILA)
+              </p>
+              <div className="bg-white rounded-lg overflow-hidden border border-emerald-100 shadow-sm">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="bg-emerald-50 text-emerald-800">
+                      <th className="px-3 py-2 font-bold">Pozycja</th>
+                      <th className="px-3 py-2 font-bold text-right">Netto</th>
+                      <th className="px-3 py-2 font-bold text-right">Brutto</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-emerald-50">
+                    {editedData.quoteItems.map((item, idx) => (
+                      <tr key={idx} className="text-emerald-900">
+                        <td className="px-3 py-2">{item.name}</td>
+                        <td className="px-3 py-2 text-right font-medium">{item.netAmount.toFixed(2)} zł</td>
+                        <td className="px-3 py-2 text-right font-bold">{item.grossAmount.toFixed(2)} zł</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-emerald-50/50 text-emerald-900 font-bold">
+                      <td className="px-3 py-2 uppercase">Suma</td>
+                      <td className="px-3 py-2 text-right text-[10px] opacity-70">
+                        {editedData.quoteItems.reduce((sum, item) => sum + item.netAmount, 0).toFixed(2)} zł
+                      </td>
+                      <td className="px-3 py-2 text-right text-emerald-700">
+                        {editedData.quoteItems.reduce((sum, item) => sum + item.grossAmount, 0).toFixed(2)} zł
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <p className="text-[10px] text-emerald-600/70 italic mt-2 text-center">
+                Te pozycje zostały automatycznie wyciągnięte przez AI z maila.
+              </p>
             </div>
           )}
 

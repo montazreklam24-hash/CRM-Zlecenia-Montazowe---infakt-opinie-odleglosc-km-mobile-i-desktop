@@ -195,6 +195,13 @@ export interface JobLocation {
   distance?: string;
 }
 
+export interface QuoteItem {
+  name: string;
+  netAmount: number;
+  grossAmount: number;
+  vatRate: number;
+}
+
 export interface JobOrderData {
   jobTitle: string;
   clientName: string;
@@ -210,6 +217,7 @@ export interface JobOrderData {
   scopeWorkText?: string;
   description?: string;
   scopeWorkImages?: string;
+  quoteItems?: QuoteItem[];
   billing?: {
     name: string | null;
     nip: string | null;
@@ -268,6 +276,7 @@ export interface Job {
   paymentStatus?: PaymentStatus;
   totalNet?: number;
   totalGross?: number;
+  priceSource?: 'ai' | 'proforma' | 'invoice';
   paidAmount?: number;
   invoices?: Invoice[];
   gmailThreadId?: string;

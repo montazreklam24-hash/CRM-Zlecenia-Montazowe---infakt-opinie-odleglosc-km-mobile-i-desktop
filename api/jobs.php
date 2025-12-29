@@ -313,8 +313,9 @@ function createJob() {
                 billing_apartment_no, billing_post_code, billing_city, billing_email,
                 address, coordinates_lat, coordinates_lng,
                 description, notes, status, column_id, column_order, created_by,
-                gmail_message_id, gmail_thread_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                gmail_message_id, gmail_thread_id,
+                value_net, value_gross, quote_items
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ');
         
         $phone = null;
@@ -324,6 +325,10 @@ function createJob() {
         $description = null;
         if (isset($data['scopeWorkText'])) $description = $data['scopeWorkText'];
         elseif (isset($data['description'])) $description = $data['description'];
+
+        $quoteItemsJson = isset($data['quoteItems']) ? json_encode($data['quoteItems'], JSON_UNESCAPED_UNICODE) : null;
+        $netAmount = isset($data['payment']['netAmount']) ? $data['payment']['netAmount'] : null;
+        $grossAmount = isset($data['payment']['grossAmount']) ? $data['payment']['grossAmount'] : null;
         
         $coordLat = null;
         $coordLng = null;
@@ -373,7 +378,10 @@ function createJob() {
             0,
             $user['id'],
             $gmailMessageId,
-            $gmailThreadId
+            $gmailThreadId,
+            $netAmount,
+            $grossAmount,
+            $quoteItemsJson
         ));
         
         $jobId = $pdo->lastInsertId();
@@ -511,6 +519,10 @@ function updateJob($id) {
         if (isset($data['paymentStatus'])) {
             $updates[] = "payment_status = ?";
             $params[] = $data['paymentStatus'];
+        }
+        if (isset($data['quoteItems'])) {
+            $updates[] = "quote_items = ?";
+            $params[] = json_encode($data['quoteItems'], JSON_UNESCAPED_UNICODE);
         }
         if (isset($input['columnId'])) {
             $updates[] = "column_id = ?";
@@ -742,6 +754,37 @@ function mapJobToFrontend($job) {
         error_log('Error fetching invoices in mapJobToFrontend: ' . $e->getMessage());
     }
     
+    // Oblicz totalGross i totalNet (z dokumentów lub z wyceny)
+    $totalNet = $job['value_net'] ? floatval($job['value_net']) : 0;
+    $totalGross = $job['value_gross'] ? floatval($job['value_gross']) : 0;
+    $priceSource = 'ai'; // Domyślnie z AI/Maila
+
+    if (!empty($invoices)) {
+        // Szukamy najlepszego dokumentu (Faktura VAT > Proforma)
+        $bestDoc = null;
+        foreach ($invoices as $inv) {
+            if ($inv['type'] === 'invoice' && $inv['status'] !== 'cancelled') {
+                $bestDoc = $inv;
+                $priceSource = 'invoice';
+                break;
+            }
+        }
+        if (!$bestDoc) {
+            foreach ($invoices as $inv) {
+                if ($inv['type'] === 'proforma' && $inv['status'] !== 'cancelled') {
+                    $bestDoc = $inv;
+                    $priceSource = 'proforma';
+                    break;
+                }
+            }
+        }
+
+        if ($bestDoc) {
+            $totalNet = $bestDoc['totalNet'];
+            $totalGross = $bestDoc['totalGross'];
+        }
+    }
+    
     return array(
         'id' => strval($jobId), // Czyste ID
         'original_id' => strval($jobId),
@@ -754,6 +797,9 @@ function mapJobToFrontend($job) {
         'columnId' => $job['column_id'] ? $job['column_id'] : 'PREPARE',
         'columnOrder' => intval($job['column_order']),
         'sortOrder' => $job['sort_order'] !== null ? intval($job['sort_order']) : null,
+        'totalNet' => $totalNet,
+        'totalGross' => $totalGross,
+        'priceSource' => $priceSource,
         'data' => array(
             'jobTitle' => $job['title'],
             'clientName' => $job['client_name'],
@@ -773,6 +819,7 @@ function mapJobToFrontend($job) {
             ),
             'coordinates' => $coords,
             'scopeWorkText' => $job['description'],
+            'quoteItems' => !empty($job['quote_items']) ? json_decode($job['quote_items'], true) : [],
             'payment' => array(
                 'type' => 'UNKNOWN',
                 'netAmount' => $job['value_net'] ? floatval($job['value_net']) : null,

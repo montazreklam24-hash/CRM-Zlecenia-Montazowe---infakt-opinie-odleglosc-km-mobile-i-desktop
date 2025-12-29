@@ -108,7 +108,6 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
     const today = new Date().getDay();
     return today === 5 || today === 6 || today === 0;
   });
-  const [showTypeModal, setShowTypeModal] = useState(false);
   const healingDoneRef = useRef(false);
   const [liveRefresh, setLiveRefresh] = useState(false);
   const [paymentFilter, setPaymentFilter] = useState<PaymentStatus | 'ALL'>('ALL');
@@ -528,7 +527,7 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
     <div className="animate-fade-in pb-20">
       <OmegaHeader 
         activeTab={activeTab} setActiveTab={setActiveTab} jobs={jobs} liveRefresh={liveRefresh} setLiveRefresh={setLiveRefresh}
-        loadJobs={loadJobs} isAdmin={isAdmin} onCreateNew={() => setShowTypeModal(true)} paymentFilter={paymentFilter} setPaymentFilter={setPaymentFilter}
+        loadJobs={loadJobs} isAdmin={isAdmin} onCreateNew={onCreateNew} paymentFilter={paymentFilter} setPaymentFilter={setPaymentFilter}
         reviewFilter={reviewFilter} setReviewFilter={setReviewFilter}
         archivePaymentFilter={archivePaymentFilter} setArchivePaymentFilter={setArchivePaymentFilter} archiveReviewFilter={archiveReviewFilter}
         setArchiveReviewFilter={setArchiveReviewFilter} searchQuery={searchQuery} setSearchQuery={setSearchQuery} viewMode={viewMode}
@@ -635,19 +634,6 @@ const DashboardOmega: React.FC<DashboardProps> = ({ role, onSelectJob, onCreateN
             })() : null}
           </DragOverlay>
         </>
-      )}
-
-      {showTypeModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-fade-in">
-            <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white p-6 text-center"><h2 className="text-2xl font-bold">Wybierz typ zlecenia</h2><p className="text-slate-300 mt-1">Jak chcesz dodać nowe zlecenie?</p></div>
-            <div className="p-6 space-y-4">
-              <button onClick={() => { setShowTypeModal(false); if (onCreateNewSimple) onCreateNewSimple(); }} className="w-full p-5 border-2 border-green-200 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all group text-left"><div className="flex items-center gap-4"><span className="text-4xl">📋</span><div><h3 className="text-xl font-bold text-green-700">Proste zlecenie</h3><p className="text-slate-600 text-sm mt-1">Ręczne wypełnianie pól</p></div></div></button>
-              <button onClick={() => { setShowTypeModal(false); onCreateNew(); }} className="w-full p-5 border-2 border-blue-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group text-left"><div className="flex items-center gap-4"><span className="text-4xl">🤖</span><div><h3 className="text-xl font-bold text-blue-700">Zlecenie AI</h3><p className="text-slate-600 text-sm mt-1">Gemini wypełni dane automatycznie</p></div></div></button>
-            </div>
-            <div className="px-6 pb-6"><button onClick={() => setShowTypeModal(false)} className="w-full py-3 text-slate-500 hover:text-slate-700 font-medium">Anuluj</button></div>
-          </div>
-        </div>
       )}
 
       {contextMenu && (

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Map, Receipt, Users, Settings, LogOut, ChevronDown, ChevronRight, FileText, BarChart3, Calendar, Archive } from 'lucide-react';
+import { LayoutDashboard, Map, Receipt, Users, Settings, LogOut, ChevronDown, ChevronRight, FileText, BarChart3, Calendar, Archive, Shield } from 'lucide-react';
+import { UserRole } from '../types';
 
 interface SidebarProps {
   onLogout?: () => void;
   className?: string;
   showLogo?: boolean;
   onNavigate?: () => void; // Callback gdy użytkownik kliknie link nawigacyjny
+  role?: UserRole;
 }
 
 interface NavSection {
@@ -16,16 +18,18 @@ interface NavSection {
     icon: React.ReactNode;
     label: string;
     to: string;
+    adminOnly?: boolean;
   }[];
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex', showLogo = true, onNavigate }) => {
+const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex', showLogo = true, onNavigate, role }) => {
   // Mapowanie polskich nazw sekcji na klucze
   const getSectionKey = (title: string): string => {
     const mapping: Record<string, string> = {
       'Główne': 'main',
       'Raporty': 'reports',
-      'Archiwum': 'archive'
+      'Archiwum': 'archive',
+      'System': 'system'
     };
     return mapping[title] || title.toLowerCase().replace(/\s+/g, '-');
   };
@@ -33,7 +37,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     'main': true, // Domyślnie rozwinięte
     'reports': false,
-    'archive': false
+    'archive': false,
+    'system': false
   });
 
   const toggleSection = (sectionKey: string) => {
@@ -42,6 +47,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
       [sectionKey]: !prev[sectionKey]
     }));
   };
+
+  const isAdmin = role === UserRole.ADMIN;
 
   const sections: NavSection[] = [
     {
@@ -52,6 +59,14 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
         { icon: <Map size={18} />, label: 'Mapa', to: '/map' },
         { icon: <Receipt size={18} />, label: 'Faktury', to: '/invoices' },
         { icon: <Users size={18} />, label: 'Kontrahenci', to: '/clients' },
+      ]
+    },
+    {
+      title: 'System',
+      icon: <Shield size={18} />,
+      items: [
+        { icon: <Users size={18} />, label: 'Użytkownicy', to: '/users', adminOnly: true },
+        { icon: <Settings size={18} />, label: 'Ustawienia', to: '/settings', adminOnly: true },
       ]
     },
     {
@@ -92,6 +107,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
         {sections.map((section, sectionIndex) => {
+          // Filtruj elementy sekcji na podstawie roli
+          const visibleItems = section.items.filter(item => !item.adminOnly || isAdmin);
+          
+          if (visibleItems.length === 0) return null;
+
           const sectionKey = getSectionKey(section.title);
           const isExpanded = expandedSections[sectionKey] ?? false;
 
@@ -119,7 +139,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
               {/* Section Items (Collapsible) */}
               {isExpanded && (
                 <div className="mt-1 ml-2 space-y-1 border-l-2 pl-2" style={{ borderColor: 'var(--border-light)' }}>
-                  {section.items.map((item) => (
+                  {visibleItems.map((item) => (
                     <NavLink
                       key={item.to}
                       to={item.to}
@@ -151,6 +171,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
           );
         })}
       </nav>
+
 
       {/* User / Logout */}
       <div className="p-4 border-t mt-auto" style={{ borderColor: 'var(--border-light)' }}>

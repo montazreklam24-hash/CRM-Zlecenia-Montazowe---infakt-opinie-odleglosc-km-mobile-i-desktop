@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { Job, JobColumnId } from '../types';
 import { getJobThumbnailUrl } from '../utils/imageUtils';
 import { Locate, Loader2 } from 'lucide-react';
@@ -27,7 +26,7 @@ declare global {
   }
 }
 
-// Komponent dymka z inteligentnym pozycjonowaniem i Portalem (aby uniknąć ucinania)
+// Komponent dymka z inteligentnym pozycjonowaniem
 const SmartPopup = ({ job, position, onClose, onSelect, mapContainer }: { job: Job, position: { x: number, y: number }, onClose: () => void, onSelect: () => void, mapContainer: HTMLDivElement | null }) => {
   const popupRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
@@ -36,41 +35,106 @@ const SmartPopup = ({ job, position, onClose, onSelect, mapContainer }: { job: J
   useLayoutEffect(() => {
     if (!popupRef.current || !mapContainer) return;
     
+    const popupRect = popupRef.current.getBoundingClientRect();
     const mapRect = mapContainer.getBoundingClientRect();
     const MARKER_HEIGHT = 40;
-    const PADDING = 10;
-    const VIEWPORT_PADDING = 20;
+    const PADDING = 15; // Większy padding wewnętrzny kontenera
+    const VIEWPORT_PADDING = 20; // Większy padding od krawędzi viewport
 
-    const popupWidth = 180; // Stała szerokość
-    const popupHeight = 220; // Przybliżona wysokość
+    // Jeśli popup nie ma jeszcze wymiarów, użyj domyślnych
+    const popupWidth = popupRef.current.offsetWidth || 180;
+    const popupHeight = popupRef.current.offsetHeight || 220;
 
-    // Współrzędne markera względem viewport
-    const markerViewportX = mapRect.left + position.x;
-    const markerViewportY = mapRect.top + position.y;
+    // Przelicz pozycję markera na współrzędne względem kontenera mapy
+    const markerX = position.x;
+    const markerY = position.y;
 
     // Viewport dimensions
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
 
-    // Domyślnie nad markerem
-    let top = markerViewportY - popupHeight - PADDING;
-    let left = markerViewportX - (popupWidth / 2);
+    // Pozycja względem kontenera mapy (absolute positioning) - wyśrodkowany nad markerem
+    let top = markerY - popupHeight - PADDING; // Domyślnie nad markerem
+    let left = markerX - (popupWidth / 2); // Wyśrodkowany względem markera
     let newPlacement: 'top' | 'bottom' = 'top';
 
-    // Jeśli nie mieści się u góry, daj pod markerem
-    if (top < VIEWPORT_PADDING) {
-      top = markerViewportY + MARKER_HEIGHT + PADDING;
+    // Oblicz pozycje absolutne względem viewport
+    let absoluteLeft = mapRect.left + left;
+    let absoluteTop = mapRect.top + top;
+    let absoluteRight = absoluteLeft + popupWidth;
+    let absoluteBottom = absoluteTop + popupHeight;
+
+    // Sprawdź czy mieści się u góry kontenera i viewport
+    if (top < PADDING || absoluteTop < VIEWPORT_PADDING) {
+      top = markerY + MARKER_HEIGHT + PADDING; // Pokaż pod markerem
       newPlacement = 'bottom';
+      absoluteTop = mapRect.top + top;
+      absoluteBottom = absoluteTop + popupHeight;
     }
 
-    // Korekta pozioma (żeby nie wychodziło poza ekran)
-    if (left < VIEWPORT_PADDING) left = VIEWPORT_PADDING;
-    if (left + popupWidth > vw - VIEWPORT_PADDING) left = vw - popupWidth - VIEWPORT_PADDING;
+    // Sprawdź czy mieści się z lewej strony (zarówno kontener jak i viewport)
+    const minLeft = Math.max(PADDING, VIEWPORT_PADDING - mapRect.left);
+    if (left < minLeft || absoluteLeft < VIEWPORT_PADDING) {
+      left = minLeft;
+      absoluteLeft = mapRect.left + left;
+      absoluteRight = absoluteLeft + popupWidth;
+    }
 
-    // Korekta pionowa (żeby nie wychodziło poza ekran na dole)
-    if (top + popupHeight > vh - VIEWPORT_PADDING && newPlacement === 'bottom') {
-      top = markerViewportY - popupHeight - PADDING;
+    // Sprawdź czy mieści się z prawej strony (zarówno kontener jak i viewport)
+    const maxLeft = Math.min(
+      mapRect.width - popupWidth - PADDING,
+      viewportWidth - mapRect.left - popupWidth - VIEWPORT_PADDING
+    );
+    if (left + popupWidth > mapRect.width - PADDING || absoluteRight > viewportWidth - VIEWPORT_PADDING) {
+      left = maxLeft;
+      absoluteLeft = mapRect.left + left;
+      absoluteRight = absoluteLeft + popupWidth;
+    }
+
+    // Jeśli nadal wychodzi poza viewport z prawej, przesuń bardziej w lewo
+    if (absoluteRight > viewportWidth - VIEWPORT_PADDING) {
+      left = Math.max(minLeft, viewportWidth - mapRect.left - popupWidth - VIEWPORT_PADDING);
+      absoluteLeft = mapRect.left + left;
+      absoluteRight = absoluteLeft + popupWidth;
+    }
+
+    // Jeśli nadal wychodzi poza viewport z lewej, przesuń bardziej w prawo
+    if (absoluteLeft < VIEWPORT_PADDING) {
+      left = Math.min(maxLeft, VIEWPORT_PADDING - mapRect.left);
+      absoluteLeft = mapRect.left + left;
+      absoluteRight = absoluteLeft + popupWidth;
+    }
+
+    // Jeśli wychodzi poza viewport z dołu, przesuń wyżej
+    if (absoluteBottom > viewportHeight - VIEWPORT_PADDING && newPlacement === 'bottom') {
+      top = markerY - popupHeight - PADDING;
       newPlacement = 'top';
+      absoluteTop = mapRect.top + top;
+      absoluteBottom = absoluteTop + popupHeight;
+    }
+
+    // Jeśli wychodzi poza viewport z góry, przesuń niżej
+    if (absoluteTop < VIEWPORT_PADDING && newPlacement === 'top') {
+      top = markerY + MARKER_HEIGHT + PADDING;
+      newPlacement = 'bottom';
+      absoluteTop = mapRect.top + top;
+      absoluteBottom = absoluteTop + popupHeight;
+    }
+
+    // Ostateczne sprawdzenie - jeśli marker jest zbyt blisko krawędzi, przesuń popup bardziej na środek
+    const markerAbsoluteX = mapRect.left + markerX;
+    const markerAbsoluteY = mapRect.top + markerY;
+    
+    // Jeśli marker jest blisko lewej krawędzi, przesuń popup bardziej w prawo
+    if (markerAbsoluteX < viewportWidth * 0.3 && absoluteLeft < VIEWPORT_PADDING + 50) {
+      left = Math.max(minLeft, markerX - popupWidth * 0.3);
+      absoluteLeft = mapRect.left + left;
+    }
+    
+    // Jeśli marker jest blisko prawej krawędzi, przesuń popup bardziej w lewo
+    if (markerAbsoluteX > viewportWidth * 0.7 && absoluteRight > viewportWidth - VIEWPORT_PADDING - 50) {
+      left = Math.min(maxLeft, markerX - popupWidth * 0.7);
+      absoluteLeft = mapRect.left + left;
     }
 
     setCoords({ top, left });
@@ -81,16 +145,17 @@ const SmartPopup = ({ job, position, onClose, onSelect, mapContainer }: { job: J
   const colName = COLUMN_NAMES[job.columnId || 'PREPARE'];
   const imgUrl = getJobThumbnailUrl(job.projectImages?.[0]);
 
-  return createPortal(
+  return (
     <div 
       ref={popupRef}
-      className="fixed bg-white rounded-lg shadow-2xl border border-slate-200 z-[9999] pointer-events-auto flex flex-col overflow-visible"
+      className="absolute bg-white rounded-lg shadow-xl border border-slate-200 z-50 pointer-events-auto flex flex-col"
       style={{ 
         top: coords.top, 
         left: coords.left,
         width: '180px',
         animation: 'fadeIn 0.2s ease-out'
       }}
+      onMouseLeave={onClose}
     >
       {/* Zdjęcie */}
       <div className="p-2 pb-0">
@@ -153,7 +218,7 @@ const SmartPopup = ({ job, position, onClose, onSelect, mapContainer }: { job: J
         </div>
 
         <button 
-          onClick={(e) => { e.stopPropagation(); onSelect(); }}
+          onClick={onSelect}
           className="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold py-1.5 rounded border border-slate-200 transition-colors"
         >
           Otwórz kartę
@@ -167,16 +232,17 @@ const SmartPopup = ({ job, position, onClose, onSelect, mapContainer }: { job: J
           left: '50%',
           marginLeft: '-6px',
           [placement === 'top' ? 'bottom' : 'top']: '-5px',
+          [placement === 'top' ? 'borderTop' : 'borderBottom']: 'none',
+          [placement === 'top' ? 'borderLeft' : 'borderRight']: 'none',
           backgroundColor: 'white',
           borderBottom: placement === 'top' ? '1px solid #e2e8f0' : 'none',
           borderRight: placement === 'top' ? '1px solid #e2e8f0' : 'none',
           borderTop: placement === 'bottom' ? '1px solid #e2e8f0' : 'none',
           borderLeft: placement === 'bottom' ? '1px solid #e2e8f0' : 'none',
-          zIndex: -1
+          [placement === 'top' ? 'boxShadow' : 'boxShadow']: '2px 2px 2px rgba(0, 0, 0, 0.05)'
         }}
       />
-    </div>,
-    document.body
+    </div>
   );
 };
 
@@ -229,14 +295,14 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
     const zoomListener = googleMapRef.current.addListener('zoom_changed', handleMapChange);
 
     return () => {
-      if (window.google && window.google.maps && googleMapRef.current) {
+      if (window.google && window.google.maps) {
         window.google.maps.event.removeListener(idleListener);
         window.google.maps.event.removeListener(boundsListener);
         window.google.maps.event.removeListener(zoomListener);
         cancelAnimationFrame(rafId);
       }
     };
-  }, [isApiLoaded]);
+  }, [isApiLoaded, hoveredJob]);
 
   // Sprawdzaj dostępność API
   useEffect(() => {
@@ -322,13 +388,6 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
 
         googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
 
-        // Kliknięcie w mapę zamyka dymek
-        googleMapRef.current.addListener('click', () => {
-          setHoveredJob(null);
-          setPopupPos(null);
-          currentHoveredMarkerRef.current = null;
-        });
-
         // Fix Ctrl+Scroll behavior: Enable scrollwheel only when Ctrl is pressed
         const mapDiv = mapRef.current;
         const handleWheel = (e: WheelEvent) => {
@@ -383,110 +442,112 @@ const MapBoardGoogle: React.FC<MapBoardProps> = ({ jobs, onSelectJob, onJobsUpda
   useEffect(() => {
     if (!googleMapRef.current || !jobs || !isApiLoaded) return;
 
-    const updateMarkers = async () => {
-      Logger.log('Updating markers for', jobs.length, 'jobs');
-      // Wyczyść stare pinezki
-      markersRef.current.forEach(marker => marker.setMap(null));
-      markersRef.current = [];
+    // Wyczyść stare pinezki
+    markersRef.current.forEach(marker => marker.setMap(null));
+    markersRef.current = [];
 
-      const bounds = new window.google.maps.LatLngBounds();
-      let hasValidMarkersCount = 0;
+    const bounds = new window.google.maps.LatLngBounds();
+    let hasValidMarkers = false;
 
-      for (const job of jobs) {
-        let position: { lat: number; lng: number } | null = null;
+    jobs.forEach(async (job) => {
+      let position: { lat: number; lng: number } | null = null;
 
-        if (job.data.coordinates && job.data.coordinates.lat && job.data.coordinates.lng) {
-          position = job.data.coordinates;
-        } else if (job.data.address && job.data.address.length > 5) {
-          const geocoder = new window.google.maps.Geocoder();
-          try {
-            // Google Geocoder może zwracać Promise lub wymagać callbacku
-            // Dla pewności obsługujemy oba przypadki
-            const result: any = await new Promise((resolve) => {
-              geocoder.geocode({ address: job.data.address + ', Polska' }, (results: any, status: any) => {
-                if (status === 'OK' && results && results[0]) {
-                  resolve(results[0]);
-                } else {
-                  resolve(null);
-                }
-              });
-            });
-
-            if (result) {
-              const location = result.geometry.location;
-              position = { lat: location.lat(), lng: location.lng() };
-              Logger.log('Geocoded address:', job.data.address, '->', position);
-            }
-          } catch (e) {
-            Logger.error('Geocoding error for', job.data.address, e);
+      if (job.data.coordinates && job.data.coordinates.lat && job.data.coordinates.lng) {
+        position = job.data.coordinates;
+      } else if (job.data.address && job.data.address.length > 5) {
+        const geocoder = new window.google.maps.Geocoder();
+        try {
+          const result = await geocoder.geocode({ address: job.data.address });
+          if (result.results && result.results[0]) {
+            const location = result.results[0].geometry.location;
+            position = { lat: location.lat(), lng: location.lng() };
           }
-        }
+        } catch (e) {}
+      }
 
-        if (position) {
-          const color = COLUMN_COLORS[job.columnId || 'PREPARE'] || '#475569';
-          
-          const svgMarker = {
-            path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
-            fillColor: color,
-            fillOpacity: 1,
-            strokeWeight: 1.5,
-            strokeColor: "#FFFFFF",
-            rotation: 0,
-            scale: 1.8,
-            anchor: new window.google.maps.Point(12, 24),
-          };
+      if (position) {
+        const color = COLUMN_COLORS[job.columnId || 'PREPARE'] || '#475569';
+        
+        const svgMarker = {
+          path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
+          fillColor: color,
+          fillOpacity: 1,
+          strokeWeight: 1.5,
+          strokeColor: "#FFFFFF",
+          rotation: 0,
+          scale: 1.8,
+          anchor: new window.google.maps.Point(12, 24),
+        };
 
-          const marker = new window.google.maps.Marker({
-            position: position,
-            map: googleMapRef.current,
-            icon: svgMarker
-          });
+        const marker = new window.google.maps.Marker({
+          position: position,
+          map: googleMapRef.current,
+          icon: svgMarker,
+          // title: job.data.jobTitle || job.friendlyId, // Usunięto, aby uniknąć natywnego tooltipu
+          // animation: window.google.maps.Animation.DROP
+        });
 
-          const handleInteraction = () => {
-            Logger.log('Marker interaction for job:', job.id);
+        const handleHover = () => {
+          if (overlayRef.current && googleMapRef.current) {
+            const markerPos = marker.getPosition();
+            const projection = overlayRef.current.getProjection();
             
-            // Jeśli to już ten sam job, nie rób nic (zapobiega pętli przy kliknięciu po hoverze)
-            if (currentHoveredMarkerRef.current === marker && hoveredJob?.id === job.id && popupPos) {
-              return;
-            }
-
-            if (overlayRef.current && googleMapRef.current) {
-              currentHoveredMarkerRef.current = marker;
-              setHoveredJob(job);
+            if (projection) {
+              const pixel = projection.fromLatLngToContainerPixel(markerPos);
+              const mapDiv = mapRef.current;
               
-              // Zgodnie z zasadami repo: ZAWSZE środkuj mapę na markerze
-              // Najpierw panTo
-              googleMapRef.current.panTo(marker.getPosition());
-              
-              // I dodatkowo przesuń, żeby karta była widoczna (wyśrodkowana)
-              // Karta ma ok. 220px wysokości. Przesuwamy o 120px w górę (czyli marker o 120px w dół na ekranie)
-              // Używamy setTimeout, aby panBy nastąpiło PO panTo (Google Maps API panTo jest asynchroniczne/animowane)
-              setTimeout(() => {
-                if (currentHoveredMarkerRef.current === marker) {
-                  googleMapRef.current.panBy(0, -120);
-                }
-              }, 100);
+              if (mapDiv) {
+                Logger.log('Hover on job:', job.id, { 
+                  pixel, 
+                  jobId: job.id
+                });
+
+                currentHoveredMarkerRef.current = marker;
+                setHoveredJob(job);
+                
+                // Zgodnie z zasadami repo: ZAWSZE środkuj mapę tak, aby KARTA była na środku
+                setPopupPos(null);
+                
+                // 1. Wyśrodkuj na markerze
+                googleMapRef.current.panTo(marker.getPosition());
+                
+                // 2. Dodaj offset, aby wyśrodkować całą kartę (ok. 220px wysokości)
+                // Jeśli karta jest pod markerem (brak miejsca u góry), przesuwamy mapę w dół.
+                const margin = 20;
+                const popupHeight = 220;
+                const popupPadding = 15;
+                const spaceAbove = pixel.y - margin;
+                const totalPopupH = popupHeight + popupPadding;
+                
+                const offsetY = spaceAbove < totalPopupH ? 110 : -110;
+                googleMapRef.current.panBy(0, offsetY);
+                
+                // Pozycja dymka zostanie zaktualizowana po zakończeniu ruchu (idle)
+                window.google.maps.event.addListenerOnce(googleMapRef.current, 'idle', () => {
+                  if (currentHoveredMarkerRef.current === marker) {
+                    updatePopupPos(marker);
+                  }
+                });
+              }
             }
-          };
+          }
+        };
 
-          marker.addListener('mouseover', handleInteraction);
-          marker.addListener('click', handleInteraction);
+        marker.addListener('mouseover', handleHover);
+        marker.addListener('click', handleHover); // Dla mobile
 
-          markersRef.current.push(marker);
-          bounds.extend(position);
-          hasValidMarkersCount++;
-        }
+        markersRef.current.push(marker);
+        bounds.extend(position);
+        hasValidMarkers = true;
       }
+    });
 
-      Logger.log('Added', hasValidMarkersCount, 'markers to map');
+    // Dopasuj mapę tylko przy pierwszym załadowaniu lub dużej zmianie (opcjonalne)
+    // Tu zostawiamy logikę "fitBounds" tylko jeśli to pierwsze ładowanie lub użytkownik wymusi
+    if (hasValidMarkers && googleMapRef.current && markersRef.current.length > 0 && !googleMapRef.current.getBounds()) {
+       googleMapRef.current.fitBounds(bounds);
+    }
 
-      // Dopasuj mapę tylko przy pierwszym załadowaniu
-      if (hasValidMarkersCount > 0 && googleMapRef.current && !googleMapRef.current.getBounds()) {
-        googleMapRef.current.fitBounds(bounds);
-      }
-    };
-
-    updateMarkers();
   }, [jobs, isApiLoaded]);
 
   return (

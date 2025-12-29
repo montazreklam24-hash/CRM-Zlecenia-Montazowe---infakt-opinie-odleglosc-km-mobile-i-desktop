@@ -337,11 +337,30 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
             <div className="flex justify-between items-center pt-2 mt-auto" style={{ borderTop: '1px solid var(--border-light)' }}>
               <div className="flex items-center gap-2">
                 {createdDate && <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{createdDate}</span>}
-                {job.totalGross && job.totalGross > 0 && (
-                  <span className="text-[10px] font-bold" style={{ color: 'var(--accent-primary)' }}>
-                    {job.totalGross.toFixed(0)} zł
-                  </span>
-                )}
+                {job.totalGross && job.totalGross > 0 ? (() => {
+                  const isVisible = isAdmin || job.paymentStatus === PaymentStatus.CASH || job.paymentStatus === PaymentStatus.PARTIAL;
+                  if (!isVisible) return <span className="text-[10px] text-slate-300 font-medium">*** zł</span>;
+                  
+                  return (
+                    <div className="flex flex-col items-end leading-none">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-bold" style={{ color: 'var(--accent-primary)' }}>
+                          {job.totalGross.toFixed(0)} zł
+                        </span>
+                        {job.priceSource === 'ai' ? (
+                          <span title="Wycena szacunkowa z maila" className="text-[10px]">✉️</span>
+                        ) : (
+                          <span title="Wycena potwierdzona dokumentem" className="text-[10px]">📄</span>
+                        )}
+                      </div>
+                      {isAdmin && job.totalNet && job.totalNet > 0 && (
+                        <span className="text-[8px] text-slate-400 font-medium">
+                          ({job.totalNet.toFixed(0)} netto)
+                        </span>
+                      )}
+                    </div>
+                  );
+                })() : null}
               </div>
               {isAdmin && (
                 <div className="flex gap-1">
@@ -453,7 +472,26 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
             <div className="text-[9px] truncate mb-1 text-slate-500">📍 {job.data.address?.split(',')[0] || 'Brak'}</div>
             {job.data.phoneNumber && <div className="text-[9px] font-bold truncate mb-1">📞 {job.data.phoneNumber}</div>}
             <div className="flex justify-between items-center mt-auto pt-1 border-t border-slate-100">
-              {job.totalGross && job.totalGross > 0 ? <span className="text-[9px] font-bold text-blue-600">{job.totalGross.toFixed(0)} zł</span> : <span />}
+              {job.totalGross && job.totalGross > 0 ? (() => {
+                const isVisible = isAdmin || job.paymentStatus === PaymentStatus.CASH || job.paymentStatus === PaymentStatus.PARTIAL;
+                if (!isVisible) return <span className="text-[9px] text-slate-300">*** zł</span>;
+
+                return (
+                  <div className="flex flex-col items-start leading-none">
+                    <div className="flex items-center gap-0.5">
+                      <span className="text-[9px] font-bold text-blue-600">{job.totalGross.toFixed(0)} zł</span>
+                      {job.priceSource === 'ai' ? (
+                        <span title="Wycena szacunkowa z maila" className="text-[8px] opacity-70">✉️</span>
+                      ) : (
+                        <span title="Wycena potwierdzona dokumentem" className="text-[8px] opacity-70">📄</span>
+                      )}
+                    </div>
+                    {isAdmin && job.totalNet && job.totalNet > 0 && (
+                      <span className="text-[7px] text-slate-400">({job.totalNet.toFixed(0)} netto)</span>
+                    )}
+                  </div>
+                );
+              })() : <span />}
               {isAdmin && (
                 <div className="flex gap-1">
                   <button onClick={(e) => { e.stopPropagation(); onDuplicate(job.id, e); }} className="p-0.5 rounded hover:bg-slate-100 text-blue-600"><Copy className="w-3 h-3" /></button>

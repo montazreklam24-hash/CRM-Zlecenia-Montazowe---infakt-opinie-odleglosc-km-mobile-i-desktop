@@ -9,6 +9,7 @@ import { SimpleJobCard } from './components/SimpleJobCard';
 import Layout from './components/Layout';
 import InvoiceModule from './components/InvoiceModule';
 import ClientModule from './components/ClientModule';
+import UserModule from './components/UserModule';
 import MapPage from './pages/MapPage';
 import InvoicingPage from './pages/InvoicingPage';
 import { geminiService, authService, jobsService } from './services/apiService';
@@ -382,6 +383,7 @@ const App: React.FC = () => {
           <Route path="/map" element={<MapPage onSelectJob={handleSelectJob} />} />
           <Route path="/invoices" element={<InvoicingPage />} />
           <Route path="/clients" element={<ClientModule onSelectJob={handleSelectJob} refreshTrigger={dashboardRefreshTrigger} />} />
+          <Route path="/users" element={<UserModule />} />
         </Route>
       </Routes>
 

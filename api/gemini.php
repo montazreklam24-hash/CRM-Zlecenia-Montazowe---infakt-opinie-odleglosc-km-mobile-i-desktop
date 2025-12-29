@@ -207,16 +207,31 @@ WYTYCZNE SZCZEGÓŁOWE:
 - Co konkretnie trzeba zrobić? (np. "1. Demontaż starego szyldu. 2. Montaż kasetonu 3x1m. 3. Wyklejenie witryny").
 - Wypisz wymiary i materiały, jeśli są podane.
 
+5. WYCENA I POZYCJE (quoteItems) - KRYTYCZNE:
+- Przeszukaj maila pod kątem kwot za poszczególne usługi.
+- Jeśli w mailu wymieniasz np. "Projekt: 200 zł, Montaż: 600 zł", stwórz z tego listę pozycji.
+- Jeśli podana jest tylko kwota NETTO, dolicz 23% VAT i oblicz BRUTTO.
+- Jeśli podana jest tylko kwota BRUTTO, odejmij VAT (dzieląc przez 1.23) i oblicz NETTO.
+- Jeśli nie określono czy netto czy brutto, przyjmij że to NETTO i dolicz 23% VAT.
+- Zsumuj wszystkie pozycje i wpisz do pól netAmount i grossAmount w obiekcie payment.
+
 FORMAT (JSON):
 {
     "suggestedTitle": "Tytuł zlecenia",
     "address": "Ulica Numer, Miasto (Nazwa Obiektu)",
     "scopeWorkText": "1. ...\n2. ...",
-    ...
-    \"payment\": {
-        \"type\": \"UNKNOWN\",
-        \"netAmount\": null,
-        \"grossAmount\": null
+    "phoneNumber": "Numer telefonu",
+    "email": "Email klienta",
+    "nip": "NIP (jeśli jest)",
+    "clientName": "Imię i Nazwisko / Nazwa Firmy",
+    "quoteItems": [
+        { "name": "Nazwa usługi", "netAmount": 100.00, "grossAmount": 123.00, "vatRate": 23 },
+        { "name": "Inna usługa", "netAmount": 200.00, "grossAmount": 246.00, "vatRate": 23 }
+    ],
+    "payment": {
+        "type": "TRANSFER",
+        "netAmount": 300.00,
+        "grossAmount": 369.00
     }
 }
 

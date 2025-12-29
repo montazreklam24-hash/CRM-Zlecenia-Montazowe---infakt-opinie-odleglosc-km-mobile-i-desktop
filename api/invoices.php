@@ -160,6 +160,14 @@ function handleCreateProforma() {
                 'total_gross' => $grossPrice / 100, // Konwersja z groszy na złote
                 'share_link' => $shareLink
             ), 'proforma', $clientId);
+
+            // Aktualizuj status zlecenia
+            try {
+                $stmt = $pdo->prepare("UPDATE jobs_ai SET payment_status = 'proforma' WHERE id = ?");
+                $stmt->execute([$jobId]);
+            } catch (Exception $e) {
+                error_log("Failed to update job status after proforma: " . $e->getMessage());
+            }
         }
         
         jsonResponse(array(
@@ -296,6 +304,15 @@ function handleCreateInvoice() {
                 'share_link' => $shareLink,
                 'status' => $markPaid ? 'paid' : 'pending'
             ), 'vat', $clientId);
+
+            // Aktualizuj status zlecenia
+            try {
+                $newStatus = $markPaid ? 'paid' : 'invoiced';
+                $stmt = $pdo->prepare("UPDATE jobs_ai SET payment_status = ? WHERE id = ?");
+                $stmt->execute([$newStatus, $jobId]);
+            } catch (Exception $e) {
+                error_log("Failed to update job status after invoice: " . $e->getMessage());
+            }
         }
         
         jsonResponse(array(

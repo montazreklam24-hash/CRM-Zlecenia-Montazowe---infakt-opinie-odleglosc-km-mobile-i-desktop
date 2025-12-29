@@ -255,6 +255,7 @@ const Layout: React.FC<LayoutProps> = ({
           showLogo={false} 
           className="h-full border-none shadow-none w-full"
           onNavigate={() => setIsSidebarOpen(false)}
+          role={user?.role}
         />
       </div>
 

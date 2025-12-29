@@ -5,7 +5,7 @@ import {
   AlertTriangle, ChevronDown, ChevronUp, User, Mail, Phone, MapPin,
   AlertCircle, Link as LinkIcon
 } from 'lucide-react';
-import { Invoice, InvoiceItem, PaymentStatus } from '../types';
+import { Invoice, InvoiceItem, PaymentStatus, QuoteItem } from '../types';
 import { invoiceService, InvoiceItemData, InvoiceClientData } from '../services/invoiceService';
 import { PAYMENT_STATUS_LIST, getPaymentStatusConfig } from '../constants/paymentStatus';
 
@@ -24,6 +24,7 @@ interface InvoiceModuleProps {
   isAdmin: boolean;
   onStatusChange?: (status: PaymentStatus, source?: 'manual' | 'auto') => void;
   onClientDataChange?: (data: InvoiceClientData) => void;
+  quoteItems?: QuoteItem[];
   // Opcjonalnie dla kompatybilności wstecznej
   billing?: {
     name?: string;
@@ -78,8 +79,11 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
   isAdmin,
   onStatusChange,
   onClientDataChange,
+  quoteItems,
   billing
 }) => {
+  if (!isAdmin) return null;
+
   const [isExpanded, setIsExpanded] = useState(true);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -96,6 +100,22 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
   });
 
   const allPresets = [...DEFAULT_PRESET_ITEMS, ...customPresets];
+
+  const fillFromAI = () => {
+    if (!quoteItems || quoteItems.length === 0) return;
+    
+    const newItems: InvoiceItem[] = quoteItems.map(item => ({
+      name: item.name,
+      quantity: 1,
+      unit: 'szt.',
+      unitPriceNet: item.netAmount,
+      vatRate: item.vatRate || 23,
+      totalNet: item.netAmount,
+      totalGross: item.grossAmount
+    }));
+    
+    setItems(newItems);
+  };
 
   const handleSaveAsPreset = (item: InvoiceItem) => {
     const newPreset: Partial<InvoiceItem> = {
@@ -729,38 +749,49 @@ const InvoiceModule: React.FC<InvoiceModuleProps> = ({
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <h4 className="text-xs font-bold text-slate-500 uppercase">Pozycje faktury</h4>
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowPresets(!showPresets)}
-                      className="flex items-center gap-1 text-sm font-bold text-indigo-600 hover:text-indigo-700"
-                    >
-                      <Plus className="w-4 h-4" /> Dodaj pozycję
-                    </button>
-                    
-                    {/* Dropdown z presetami */}
-                    {showPresets && (
-                      <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2 space-y-1 max-h-72 overflow-y-auto">
-                        {allPresets.map((preset, i) => (
-                          <button
-                            key={i}
-                            onClick={() => addItem(preset)}
-                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 text-sm"
-                          >
-                            <span className="font-medium">{preset.name}</span>
-                            <span className="text-slate-400 ml-2">
-                              ({preset.unitPriceNet} zł/{preset.unit})
-                            </span>
-                          </button>
-                        ))}
-                        <hr className="my-2" />
-                        <button
-                          onClick={() => addItem()}
-                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-indigo-50 text-sm text-indigo-600 font-medium"
-                        >
-                          + Pusta pozycja
-                        </button>
-                      </div>
+                  <div className="flex items-center gap-3">
+                    {quoteItems && quoteItems.length > 0 && (
+                      <button
+                        onClick={fillFromAI}
+                        className="flex items-center gap-1 text-sm font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg transition-colors border border-emerald-100"
+                        title="Wypełnij danymi z wyceny AI w mailu"
+                      >
+                        💰 Wypełnij z AI
+                      </button>
                     )}
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowPresets(!showPresets)}
+                        className="flex items-center gap-1 text-sm font-bold text-indigo-600 hover:text-indigo-700"
+                      >
+                        <Plus className="w-4 h-4" /> Dodaj pozycję
+                      </button>
+                      
+                      {/* Dropdown z presetami */}
+                      {showPresets && (
+                        <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2 space-y-1 max-h-72 overflow-y-auto">
+                          {allPresets.map((preset, i) => (
+                            <button
+                              key={i}
+                              onClick={() => addItem(preset)}
+                              className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 text-sm"
+                            >
+                              <span className="font-medium">{preset.name}</span>
+                              <span className="text-slate-400 ml-2">
+                                ({preset.unitPriceNet} zł/{preset.unit})
+                              </span>
+                            </button>
+                          ))}
+                          <hr className="my-2" />
+                          <button
+                            onClick={() => addItem()}
+                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-indigo-50 text-sm text-indigo-600 font-medium"
+                          >
+                            + Pusta pozycja
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
