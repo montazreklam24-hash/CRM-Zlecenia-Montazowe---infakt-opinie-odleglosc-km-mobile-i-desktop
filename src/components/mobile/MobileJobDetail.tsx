@@ -469,11 +469,11 @@ const MobileJobDetail: React.FC<MobileJobDetailProps> = ({
         )}
 
         {/* Payment & Amount */}
-        {job.totalGross && job.totalGross > 0 && (
+        {job.totalGross && job.totalGross > 0 && (isAdmin || job.paymentStatus === PaymentStatus.CASH) && (
           <div className="bg-green-50 rounded-2xl p-4 border border-green-100">
             <label className="text-xs text-green-600 font-medium uppercase tracking-wider flex items-center gap-2 mb-2">
               <DollarSign className="w-4 h-4" />
-              Kwota
+              Kwota do pobrania (gotówka)
             </label>
             <div className="text-2xl font-bold text-green-700">
               {job.totalGross.toFixed(2)} zł

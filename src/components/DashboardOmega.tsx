@@ -1598,11 +1598,15 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
                   {createdDate}
                 </span>
               )}
-              {job.totalGross && job.totalGross > 0 && (
-                <span className="text-[10px] font-bold" style={{ color: 'var(--accent-primary)' }}>
-                  {job.totalGross.toFixed(0)} zł
-                </span>
-              )}
+              {job.totalGross && job.totalGross > 0 && (() => {
+                const isVisible = isAdmin || job.paymentStatus === PaymentStatus.CASH;
+                if (!isVisible) return <span className="text-[10px] text-slate-300 font-medium">*** zł</span>;
+                return (
+                  <span className="text-[10px] font-bold" style={{ color: 'var(--accent-primary)' }}>
+                    {job.totalGross.toFixed(0)} zł
+                  </span>
+                );
+              })()}
             </div>
             {isAdmin && (
               <div className="flex gap-1">
@@ -1953,11 +1957,15 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
 
           {/* Bottom row: Amount + Actions */}
           <div className="flex justify-between items-center mt-auto pt-1 border-t border-slate-100">
-            {job.totalGross && job.totalGross > 0 ? (
-              <span className="text-[9px] font-bold" style={{ color: 'var(--accent-primary)' }}>
-                {job.totalGross.toFixed(0)} zł
-              </span>
-            ) : <span />}
+            {job.totalGross && job.totalGross > 0 ? (() => {
+              const isVisible = isAdmin || job.paymentStatus === PaymentStatus.CASH;
+              if (!isVisible) return <span className="text-[10px] text-slate-300 font-medium">*** zł</span>;
+              return (
+                <span className="text-[9px] font-bold" style={{ color: 'var(--accent-primary)' }}>
+                  {job.totalGross.toFixed(0)} zł
+                </span>
+              );
+            })() : <span />}
             
             {/* Delete/Duplicate buttons */}
             {isAdmin && (

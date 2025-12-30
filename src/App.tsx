@@ -381,9 +381,9 @@ const App: React.FC = () => {
             )
           } />
           <Route path="/map" element={<MapPage onSelectJob={handleSelectJob} />} />
-          <Route path="/invoices" element={<InvoicingPage />} />
-          <Route path="/clients" element={<ClientModule onSelectJob={handleSelectJob} refreshTrigger={dashboardRefreshTrigger} />} />
-          <Route path="/users" element={<UserModule />} />
+          <Route path="/invoices" element={userRole === UserRole.ADMIN ? <InvoicingPage /> : <DashboardOmega role={userRole} onSelectJob={handleSelectJob} onCreateNew={handleStartCreate} refreshTrigger={dashboardRefreshTrigger} />} />
+          <Route path="/clients" element={userRole === UserRole.ADMIN ? <ClientModule onSelectJob={handleSelectJob} refreshTrigger={dashboardRefreshTrigger} /> : <DashboardOmega role={userRole} onSelectJob={handleSelectJob} onCreateNew={handleStartCreate} refreshTrigger={dashboardRefreshTrigger} />} />
+          <Route path="/users" element={userRole === UserRole.ADMIN ? <UserModule /> : <DashboardOmega role={userRole} onSelectJob={handleSelectJob} onCreateNew={handleStartCreate} refreshTrigger={dashboardRefreshTrigger} />} />
         </Route>
       </Routes>
 

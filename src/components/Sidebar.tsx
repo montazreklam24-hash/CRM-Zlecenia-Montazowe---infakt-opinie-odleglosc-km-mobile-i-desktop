@@ -57,8 +57,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
       items: [
         { icon: <LayoutDashboard size={18} />, label: 'Pulpit', to: '/' },
         { icon: <Map size={18} />, label: 'Mapa', to: '/map' },
-        { icon: <Receipt size={18} />, label: 'Faktury', to: '/invoices' },
-        { icon: <Users size={18} />, label: 'Kontrahenci', to: '/clients' },
+        { icon: <Receipt size={18} />, label: 'Faktury', to: '/invoices', adminOnly: true },
+        { icon: <Users size={18} />, label: 'Kontrahenci', to: '/clients', adminOnly: true },
       ]
     },
     {
@@ -73,8 +73,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
       title: 'Raporty',
       icon: <BarChart3 size={18} />,
       items: [
-        { icon: <FileText size={18} />, label: 'Raport zleceń', to: '/reports/jobs' },
-        { icon: <Calendar size={18} />, label: 'Raport miesięczny', to: '/reports/monthly' },
+        { icon: <FileText size={18} />, label: 'Raport zleceń', to: '/reports/jobs', adminOnly: true },
+        { icon: <Calendar size={18} />, label: 'Raport miesięczny', to: '/reports/monthly', adminOnly: true },
       ]
     },
     {
@@ -82,7 +82,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, className = 'hidden md:flex
       icon: <Archive size={18} />,
       items: [
         { icon: <Archive size={18} />, label: 'Zlecenia zakończone', to: '/archive/completed' },
-        { icon: <FileText size={18} />, label: 'Dokumenty', to: '/archive/documents' },
+        { icon: <FileText size={18} />, label: 'Dokumenty', to: '/archive/documents', adminOnly: true },
       ]
     }
   ];

@@ -242,6 +242,10 @@ KRYTYCZNE ZASADY:
    - W polu "addressCandidates" wypisz wszystkie inne adresy znalezione w mailu.
    - Jeśli w mailu jest inny adres rejestrowy/do faktury, wpisz go w pole "billingAddress".
 5. WĄTKI: Przeszukaj cały wątek, dane klienta często są w pierwszej wiadomości.
+6. INTELIGENTNA ANALIZA HISTORII: Jeśli klient dopisuje nowe zlecenie do starego wątku:
+   - Skup się na najnowszej wiadomości jako głównym zleceniu.
+   - Jeśli w starszych częściach wątku widzisz listę prac, ale z kontekstu wynika, że mogły zostać zakończone (stara data, podziękowania, faktury), umieść je w opisie z dopiskiem: "[WĄTPLIWE - CZY TO TEŻ? - dane z dnia XX.XX.XXXX]". 
+   - Nigdy nie usuwaj ich całkowicie, jeśli nie masz 100% pewności, ale oznacz je tak, by użytkownik musiał je sprawdzić.
 
 ODPOWIEDZ TYLKO CZYSTYM JSONEM:
 {

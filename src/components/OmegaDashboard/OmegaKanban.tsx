@@ -338,7 +338,7 @@ const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
               <div className="flex items-center gap-2">
                 {createdDate && <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{createdDate}</span>}
                 {job.totalGross && job.totalGross > 0 ? (() => {
-                  const isVisible = isAdmin || job.paymentStatus === PaymentStatus.CASH || job.paymentStatus === PaymentStatus.PARTIAL;
+                  const isVisible = isAdmin || job.paymentStatus === PaymentStatus.CASH;
                   if (!isVisible) return <span className="text-[10px] text-slate-300 font-medium">*** zł</span>;
                   
                   return (
@@ -473,7 +473,7 @@ const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
             {job.data.phoneNumber && <div className="text-[9px] font-bold truncate mb-1">📞 {job.data.phoneNumber}</div>}
             <div className="flex justify-between items-center mt-auto pt-1 border-t border-slate-100">
               {job.totalGross && job.totalGross > 0 ? (() => {
-                const isVisible = isAdmin || job.paymentStatus === PaymentStatus.CASH || job.paymentStatus === PaymentStatus.PARTIAL;
+                const isVisible = isAdmin || job.paymentStatus === PaymentStatus.CASH;
                 if (!isVisible) return <span className="text-[9px] text-slate-300">*** zł</span>;
 
                 return (

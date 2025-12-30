@@ -206,6 +206,10 @@ WYTYCZNE SZCZEGÓŁOWE:
 - Nie kopiuj maila! Napisz zwięzłe, żołnierskie streszczenie w punktach.
 - Co konkretnie trzeba zrobić? (np. "1. Demontaż starego szyldu. 2. Montaż kasetonu 3x1m. 3. Wyklejenie witryny").
 - Wypisz wymiary i materiały, jeśli są podane.
+- ANALIZA WĄTKU: Jeśli w treści są starsze wiadomości (historia):
+  a) Wyraźnie oddziel nowe zlecenie od starego.
+  b) Jeśli widzisz starsze prośby, co do których masz podejrzenie, że zostały już wykonane (bo są z odległą datą lub w wątku dalej jest mowa o fakturze/płatności/montażu), dopisz je na końcu listy z przedrostkiem: "[DO WERYFIKACJI - PRAWDOPODOBNIE WYKONANE]".
+  c) Dodaj krótką informację, dlaczego tak uważasz (np. "z maila z dnia 12.10").
 
 5. WYCENA I POZYCJE (quoteItems) - KRYTYCZNE:
 - Przeszukaj maila pod kątem kwot za poszczególne usługi.

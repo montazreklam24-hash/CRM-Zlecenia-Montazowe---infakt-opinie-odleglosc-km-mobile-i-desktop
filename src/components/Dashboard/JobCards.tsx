@@ -275,11 +275,15 @@ export const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
                   })}
                 </span>
               )}
-              {job.totalGross && job.totalGross > 0 && (
-                <span className="text-[10px] font-bold" style={{ color: 'var(--accent-primary)' }}>
-                  {job.totalGross.toFixed(0)} zł
-                </span>
-              )}
+              {job.totalGross && job.totalGross > 0 && (() => {
+                const isVisible = isAdmin || job.paymentStatus === PaymentStatus.CASH;
+                if (!isVisible) return <span className="text-[10px] text-slate-300 font-medium ml-1">*** zł</span>;
+                return (
+                  <span className="text-[10px] font-bold" style={{ color: 'var(--accent-primary)' }}>
+                    {job.totalGross.toFixed(0)} zł
+                  </span>
+                );
+              })()}
             </div>
             {isAdmin && (
               <div className="flex gap-1">
@@ -527,11 +531,15 @@ export const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
                     {new Date(job.data.scheduledDate).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
                   </div>
                 )}
-                {job.totalGross && job.totalGross > 0 && (
-                  <div className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded">
-                    {job.totalGross.toFixed(0)} zł
-                  </div>
-                )}
+                {job.totalGross && job.totalGross > 0 && (() => {
+                  const isVisible = isAdmin || job.paymentStatus === PaymentStatus.CASH;
+                  if (!isVisible) return <div className="text-[8px] font-bold text-slate-300 bg-slate-50 px-1 rounded">*** zł</div>;
+                  return (
+                    <div className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded">
+                      {job.totalGross.toFixed(0)} zł
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>

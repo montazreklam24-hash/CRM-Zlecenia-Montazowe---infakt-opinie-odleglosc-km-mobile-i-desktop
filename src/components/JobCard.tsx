@@ -1636,7 +1636,7 @@ const JobCard: React.FC<JobCardProps> = ({
           </div>
 
           {/* Billing Data - Sekcja do edycji */}
-          {(isEditing || editedData.billing?.name || editedData.billing?.nip) && (
+          {isAdmin && (isEditing || editedData.billing?.name || editedData.billing?.nip) && (
             <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
               <div className="flex justify-between items-center mb-3">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
