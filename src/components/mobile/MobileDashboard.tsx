@@ -116,7 +116,8 @@ const DEMO_JOBS: Job[] = [
 ];
 
 // Column configuration
-const COLUMNS: { id: JobColumnId; short: string; full: string; color: string }[] = [
+const COLUMNS: { id: JobColumnId | 'ALL'; short: string; full: string; color: string }[] = [
+  { id: 'ALL', short: '🏠', full: 'Wszystkie', color: '#1e293b' },
   { id: 'PREPARE', short: '📦', full: 'Przygotowanie', color: '#475569' },
   { id: 'MON', short: 'Pn', full: 'Poniedziałek', color: '#f43f5e' },
   { id: 'TUE', short: 'Wt', full: 'Wtorek', color: '#10b981' },
@@ -216,11 +217,11 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({
   const [paymentFilter, setPaymentFilter] = useState<PaymentStatus | 'ALL'>('ALL');
 
   // Load last selected column from localStorage, default to today's day
-  const [selectedColumn, setSelectedColumn] = useState<JobColumnId>(() => {
+  const [selectedColumn, setSelectedColumn] = useState<JobColumnId | 'ALL'>(() => {
     const saved = localStorage.getItem('mobile_selected_column');
     // Jeśli zapisana kolumna istnieje, użyj jej; w przeciwnym razie dzisiejszy dzień
-    if (saved && ['PREPARE', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'COMPLETED'].includes(saved)) {
-      return saved as JobColumnId;
+    if (saved && (['PREPARE', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'COMPLETED', 'ALL'].includes(saved))) {
+      return saved as JobColumnId | 'ALL';
     }
     return getTodayColumnId();
   });
@@ -242,7 +243,7 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({
   // Get jobs for selected column with search and payment filter
   const columnJobs = jobs
     .filter(j => {
-      const matchesColumn = (j.columnId || 'PREPARE') === selectedColumn;
+      const matchesColumn = selectedColumn === 'ALL' || (j.columnId || 'PREPARE') === selectedColumn;
       const notArchived = j.status !== JobStatus.ARCHIVED;
       const matchesSearch = !searchQuery || 
         j.data.jobTitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -252,11 +253,21 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({
       const matchesPayment = paymentFilter === 'ALL' || j.paymentStatus === paymentFilter;
       return matchesColumn && notArchived && matchesSearch && matchesPayment;
     })
-    .sort((a, b) => (a.order ?? 999999) - (b.order ?? 999999));
+    .sort((a, b) => {
+      // Jeśli widok WSZYSTKIE, sortuj po dacie utworzenia (najnowsze u góry)
+      if (selectedColumn === 'ALL') {
+        return (b.createdAt || 0) - (a.createdAt || 0);
+      }
+      return (a.order ?? 999999) - (b.order ?? 999999);
+    });
 
   // Get job count for a column
-  const getCount = (colId: JobColumnId) => 
-    jobs.filter(j => (j.columnId || 'PREPARE') === colId && j.status !== JobStatus.ARCHIVED).length;
+  const getCount = (colId: JobColumnId | 'ALL') => {
+    if (colId === 'ALL') {
+      return jobs.filter(j => j.status !== JobStatus.ARCHIVED).length;
+    }
+    return jobs.filter(j => (j.columnId || 'PREPARE') === colId && j.status !== JobStatus.ARCHIVED).length;
+  };
 
   // Get current column info
   const currentColumn = COLUMNS.find(c => c.id === selectedColumn) || COLUMNS[1];
@@ -430,8 +441,8 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({
 interface SwipeableJobListProps {
   jobs: Job[];
   columns: typeof COLUMNS;
-  selectedColumn: JobColumnId;
-  onColumnChange: (col: JobColumnId) => void;
+  selectedColumn: JobColumnId | 'ALL';
+  onColumnChange: (col: JobColumnId | 'ALL') => void;
   onOpenJob: (job: Job) => void;
   onMoveUp: (jobId: string) => void;
   onMoveDown: (jobId: string) => void;
@@ -592,7 +603,7 @@ interface MobileJobCardCompactProps {
   onArchive: () => void;
   canMoveUp: boolean;
   canMoveDown: boolean;
-  currentColumnId: JobColumnId;
+  currentColumnId: JobColumnId | 'ALL';
   isAdmin: boolean;
   isDemo?: boolean;
 }
@@ -662,9 +673,9 @@ const MobileJobCardCompact: React.FC<MobileJobCardCompactProps> = ({
         {/* Move UP button */}
         <button
           onClick={() => onMoveUp()}
-          disabled={!canMoveUp}
+          disabled={!canMoveUp || currentColumnId === 'ALL'}
           className={`px-4 flex items-center justify-center transition-all ${
-            canMoveUp 
+            canMoveUp && currentColumnId !== 'ALL'
               ? 'bg-orange-500 text-white active:bg-orange-600' 
               : 'bg-slate-200 text-slate-400'
           }`}
@@ -685,6 +696,14 @@ const MobileJobCardCompact: React.FC<MobileJobCardCompactProps> = ({
           <div className="absolute bottom-0.5 left-0.5 text-[6px] font-bold bg-black/70 text-white px-1 rounded">
             {job.friendlyId}
           </div>
+          {/* Column indicator for "ALL" view */}
+          {currentColumnId === 'ALL' && (
+            <div 
+              className="absolute top-0 right-0 w-3 h-3 rounded-bl-lg shadow-sm"
+              style={{ background: COLUMNS.find(c => c.id === job.columnId)?.color || '#64748b' }}
+              title={COLUMNS.find(c => c.id === job.columnId)?.full || 'Brak kolumny'}
+            />
+          )}
         </div>
 
         {/* Middle: Title + Address */}
@@ -758,9 +777,9 @@ const MobileJobCardCompact: React.FC<MobileJobCardCompactProps> = ({
         {/* Move DOWN button */}
         <button
           onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
-          disabled={!canMoveDown}
+          disabled={!canMoveDown || currentColumnId === 'ALL'}
           className={`px-4 flex items-center justify-center transition-all ${
-            canMoveDown 
+            canMoveDown && currentColumnId !== 'ALL'
               ? 'bg-orange-500 text-white active:bg-orange-600' 
               : 'bg-slate-200 text-slate-400'
           }`}
@@ -806,10 +825,10 @@ const MobileJobCardCompact: React.FC<MobileJobCardCompactProps> = ({
               📅 Przenieś zlecenie do:
             </div>
             <div className="grid grid-cols-2 gap-2 mb-2">
-              {COLUMNS.filter(c => c.id !== currentColumnId).map(col => (
+              {COLUMNS.filter(c => c.id !== currentColumnId && c.id !== 'ALL').map(col => (
                 <button
                   key={col.id}
-                  onClick={() => handleMoveToColumn(col.id)}
+                  onClick={() => handleMoveToColumn(col.id as JobColumnId)}
                   className="text-left px-3 py-3 rounded-xl hover:bg-slate-50 active:bg-slate-100 text-sm font-medium text-slate-700 flex items-center gap-2 border border-slate-100"
                 >
                   <span 

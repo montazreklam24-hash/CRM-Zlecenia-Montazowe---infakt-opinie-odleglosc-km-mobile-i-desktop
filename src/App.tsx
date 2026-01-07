@@ -33,24 +33,14 @@ interface AppState {
   returnToArchive?: boolean;
 }
 
-const AUTO_USER: User = {
-  id: 1,
-  email: 'admin@montazreklam24.pl',
-  name: 'Administrator',
-  role: UserRole.ADMIN,
-  phone: null,
-  is_active: true,
-  last_login: null
-};
-
 const App: React.FC = () => {
   // Przywróć returnToArchive z localStorage przy inicjalizacji
   const savedTab = localStorage.getItem('dashboard_active_tab');
   const initialReturnToArchive = savedTab === 'ARCHIVED';
   
   const [state, setState] = useState<AppState>({
-    currentView: 'APP',
-    user: AUTO_USER,
+    currentView: 'LOGIN',
+    user: null,
     activeModal: 'NONE',
     selectedJob: null,
     tempJobData: null,
@@ -59,6 +49,26 @@ const App: React.FC = () => {
     error: null,
     returnToArchive: initialReturnToArchive
   });
+
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Initial session check
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const user = await authService.getCurrentUser();
+        if (user) {
+          setState(prev => ({ ...prev, user, currentView: 'APP' }));
+        }
+      } catch (err) {
+        console.error('Auth check failed:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    checkAuth();
+  }, []);
 
   useEffect(() => {
     // Obsługa przycisku wstecz w przeglądarce
@@ -142,6 +152,19 @@ const App: React.FC = () => {
   }, [state.user, state.activeModal]);
 
   const [dashboardRefreshTrigger, setDashboardRefreshTrigger] = useState(0);
+
+  // Sync with localStorage for cross-window updates
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'crm_last_change') {
+        console.log('📡 App: Wykryto zmianę w innym oknie, odświeżam dashboardy...');
+        setDashboardRefreshTrigger(prev => prev + 1);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
   
   // Dashboard Variant logic (Legacy vs Omega)
   const [dashVariant, setDashVariant] = useState<'legacy' | 'omega'>(() => {
@@ -274,6 +297,18 @@ const App: React.FC = () => {
       alert('Błąd zapisu zlecenia');
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-orange-500 animate-spin mx-auto mb-4" />
+          <div className="text-white font-bold tracking-widest text-xl">MONTAŻ REKLAM 24</div>
+          <div className="text-slate-400 text-sm mt-2">Inicjalizacja systemu...</div>
+        </div>
+      </div>
+    );
+  }
 
   // Login view
   if (state.currentView === 'LOGIN' || !state.user) {

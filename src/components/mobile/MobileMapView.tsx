@@ -167,10 +167,7 @@ const MobileMapView: React.FC<MobileMapViewProps> = ({ jobs, onBack, onOpenJob }
       markers.push(marker);
     });
 
-    // Close card on map background click
-    map.on('click', () => {
-      setSelectedJob(null);
-    });
+    // Usunięto: map.on('click', ...) - karta ma być stała
 
     // Fit bounds if there are markers
     if (markers.length > 0) {

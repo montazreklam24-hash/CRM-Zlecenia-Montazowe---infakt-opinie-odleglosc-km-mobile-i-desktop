@@ -278,10 +278,20 @@ export const DraggableJobCard: React.FC<DraggableJobCardProps> = ({
               {job.totalGross && job.totalGross > 0 && (() => {
                 const isVisible = isAdmin || job.paymentStatus === PaymentStatus.CASH;
                 if (!isVisible) return <span className="text-[10px] text-slate-300 font-medium ml-1">*** zł</span>;
+                
+                const sourceInfo = {
+                  ai: { icon: '🤖', label: 'Wycena orientacyjna', color: 'text-slate-400' },
+                  proforma: { icon: '📄', label: 'Z proformy', color: 'text-orange-500' },
+                  invoice: { icon: '✅', label: 'Z faktury VAT', color: 'text-emerald-600' }
+                }[job.priceSource || 'ai'];
+
                 return (
-                  <span className="text-[10px] font-bold" style={{ color: 'var(--accent-primary)' }}>
-                    {job.totalGross.toFixed(0)} zł
-                  </span>
+                  <div className="flex items-center gap-1" title={sourceInfo.label}>
+                    <span className="text-[8px]">{sourceInfo.icon}</span>
+                    <span className={`text-[10px] font-bold ${job.priceSource === 'invoice' ? 'text-emerald-600' : 'text-slate-700'}`}>
+                      {job.totalGross.toFixed(0)} zł
+                    </span>
+                  </div>
                 );
               })()}
             </div>
@@ -534,8 +544,23 @@ export const SmallKanbanCard: React.FC<DraggableJobCardProps> = ({
                 {job.totalGross && job.totalGross > 0 && (() => {
                   const isVisible = isAdmin || job.paymentStatus === PaymentStatus.CASH;
                   if (!isVisible) return <div className="text-[8px] font-bold text-slate-300 bg-slate-50 px-1 rounded">*** zł</div>;
+                  
+                  const sourceIcon = {
+                    ai: '🤖',
+                    proforma: '📄',
+                    invoice: '✅'
+                  }[job.priceSource || 'ai'];
+
                   return (
-                    <div className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded">
+                    <div 
+                      className={`text-[8px] font-bold px-1 rounded flex items-center gap-0.5 ${
+                        job.priceSource === 'invoice' ? 'bg-emerald-50 text-emerald-600' : 
+                        job.priceSource === 'proforma' ? 'bg-orange-50 text-orange-600' :
+                        'bg-slate-50 text-slate-500'
+                      }`}
+                      title={job.priceSource === 'invoice' ? 'Faktura VAT' : job.priceSource === 'proforma' ? 'Proforma' : 'Orientacyjna'}
+                    >
+                      <span>{sourceIcon}</span>
                       {job.totalGross.toFixed(0)} zł
                     </div>
                   );

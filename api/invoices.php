@@ -693,11 +693,23 @@ function handleSyncStatus() {
                     $localStatus = 'pending'; // Częściowo opłacone = nadal oczekuje
                 }
                 
-                // Aktualizuj tylko jeśli status się zmienił
-                if ($inv['status'] !== $localStatus) {
-                    $updateStmt = $pdo->prepare("UPDATE invoices SET status = ? WHERE id = ?");
-                    $updateStmt->execute(array($localStatus, $inv['id']));
-                    $updated++;
+                // Pobierz aktualne kwoty z inFakt (zawsze, na wypadek gdyby były 0 w DB)
+                $totalNet = isset($infaktInvoice['net_price']) ? floatval($infaktInvoice['net_price']) / 100 : 0;
+                $totalGross = isset($infaktInvoice['gross_price']) ? floatval($infaktInvoice['gross_price']) / 100 : 0;
+                
+                // Aktualizuj status i kwoty
+                $updateStmt = $pdo->prepare("
+                    UPDATE invoices 
+                    SET status = ?, total_net = ?, total_gross = ? 
+                    WHERE id = ?
+                ");
+                $updateStmt->execute(array($localStatus, $totalNet, $totalGross, $inv['id']));
+                $updated++;
+                
+                // Jeśli opłacono, zsynchronizuj też status zlecenia
+                if ($localStatus === 'paid') {
+                    $jobUpd = $pdo->prepare("UPDATE jobs_ai SET payment_status = 'paid' WHERE id = (SELECT job_id FROM invoices WHERE id = ?)");
+                    $jobUpd->execute(array($inv['id']));
                 }
                 
             } catch (Exception $e) {
@@ -758,15 +770,18 @@ function runFullSync($userId = null) {
                 $paymentStatus = isset($infaktInvoice['payment_status']) ? $infaktInvoice['payment_status'] : 'unpaid';
                 $localStatus = ($paymentStatus === 'paid') ? 'paid' : 'pending';
                 
-                if ($inv['status'] !== $localStatus) {
-                    $upd = $pdo->prepare("UPDATE invoices SET status = ? WHERE id = ?");
-                    $upd->execute(array($localStatus, $inv['id']));
-                    $results['invoices']['updated']++;
-                    
-                    if ($localStatus === 'paid') {
-                        $jobUpd = $pdo->prepare("UPDATE jobs_ai SET payment_status = 'paid' WHERE id = (SELECT job_id FROM invoices WHERE id = ?)");
-                        $jobUpd->execute(array($inv['id']));
-                    }
+                // Pobierz aktualne kwoty z inFakt
+                $totalNet = isset($infaktInvoice['net_price']) ? floatval($infaktInvoice['net_price']) / 100 : 0;
+                $totalGross = isset($infaktInvoice['gross_price']) ? floatval($infaktInvoice['gross_price']) / 100 : 0;
+                
+                // Aktualizuj status i kwoty (zawsze, żeby mieć pewność)
+                $upd = $pdo->prepare("UPDATE invoices SET status = ?, total_net = ?, total_gross = ? WHERE id = ?");
+                $upd->execute(array($localStatus, $totalNet, $totalGross, $inv['id']));
+                $results['invoices']['updated']++;
+                
+                if ($localStatus === 'paid') {
+                    $jobUpd = $pdo->prepare("UPDATE jobs_ai SET payment_status = 'paid' WHERE id = (SELECT job_id FROM invoices WHERE id = ?)");
+                    $jobUpd->execute(array($inv['id']));
                 }
             }
         } catch (Exception $e) {

@@ -69,10 +69,7 @@ const MobileGoogleMapView: React.FC<MobileGoogleMapViewProps> = ({ jobs, onBack,
         }
       }, 500);
 
-      // Kliknięcie w tło mapy zamyka kartę
-      googleMapRef.current.addListener('click', () => {
-        setSelectedJob(null);
-      });
+      // Usunięto: googleMapRef.current.addListener('click', ...) - karta ma być stała
     }
   }, []);
 

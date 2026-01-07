@@ -17,6 +17,7 @@ import { rotateImage90, compressImage, processImageFile } from '../utils/imageUt
 import InvoiceModule from './InvoiceModule';
 import CompletionSection from './CompletionSection';
 import { useVoiceInput } from '../hooks/useVoiceInput';
+import { useDeviceType } from '../hooks/useDeviceType';
 
 interface JobCardProps {
   job?: Job;
@@ -184,6 +185,7 @@ const JobCard: React.FC<JobCardProps> = ({
 }) => {
   const isAdmin = role === UserRole.ADMIN;
   const [isEditing, setIsEditing] = useState(!job);
+  const { isMobile } = useDeviceType();
   
   const normalizeData = (d: any): JobOrderData => ({
     ...d,
@@ -1215,6 +1217,21 @@ const JobCard: React.FC<JobCardProps> = ({
             </div>
           </div>
 
+          {/* Gotówka do pobrania dla pracownika */}
+          {!isAdmin && job?.paymentStatus === PaymentStatus.CASH && job?.totalGross && job.totalGross > 0 && (
+            <div className="bg-yellow-100 border-2 border-yellow-400 rounded-xl p-5 shadow-lg animate-pulse">
+              <p className="text-sm font-black text-yellow-800 uppercase tracking-widest flex items-center gap-2">
+                💰 GOTÓWKA DO POBRANIA NA MIEJSCU
+              </p>
+              <h2 className="text-4xl font-black text-yellow-900 mt-2">
+                {job.totalGross.toFixed(2)} zł
+              </h2>
+              <p className="text-xs text-yellow-700 mt-1 font-bold">
+                Proszę pobrać powyższą kwotę od klienta po zakończeniu montażu.
+              </p>
+            </div>
+          )}
+
           {/* Invoice Module - TOP POSITION for easy access */}
           {isAdmin && job && (
             <InvoiceModule
@@ -1973,37 +1990,39 @@ const JobCard: React.FC<JobCardProps> = ({
             </div>
           )}
 
-          {/* Admin Notes */}
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 shadow-sm">
-            <div className="flex justify-between items-center mb-3">
-              <p className="text-xs font-bold text-amber-700 uppercase tracking-wide flex items-center gap-2">
-                <MessageSquare className="w-4 h-4" /> UWAGI WEWNĘTRZNE
-              </p>
-              {isEditing && isSupported && (
-                <button
-                  onClick={() => toggleVoice('adminNotes')}
-                  className={`p-1.5 rounded-lg transition-all ${
-                    isListening && activeVoiceField === 'adminNotes'
-                      ? 'bg-red-100 text-red-600 animate-pulse'
-                      : 'bg-white text-slate-400 hover:text-amber-600'
-                  }`}
-                  title="Nagraj głosowo"
-                >
-                  {isListening && activeVoiceField === 'adminNotes' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                </button>
+          {/* Admin Notes - widoczne tylko dla Admina */}
+          {isAdmin && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <p className="text-xs font-bold text-amber-700 uppercase tracking-wide flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" /> UWAGI WEWNĘTRZNE
+                </p>
+                {isEditing && isSupported && (
+                  <button
+                    onClick={() => toggleVoice('adminNotes')}
+                    className={`p-1.5 rounded-lg transition-all ${
+                      isListening && activeVoiceField === 'adminNotes'
+                        ? 'bg-red-100 text-red-600 animate-pulse'
+                        : 'bg-white text-slate-400 hover:text-amber-600'
+                    }`}
+                    title="Nagraj głosowo"
+                  >
+                    {isListening && activeVoiceField === 'adminNotes' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
+                )}
+              </div>
+              {isEditing ? (
+                <textarea 
+                  value={adminNotes} 
+                  onChange={(e) => setAdminNotes(e.target.value)} 
+                  className="w-full min-h-[80px] bg-white text-slate-800 border border-amber-200 p-3 rounded-lg text-sm" 
+                  placeholder="Uwagi dla montażystów..." 
+                />
+              ) : (
+                <p className="text-sm font-medium text-slate-700 whitespace-pre-wrap">{adminNotes || 'Brak uwag.'}</p>
               )}
             </div>
-            {isEditing ? (
-              <textarea 
-                value={adminNotes} 
-                onChange={(e) => setAdminNotes(e.target.value)} 
-                className="w-full min-h-[80px] bg-white text-slate-800 border border-amber-200 p-3 rounded-lg text-sm" 
-                placeholder="Uwagi dla montażystów..." 
-              />
-            ) : (
-              <p className="text-sm font-medium text-slate-700 whitespace-pre-wrap">{adminNotes || 'Brak uwag.'}</p>
-            )}
-          </div>
+          )}
 
           {/* Checklist */}
           <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
@@ -2162,8 +2181,8 @@ const JobCard: React.FC<JobCardProps> = ({
         </div>
       </div>
 
-      {/* Footer Actions */}
-      <div className="mt-6 space-y-4">
+      {/* Footer Actions - Sticky on Mobile */}
+      <div className={`mt-6 space-y-4 ${isMobile ? 'sticky bottom-0 left-0 right-0 bg-slate-100/95 backdrop-blur-md p-4 -mx-5 border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-40' : ''}`}>
         {/* Przycisk "Zakończ zlecenie" - widoczny w obu trybach (edycja i normalny) oraz dla zleceń z archiwum */}
         {isAdmin && job && (
           <div className="space-y-3">

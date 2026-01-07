@@ -65,6 +65,7 @@ const geocodeWithNominatim = async (address: string): Promise<{ lat: number; lng
 };
 
 const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpdated }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
@@ -72,6 +73,38 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
   const [mapReady, setMapReady] = useState(false);
   const [selectedJobForList, setSelectedJobForList] = useState<Job | null>(null);
   const [jobsWithCoords, setJobsWithCoords] = useState<Map<string, { lat: number; lng: number }>>(new Map());
+  const [isLiveMode, setIsLiveMode] = useState(false);
+
+  // Polling for LIVE mode
+  useEffect(() => {
+    let interval: any;
+    
+    if (isLiveMode && onJobsUpdated) {
+      console.log('🔄 MapBoardOSM: Tryb LIVE aktywny (polling co 15s)');
+      interval = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          onJobsUpdated();
+        }
+      }, 15000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isLiveMode, onJobsUpdated]);
+
+  // Sync with localStorage for cross-window updates
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'crm_last_change' && onJobsUpdated) {
+        console.log('📡 MapBoardOSM: Wykryto zmianę w innym oknie, odświeżam...');
+        onJobsUpdated();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [onJobsUpdated]);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
@@ -333,10 +366,10 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
   }, []);
 
   const toggleFullscreen = () => {
-    if (!mapContainerRef.current) return;
+    if (!containerRef.current) return;
     
     if (!document.fullscreenElement) {
-      mapContainerRef.current.requestFullscreen().then(() => {
+      containerRef.current.requestFullscreen().then(() => {
         setTimeout(() => {
           mapInstanceRef.current?.invalidateSize();
         }, 100);
@@ -358,11 +391,12 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
   });
 
   return (
-    <div className="relative flex gap-4">
+    <div ref={containerRef} className={`relative flex gap-4 bg-slate-50 p-2 rounded-xl transition-all ${isFullscreen ? 'h-screen w-screen p-4' : ''}`}>
       {/* Panel listy zleceń */}
-      <div className="w-64 flex-shrink-0 bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden flex flex-col">
-        <div className="bg-slate-800 text-white px-4 py-2 font-bold text-sm">
-          Zlecenia na mapie ({visibleJobs.length})
+      <div className={`w-64 flex-shrink-0 bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden flex flex-col ${isFullscreen ? 'h-full' : 'h-[500px]'}`}>
+        <div className="bg-slate-800 text-white px-4 py-2 font-bold text-sm flex items-center justify-between">
+          <span>Zlecenia ({visibleJobs.length})</span>
+          {isLiveMode && <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />}
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-2">
           {visibleJobs.length === 0 ? (
@@ -438,6 +472,18 @@ const MapBoardOSM: React.FC<MapBoardOSMProps> = ({ jobs, onSelectJob, onJobsUpda
         
         {/* Controls */}
         <div className="absolute top-2 right-2 flex gap-2 z-10">
+          <button
+            onClick={() => setIsLiveMode(!isLiveMode)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg shadow-md transition-all font-bold text-xs ${
+              isLiveMode 
+                ? 'bg-green-600 text-white animate-pulse' 
+                : 'bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+            title={isLiveMode ? "Wyłącz tryb LIVE" : "Włącz tryb LIVE (auto-odświeżanie)"}
+          >
+            <div className={`w-2 h-2 rounded-full ${isLiveMode ? 'bg-white' : 'bg-slate-400'}`} />
+            LIVE
+          </button>
           <button
             onClick={handleRefresh}
             className="bg-white hover:bg-slate-50 text-slate-700 p-2 rounded-lg shadow-md transition-colors"

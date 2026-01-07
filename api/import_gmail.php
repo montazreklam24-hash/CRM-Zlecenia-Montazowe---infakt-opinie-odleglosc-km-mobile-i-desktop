@@ -1,19 +1,18 @@
 <?php
 /**
- * Import wiadomości z Gmaila (wraz z załącznikami) - Poprawiona wersja z obsługą threadId i inline images
+ * API Importu z Gmaila
+ * Obsługuje:
+ * 1. Pobieranie załączników z Gmaila dla Rozszerzenia Chrome
+ * 2. Bezpośrednie tworzenie zleceń z Gmaila (np. przez Google Apps Script)
  */
+
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/images.php';
+require_once __DIR__ . '/jobs.php';
+require_once __DIR__ . '/gemini.php';
 
 header('Content-Type: application/json');
 handleCORS();
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-  http_response_code(405);
-  echo json_encode(['success' => false, 'error' => 'Method not allowed']);
-  exit;
-}
 
 // DEBUG LOGGING
 function debugImport($msg) {
@@ -22,236 +21,280 @@ function debugImport($msg) {
     file_put_contents($logDir . '/debug_import.log', date('Y-m-d H:i:s') . " | " . $msg . "\n", FILE_APPEND);
 }
 
-$input = json_decode(file_get_contents('php://input'), true);
-$id = $input['messageId'] ?? $input['id'] ?? null;
-$token = $input['token'] ?? null;
-// USUNIĘTO selectedIds - teraz zawsze pobieramy WSZYSTKO, filtrowanie po nazwie robi rozszerzenie
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit; }
 
-// Log input parameters (without token)
-debugImport("=== NEW REQUEST ===");
-debugImport("INPUT params: ID=$id (pobieramy WSZYSTKIE załączniki)");
+// Autoryzacja
+$providedSecret = isset($_SERVER['HTTP_X_CRM_SECRET']) ? $_SERVER['HTTP_X_CRM_SECRET'] : (isset($_GET['secret']) ? $_GET['secret'] : '');
+$authToken = getAuthToken();
 
-if (!$id || !$token) {
-  http_response_code(400);
-  echo json_encode(['success' => false, 'error' => 'Missing messageId/id or token']);
-  exit;
+// Pozwól jeśli to CRM_API_SECRET lub jeśli użytkownik jest zalogowany
+$isAuthorized = false;
+if ($providedSecret === CRM_API_SECRET || $authToken === CRM_API_SECRET) {
+    $isAuthorized = true;
+} else {
+    try {
+        requireAuth();
+        $isAuthorized = true;
+    } catch (Exception $e) {}
 }
 
-function base64url_decode_safe(string $data): string {
-  $data = strtr($data, '-_', '+/');
-  $pad = strlen($data) % 4;
-  if ($pad) $data .= str_repeat('=', 4 - $pad);
-  $decoded = base64_decode($data, true);
-  return $decoded === false ? '' : $decoded;
+if (!$isAuthorized) {
+    jsonResponse(['success' => false, 'error' => 'Unauthorized'], 401);
 }
 
-function googleApiGetRaw(string $url, string $token): array {
-  debugImport("API Request: $url");
-  $ch = curl_init();
-  curl_setopt_array($ch, [
-    CURLOPT_URL => $url,
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_HTTPHEADER => [
-      "Authorization: Bearer {$token}",
-      "Accept: application/json"
-    ],
-    CURLOPT_SSL_VERIFYPEER => false,
-    CURLOPT_TIMEOUT => 30
-  ]);
-  $response = curl_exec($ch);
-  $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-  $err = curl_error($ch);
-  curl_close($ch);
+$input = getJsonInput();
 
-  if ($response === false) {
-    debugImport("Curl error: $err");
-    return ['ok' => false, 'code' => 0, 'error' => $err ?: 'Curl error', 'json' => null];
-  }
-  $json = json_decode($response, true);
-  debugImport("API Response: HTTP $httpCode");
-  return ['ok' => ($httpCode >= 200 && $httpCode < 300), 'code' => $httpCode, 'error' => null, 'json' => $json];
-}
+// --- SCENARIUSZ 1: Pobieranie załączników (Rozszerzenie Chrome) ---
+// Rozszerzenie wysyła messageId/id oraz token OAuth2 Gmaila
+if ((isset($input['messageId']) || isset($input['id'])) && isset($input['token'])) {
+    $id = isset($input['messageId']) ? $input['messageId'] : $input['id'];
+    $token = $input['token'];
 
-// UPROSZCZONA WERSJA - Zawsze zbiera WSZYSTKIE załączniki (z deduplikacją)
-// $seenFiles to zbiór już zebranych plików (klucz: nazwa+rozmiar), żeby uniknąć duplikatów z różnych wiadomości w wątku
-function collectAttachmentsFromPart(array $part, string $messageId, array &$out, array &$seenFiles): void {
-  $mimeType = $part['mimeType'] ?? '';
-  $filename = $part['filename'] ?? '';
-  $body = $part['body'] ?? [];
-  $attachmentId = $body['attachmentId'] ?? null;
-  $fileSize = $body['size'] ?? 0; // Rozmiar pliku z Gmail API
-  $inlineData = $body['data'] ?? null;
+    debugImport("=== NEW ATTACHMENT REQUEST ===");
+    debugImport("INPUT params: ID=$id (pobieramy WSZYSTKIE załączniki)");
 
-  // Załącznik z ID (typowy przypadek)
-  if ($attachmentId) {
-    $isInlineImage = (strpos($mimeType, 'image/') === 0);
-    if ($filename || $isInlineImage) {
-      // DEDUPLIKACJA: Sprawdź czy już mamy plik o tej nazwie I rozmiarze
-      // Klucz = nazwa (lowercase) + rozmiar - dzięki temu różne wersje pliku (inny rozmiar) zostaną pobrane
-      $fileKey = strtolower($filename ?: 'inline_' . substr($attachmentId, 0, 16)) . '_' . $fileSize;
-      if (isset($seenFiles[$fileKey])) {
-        debugImport("SKIPPING DUPLICATE: $filename ({$fileSize} bytes) - already collected from another message");
-      } else {
-        debugImport("Collecting: $filename (mime: $mimeType, size: {$fileSize} bytes)");
-        $seenFiles[$fileKey] = true;
-        $out[] = [
-          'messageId' => $messageId,
-          'attachmentId' => (string)$attachmentId,
-          'filename' => $filename,
-          'mimeType' => $mimeType,
-          'isInline' => $isInlineImage,
-          'size' => $fileSize
-        ];
-      }
+    function base64url_decode_safe($data) {
+        $data = strtr($data, '-_', '+/');
+        $pad = strlen($data) % 4;
+        if ($pad) $data .= str_repeat('=', 4 - $pad);
+        $decoded = base64_decode($data);
+        return $decoded === false ? '' : $decoded;
     }
-  }
 
-  // Inline obraz bez ID (rzadko)
-  if (!$attachmentId && $inlineData && strpos($mimeType, 'image/') === 0) {
-    $inlineFilename = $filename ?: ('inline_' . substr(md5($inlineData), 0, 8) . '.png');
-    $inlineSize = strlen($inlineData); // Rozmiar danych base64
-    $fileKey = strtolower($inlineFilename) . '_' . $inlineSize;
-    if (!isset($seenFiles[$fileKey])) {
-      $seenFiles[$fileKey] = true;
-      $out[] = [
-        'messageId' => $messageId,
-        'attachmentId' => null,
-        'filename' => $inlineFilename,
-        'mimeType' => $mimeType,
-        'isInline' => true,
-        'inlineData' => $inlineData,
-        'size' => $inlineSize
-      ];
-    }
-  }
+    function googleApiGetRaw($url, $token) {
+        debugImport("API Request: $url");
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                "Authorization: Bearer {$token}",
+                "Accept: application/json"
+            ],
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_TIMEOUT => 30
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
 
-  // Rekurencja do pod-części
-  if (!empty($part['parts']) && is_array($part['parts'])) {
-    foreach ($part['parts'] as $sub) {
-      if (is_array($sub)) collectAttachmentsFromPart($sub, $messageId, $out, $seenFiles);
+        if ($response === false) {
+            debugImport("Curl error: $err");
+            return ['ok' => false, 'code' => 0, 'error' => $err ?: 'Curl error', 'json' => null];
+        }
+        $json = json_decode($response, true);
+        debugImport("API Response: HTTP $httpCode");
+        return ['ok' => ($httpCode >= 200 && $httpCode < 300), 'code' => $httpCode, 'error' => null, 'json' => $json];
     }
-  }
+
+    function collectAttachmentsFromPart($part, $messageId, &$out, &$seenFiles) {
+        $mimeType = isset($part['mimeType']) ? $part['mimeType'] : '';
+        $filename = isset($part['filename']) ? $part['filename'] : '';
+        $body = isset($part['body']) ? $part['body'] : [];
+        $attachmentId = isset($body['attachmentId']) ? $body['attachmentId'] : null;
+        $fileSize = isset($body['size']) ? $body['size'] : 0;
+        $inlineData = isset($body['data']) ? $body['data'] : null;
+
+        if ($attachmentId) {
+            $isInlineImage = (strpos($mimeType, 'image/') === 0);
+            if ($filename || $isInlineImage) {
+                $fileKey = strtolower($filename ?: 'inline_' . substr($attachmentId, 0, 16)) . '_' . $fileSize;
+                if (isset($seenFiles[$fileKey])) {
+                    debugImport("SKIPPING DUPLICATE: $filename ({$fileSize} bytes)");
+                } else {
+                    debugImport("Collecting: $filename (mime: $mimeType, size: {$fileSize} bytes)");
+                    $seenFiles[$fileKey] = true;
+                    $out[] = [
+                        'messageId' => $messageId,
+                        'attachmentId' => (string)$attachmentId,
+                        'filename' => $filename,
+                        'mimeType' => $mimeType,
+                        'isInline' => $isInlineImage,
+                        'size' => $fileSize
+                    ];
+                }
+            }
+        }
+
+        if (!empty($part['parts']) && is_array($part['parts'])) {
+            foreach ($part['parts'] as $sub) {
+                collectAttachmentsFromPart($sub, $messageId, $out, $seenFiles);
+            }
+        }
+    }
+
+    try {
+        debugImport("=== START IMPORT (ID: $id) - POBIERAMY CAŁY WĄTEK ===");
+        $attachmentsMeta = [];
+
+        // Pobierz threadId
+        $msgUrl = "https://www.googleapis.com/gmail/v1/users/me/messages/{$id}?format=minimal";
+        $msgRes = googleApiGetRaw($msgUrl, $token);
+        
+        $threadId = null;
+        if ($msgRes['ok'] && !empty($msgRes['json']['threadId'])) {
+            $threadId = $msgRes['json']['threadId'];
+            debugImport("Got threadId: $threadId");
+        } else {
+            $threadId = $id;
+            debugImport("Using $id as threadId directly");
+        }
+        
+        // Pobierz CAŁY WĄTEK
+        $threadUrl = "https://www.googleapis.com/gmail/v1/users/me/threads/{$threadId}?format=full";
+        $threadRes = googleApiGetRaw($threadUrl, $token);
+        
+        if (!$threadRes['ok']) {
+            throw new Exception("Nie udało się pobrać wątku $threadId. HTTP: " . $threadRes['code']);
+        }
+        
+        $messages = isset($threadRes['json']['messages']) ? $threadRes['json']['messages'] : [];
+        debugImport("Thread fetched. Messages count: " . count($messages));
+        
+        // Sortuj najnowsze najpierw
+        usort($messages, function($a, $b) {
+            $dateA = isset($a['internalDate']) ? floatval($a['internalDate']) : 0;
+            $dateB = isset($b['internalDate']) ? floatval($b['internalDate']) : 0;
+            return $dateB - $dateA;
+        });
+
+        $seenFiles = [];
+        foreach ($messages as $msg) {
+            if (isset($msg['payload'])) {
+                collectAttachmentsFromPart($msg['payload'], $msg['id'], $attachmentsMeta, $seenFiles);
+            }
+        }
+
+        debugImport("Found " . count($attachmentsMeta) . " matching attachment(s)");
+
+        $saved = [];
+        foreach ($attachmentsMeta as $a) {
+            $filename = $a['filename'] ?: ('image_' . $a['messageId'] . '_' . ($a['attachmentId'] ?: 'inline') . '.png');
+            $safeFilename = preg_replace('/[^a-zA-Z0-9\._-]/', '_', $filename);
+            
+            $msgId = $a['messageId'];
+            $attId = $a['attachmentId'];
+            $attUrl = "https://www.googleapis.com/gmail/v1/users/me/messages/{$msgId}/attachments/{$attId}";
+            $attRes = googleApiGetRaw($attUrl, $token);
+            
+            if (!$attRes['ok'] || empty($attRes['json']['data'])) continue;
+            $dataBinary = base64url_decode_safe($attRes['json']['data']);
+
+            if ($dataBinary === '') continue;
+
+            $finalFilename = time() . '_' . $safeFilename;
+            $filePath = UPLOAD_DIR . $finalFilename;
+            
+            if (file_put_contents($filePath, $dataBinary)) {
+                debugImport("Saved file: $filePath (" . strlen($dataBinary) . " bytes)");
+                
+                // Miniaturka dla PDF/EPS/AI/PSD
+                $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+                if (in_array($ext, ['pdf', 'eps', 'ai', 'psd'])) {
+                    generateThumbnail($filePath);
+                }
+
+                $saved[] = [
+                    'filename' => $finalFilename,
+                    'originalName' => $filename,
+                    'path' => rtrim(UPLOADS_URL, '/') . '/' . $finalFilename,
+                    'mimeType' => $a['mimeType'] ?: 'application/octet-stream'
+                ];
+            }
+        }
+
+        debugImport("=== IMPORT COMPLETE (Saved: " . count($saved) . ") ===");
+        jsonResponse([
+            'success' => true, 
+            'attachments' => $saved,
+            'threadId' => $threadId
+        ]);
+
+    } catch (Exception $e) {
+        debugImport("ERROR: " . $e->getMessage());
+        jsonResponse(['success' => false, 'error' => $e->getMessage()], 500);
+    }
 }
 
-function collectAttachmentsFromMessage(array $message, array &$out, array &$seenFiles): void {
-  $messageId = $message['id'] ?? '';
-  if (!$messageId) return;
-  $payload = $message['payload'] ?? null;
-  if (!$payload || !is_array($payload)) return;
-  collectAttachmentsFromPart($payload, $messageId, $out, $seenFiles);
+// --- SCENARIUSZ 2: Bezpośrednie tworzenie zlecenia (GAS / Direct POST) ---
+if (empty($input['text']) && empty($input['data'])) {
+    jsonResponse(['error' => 'No data provided'], 400);
 }
 
 try {
-  debugImport("=== START IMPORT (ID: $id) - POBIERAMY CAŁY WĄTEK ===");
-  $attachmentsMeta = [];
-
-  // KROK 1: Pobierz pojedynczą wiadomość żeby uzyskać threadId
-  $msgUrl = "https://www.googleapis.com/gmail/v1/users/me/messages/{$id}?format=minimal";
-  $msgRes = googleApiGetRaw($msgUrl, $token);
-  
-  $threadId = null;
-  if ($msgRes['ok'] && !empty($msgRes['json']['threadId'])) {
-      $threadId = $msgRes['json']['threadId'];
-      debugImport("Got threadId: $threadId from message $id");
-  } else {
-      // Może $id to już threadId?
-      $threadId = $id;
-      debugImport("Using $id as threadId directly");
-  }
-  
-  // KROK 2: Pobierz CAŁY WĄTEK ze wszystkimi wiadomościami
-  $threadUrl = "https://www.googleapis.com/gmail/v1/users/me/threads/{$threadId}?format=full";
-  $threadRes = googleApiGetRaw($threadUrl, $token);
-  
-  if (!$threadRes['ok']) {
-      throw new Exception("Nie udało się pobrać wątku $threadId. HTTP: " . $threadRes['code']);
-  }
-  
-  $messages = $threadRes['json']['messages'] ?? [];
-  debugImport("Thread fetched. Messages count: " . count($messages));
-  
-  // KROK 3: Posortuj wiadomości od NAJNOWSZEJ do najstarszej
-  // Gmail API zwraca chronologicznie (stare→nowe), a my chcemy odwrotnie
-  // Dzięki temu najnowszy załącznik (np. zaakceptowany projekt) będzie okładką
-  usort($messages, function($a, $b) {
-      $dateA = isset($a['internalDate']) ? intval($a['internalDate']) : 0;
-      $dateB = isset($b['internalDate']) ? intval($b['internalDate']) : 0;
-      return $dateB - $dateA; // Malejąco (najnowsze najpierw)
-  });
-  debugImport("Messages sorted: newest first");
-  
-  // KROK 4: Zbierz załączniki ze WSZYSTKICH wiadomości w wątku (z deduplikacją po nazwie+rozmiarze)
-  $seenFiles = []; // Śledzenie już zebranych plików (klucz: nazwa_rozmiar) - zapobiega duplikatom z różnych wiadomości
-  foreach ($messages as $msg) {
-      if (is_array($msg)) {
-          $msgDate = isset($msg['internalDate']) ? date('Y-m-d H:i', intval($msg['internalDate'])/1000) : 'unknown';
-          debugImport("Scanning message: " . ($msg['id'] ?? 'unknown') . " (date: $msgDate)");
-          collectAttachmentsFromMessage($msg, $attachmentsMeta, $seenFiles);
-      }
-  }
-
-  debugImport("Found " . count($attachmentsMeta) . " matching attachment(s)");
-
-  if (count($attachmentsMeta) === 0) {
-      debugImport("WARNING: No attachments found. Dumping message structure (SAMPLE):");
-      // Dump only part of json to avoid huge logs
-      $jsonStr = json_encode($msgRes['json'], JSON_PRETTY_PRINT);
-      debugImport(substr($jsonStr, 0, 2000) . "...");
-  }
-
-  // 3) Pobierz pliki
-  $saved = [];
-  foreach ($attachmentsMeta as $a) {
-    $filename = $a['filename'] ?: ('image_' . $a['messageId'] . '_' . ($a['attachmentId'] ?? 'inline') . '.png');
-    $safeFilename = preg_replace('/[^a-zA-Z0-9\._-]/', '_', $filename);
-    $dataBinary = '';
-
-    if (!empty($a['inlineData'])) {
-      $dataBinary = base64url_decode_safe($a['inlineData']);
-    } else {
-      $attId = $a['attachmentId'];
-      $msgId = $a['messageId'];
-      $attUrl = "https://www.googleapis.com/gmail/v1/users/me/messages/{$msgId}/attachments/{$attId}";
-      $attRes = googleApiGetRaw($attUrl, $token);
-      if (!$attRes['ok'] || empty($attRes['json']['data'])) continue;
-      $dataBinary = base64url_decode_safe($attRes['json']['data']);
-    }
-
-    if ($dataBinary === '') continue;
-
-    // Używamy standardowego UPLOAD_DIR z config.php
-    $finalFilename = time() . '_' . $safeFilename;
-    $filePath = UPLOAD_DIR . '/' . $finalFilename;
+    $pdo = getDB();
     
-    if (file_put_contents($filePath, $dataBinary)) {
-        debugImport("Saved file: $filePath (" . strlen($dataBinary) . " bytes)");
-        
-        // Generuj miniaturkę dla PDF/EPS
-        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-        if (in_array($ext, ['pdf', 'eps', 'ai', 'psd'])) {
-            generateThumbnail($filePath);
+    $text = isset($input['text']) ? $input['text'] : '';
+    $images = isset($input['images']) ? $input['images'] : [];
+    $gmailMessageId = isset($input['gmailMessageId']) ? $input['gmailMessageId'] : null;
+    $gmailThreadId = isset($input['gmailThreadId']) ? $input['gmailThreadId'] : null;
+    $title = isset($input['title']) ? $input['title'] : 'Zlecenie z Gmail';
+
+    if (!empty($text) && empty($input['data'])) {
+        // Poprawione wywołanie: analyzeEmailContent zamiast nieistniejącego analyzeWithGemini
+        $geminiResult = analyzeEmailContent($text);
+        if ($geminiResult && isset($geminiResult['data'])) {
+            $jobData = $geminiResult['data'];
+            if (isset($jobData['suggestedTitle']) && ($title === 'Zlecenie z Gmail' || strlen($title) < 5)) {
+                $title = $jobData['suggestedTitle'];
+            }
+        } else {
+            $jobData = [
+                'jobTitle' => $title,
+                'scopeWorkText' => $text,
+                'address' => 'Do ustalenia'
+            ];
         }
-
-        $saved[] = [
-          'filename' => $finalFilename,
-          'originalName' => $filename,
-          'path' => rtrim(UPLOADS_URL, '/') . '/' . $finalFilename,
-          'mimeType' => $a['mimeType'] ?? 'application/octet-stream'
-        ];
     } else {
-        debugImport("Failed to save file: $filePath");
+        $jobData = isset($input['data']) ? $input['data'] : [];
     }
-  }
 
-  debugImport("=== IMPORT COMPLETE (Saved: " . count($saved) . ") ===");
-  echo json_encode([
-      'success' => true, 
-      'attachments' => $saved,
-      'threadId' => $threadId
-  ]);
+    // Sprawdź duplikaty
+    if ($gmailMessageId) {
+        $stmt = $pdo->prepare('SELECT id FROM jobs_ai WHERE gmail_message_id = ?');
+        $stmt->execute([$gmailMessageId]);
+        if ($stmt->fetch()) {
+            jsonResponse(['success' => true, 'message' => 'Zlecenie już istnieje', 'isDuplicate' => true]);
+        }
+    }
+
+    $friendlyId = generateFriendlyId();
+    
+    $stmt = $pdo->prepare('
+        INSERT INTO jobs_ai (
+            friendly_id, title, address, description, status, column_id, created_by,
+            gmail_message_id, gmail_thread_id, value_net, value_gross
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ');
+
+    $stmt->execute([
+        $friendlyId,
+        $title,
+        isset($jobData['address']) ? $jobData['address'] : null,
+        isset($jobData['scopeWorkText']) ? $jobData['scopeWorkText'] : (isset($jobData['description']) ? $jobData['description'] : $text),
+        'NEW',
+        'PREPARE',
+        1, // System
+        $gmailMessageId,
+        $gmailThreadId,
+        isset($jobData['payment']['netAmount']) ? $jobData['payment']['netAmount'] : null,
+        isset($jobData['payment']['grossAmount']) ? $jobData['payment']['grossAmount'] : null
+    ]);
+
+    $jobId = $pdo->lastInsertId();
+
+    if (!empty($images)) {
+        saveJobImages($jobId, $images, 'project');
+    }
+
+    jsonResponse([
+        'success' => true,
+        'jobId' => $jobId,
+        'friendlyId' => $friendlyId,
+        'message' => 'Zlecenie utworzone pomyślnie'
+    ]);
 
 } catch (Exception $e) {
-  debugImport("ERROR: " . $e->getMessage());
-  http_response_code(500);
-  echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    jsonResponse(['error' => $e->getMessage()], 500);
 }

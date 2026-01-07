@@ -40,6 +40,11 @@ const clearToken = (): void => {
   localStorage.removeItem(TOKEN_KEY);
 };
 
+// Helper do informowania innych okien o zmianie
+const notifyChanges = () => {
+  localStorage.setItem('crm_last_change', Date.now().toString());
+};
+
 // HTTP helper
 async function apiRequest<T>(
   endpoint: string,
@@ -125,7 +130,7 @@ async function apiRequest<T>(
 // =====================================================
 
 export const authService = {
-  async login(login: string, password: string): Promise<{ user: User; token: string }> {
+  async login(login: string, password: string, rememberMe: boolean = false): Promise<{ user: User; token: string }> {
     if (DEMO_MODE) {
       setToken('demo-token-12345');
       return { user: DEMO_USER, token: 'demo-token-12345' };
@@ -133,7 +138,7 @@ export const authService = {
     
     const response = await apiRequest<{ success: boolean; user: User; token: string }>('/login', {
       method: 'POST',
-      body: JSON.stringify({ login, password }),
+      body: JSON.stringify({ login, password, rememberMe }),
     });
     
     if (response.token) {
@@ -254,6 +259,7 @@ export const jobsService = {
       }),
     });
     
+    notifyChanges();
     return response.job;
   },
   
@@ -267,6 +273,7 @@ export const jobsService = {
       body: JSON.stringify(updates),
     });
     
+    notifyChanges();
     return response.job;
   },
   
@@ -282,6 +289,7 @@ export const jobsService = {
       method: 'PUT',
       body: JSON.stringify(body),
     });
+    notifyChanges();
   },
 
   async updateJobPosition(id: string, columnId: JobColumnId, order: number): Promise<void> {
@@ -291,6 +299,7 @@ export const jobsService = {
       method: 'PUT',
       body: JSON.stringify({ columnId, columnOrder: order }),
     });
+    notifyChanges();
   },
 
   async reorderJobs(columnId: JobColumnId, orderedIds: string[]): Promise<void> {
@@ -304,6 +313,7 @@ export const jobsService = {
         orderedIds,
       }),
     });
+    notifyChanges();
   },
   
   async completeJob(
@@ -373,6 +383,7 @@ export const jobsService = {
       method: 'PUT',
       body: JSON.stringify(updateData),
     });
+    notifyChanges();
   },
   
   async deleteJob(id: string): Promise<void> {
@@ -380,6 +391,7 @@ export const jobsService = {
     
     // Prosty DELETE, bez typu
     await apiRequest(`/jobs/${id}`, { method: 'DELETE' });
+    notifyChanges();
   },
   
   async duplicateJob(originalId: string): Promise<Job> {
@@ -392,6 +404,7 @@ export const jobsService = {
       original.checklist?.map(item => ({ ...item, isChecked: false }))
     );
     
+    notifyChanges();
     return newJob;
   },
 
