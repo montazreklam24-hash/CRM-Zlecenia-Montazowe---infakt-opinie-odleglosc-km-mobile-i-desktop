@@ -13,6 +13,7 @@ if (!is_dir($logDir)) mkdir($logDir, 0777, true);
 ini_set('error_log', $logDir . '/php_error.log');
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/images.php';
 require_once __DIR__ . '/jobs.php';
 require_once __DIR__ . '/gemini.php';
@@ -197,6 +198,11 @@ try {
 
             $finalFilename = time() . '_' . substr(md5(uniqid()), 0, 4) . '_' . $safeFilename;
             $filePath = UPLOAD_DIR . $finalFilename;
+            
+            // Upewnij się, że katalog istnieje
+            if (!is_dir(UPLOAD_DIR)) {
+                mkdir(UPLOAD_DIR, 0777, true);
+            }
             
             if (file_put_contents($filePath, $dataBinary)) {
                 debugImport("Saved file: $filePath (" . strlen($dataBinary) . " bytes)");
