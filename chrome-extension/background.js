@@ -337,12 +337,16 @@ ${contextBody}
     }
 
     if (parsed.phoneCandidates && Array.isArray(parsed.phoneCandidates)) {
+        const CRM_PHONES = ['888201250', '222139596'];
         parsed.phoneCandidates = parsed.phoneCandidates.map(p => {
             const d = String(p).replace(/\D/g, '');
             return d.length === 9 ? d.match(/.{1,3}/g).join(' ') : String(p);
         }).filter(p => {
             const cleanP = String(p).replace(/\s/g, '');
-            return cleanP && cleanP !== String(parsed.phone).replace(/\s/g, '') && !COMPANY_EMAILS.some(ce => cleanP.includes(ce));
+            return cleanP && 
+                   cleanP !== String(parsed.phone).replace(/\s/g, '') && 
+                   !CRM_PHONES.some(cp => cleanP.includes(cp)) &&
+                   !COMPANY_EMAILS.some(ce => cleanP.includes(ce));
         });
         parsed.phoneCandidates = [...new Set(parsed.phoneCandidates)];
     } else parsed.phoneCandidates = [];
@@ -460,7 +464,7 @@ async function importAttachments(selectedAttachments, gmailMessageId) {
   
   if (!gmailMessageId) {
     await logDebug('error', 'import', 'No gmailMessageId provided');
-    return [];
+    return { paths: [], threadId: null };
   }
   
   const settings = await getSettings();
@@ -471,7 +475,7 @@ async function importAttachments(selectedAttachments, gmailMessageId) {
     token = await getAuthToken();
   } catch (e) {
     await logDebug('error', 'import', 'Failed to get Gmail token', e.message);
-    return [];
+    return { paths: [], threadId: null };
   }
   
   // 2. Wyślij do PHP - pobierz WSZYSTKIE załączniki
@@ -491,8 +495,19 @@ async function importAttachments(selectedAttachments, gmailMessageId) {
       })
     });
     
-    const data = await resp.json();
-    await logDebug('info', 'import', 'PHP response', { 
+    const dataText = await resp.text();
+    let data;
+    try {
+      data = JSON.parse(dataText);
+    } catch (e) {
+      await logDebug('error', 'import', 'PHP response is not valid JSON', {
+        textPreview: dataText.substring(0, 500),
+        error: e.message
+      });
+      return { paths: [], threadId: null };
+    }
+    
+    await logDebug('info', 'import', 'PHP response parsed', { 
       success: data.success, 
       attachmentsCount: data.attachments?.length,
       error: data.error
@@ -500,18 +515,21 @@ async function importAttachments(selectedAttachments, gmailMessageId) {
     
     if (!data.success || !data.attachments) {
       await logDebug('error', 'import', 'PHP import failed', data.error);
-      return [];
+      return { paths: [], threadId: null };
     }
     
     // 3. FILTRUJ po nazwie - tylko wybrane załączniki trafiają do karty
-    const selectedNames = new Set((selectedAttachments || []).map(a => a.name?.toLowerCase()));
+    const selectedNames = new Set((selectedAttachments || []).map(a => a.name?.toLowerCase().trim()));
     await logDebug('info', 'import', 'Filtering by names', { 
       allFromPHP: data.attachments.map(a => a.originalName),
       selectedNames: Array.from(selectedNames)
     });
     
     const filteredPaths = data.attachments
-      .filter(a => selectedNames.has(a.originalName?.toLowerCase()))
+      .filter(a => {
+        const name = a.originalName?.toLowerCase().trim();
+        return selectedNames.has(name);
+      })
       .map(a => a.path);
     
     await logDebug('info', 'import', 'Filtered result', { 

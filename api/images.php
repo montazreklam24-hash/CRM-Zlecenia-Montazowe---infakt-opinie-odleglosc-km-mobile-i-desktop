@@ -27,7 +27,7 @@ function saveImageToFile($base64Data, $jobId, $type, $order) {
     }
     
     if (!is_dir(UPLOADS_DIR)) {
-        mkdir(UPLOADS_DIR, 0755, true);
+        @mkdir(UPLOADS_DIR, 0755, true);
     }
     
     if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $matches)) {
@@ -44,7 +44,7 @@ function saveImageToFile($base64Data, $jobId, $type, $order) {
     $filename = sprintf('job_%d_%s_%d_%d.%s', $jobId, $type, $order, time(), $extension);
     $filepath = UPLOADS_DIR . '/' . $filename;
     
-    if (file_put_contents($filepath, $imageData) === false) {
+    if (@file_put_contents($filepath, $imageData) === false) {
         error_log("Nie można zapisać obrazu: $filepath");
         return null;
     }

@@ -3,28 +3,50 @@
  * API Importu z Gmaila - WERSJA POPRAWIONA I BEZPIECZNA
  */
 
+// Zapobieganie wyciekowi jakichkolwiek znaków przed JSONem
+if (ob_get_level() == 0) ob_start();
+
 // Wyłącz wyświetlanie błędów do outputu (zapobieganie "Unexpected token <")
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
 // Własny log błędów
 $logDir = __DIR__ . '/logs';
-if (!is_dir($logDir)) mkdir($logDir, 0777, true);
-ini_set('error_log', $logDir . '/php_error.log');
+if (!is_dir($logDir)) @mkdir($logDir, 0777, true);
+@ini_set('error_log', $logDir . '/php_error.log');
 
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/auth.php';
-require_once __DIR__ . '/images.php';
-require_once __DIR__ . '/jobs.php';
-require_once __DIR__ . '/gemini.php';
-
-// Funkcje pomocnicze na górze
 if (!function_exists('debugImport')) {
     function debugImport($msg) {
         $logFile = __DIR__ . '/logs/debug_import.log';
-        file_put_contents($logFile, date('Y-m-d H:i:s') . " | " . $msg . "\n", FILE_APPEND);
+        @file_put_contents($logFile, date('Y-m-d H:i:s') . " | " . $msg . "\n", FILE_APPEND);
     }
 }
+
+// BARDZO WCZESNY DEBUG
+debugImport("--- SCRIPT START ---");
+debugImport("METHOD: " . $_SERVER['REQUEST_METHOD']);
+
+// Przechwytywanie błędów do loga
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    debugImport("PHP ERROR [$errno]: $errstr in $errfile on line $errline");
+    return false;
+});
+
+// Loguj załadowanie każdego pliku
+debugImport("Loading config...");
+require_once __DIR__ . '/config.php';
+debugImport("Loading auth...");
+require_once __DIR__ . '/auth.php';
+debugImport("Loading images...");
+require_once __DIR__ . '/images.php';
+debugImport("Loading jobs...");
+require_once __DIR__ . '/jobs.php';
+debugImport("Loading gemini...");
+require_once __DIR__ . '/gemini.php';
+debugImport("All core files loaded.");
+
+// Funkcje pomocnicze na górze
+// debugImport została przeniesiona wyżej dla wczesnego debugowania
 
 if (!function_exists('base64url_decode_safe')) {
     function base64url_decode_safe($data) {
@@ -105,6 +127,7 @@ try {
     handleCORS();
 
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        http_response_code(200);
         exit;
     }
 
@@ -197,14 +220,17 @@ try {
             if ($dataBinary === '') continue;
 
             $finalFilename = time() . '_' . substr(md5(uniqid()), 0, 4) . '_' . $safeFilename;
-            $filePath = UPLOAD_DIR . $finalFilename;
+            
+            // Ścieżka do zapisu (plural/singular fallback)
+            $targetDir = defined('UPLOAD_DIR') ? UPLOAD_DIR : (defined('UPLOADS_DIR') ? UPLOADS_DIR : (__DIR__ . '/../uploads/'));
+            $filePath = rtrim($targetDir, '/') . '/' . $finalFilename;
             
             // Upewnij się, że katalog istnieje
-            if (!is_dir(UPLOAD_DIR)) {
-                mkdir(UPLOAD_DIR, 0777, true);
+            if (!is_dir($targetDir)) {
+                @mkdir($targetDir, 0777, true);
             }
             
-            if (file_put_contents($filePath, $dataBinary)) {
+            if (@file_put_contents($filePath, $dataBinary)) {
                 debugImport("Saved file: $filePath (" . strlen($dataBinary) . " bytes)");
                 
                 $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));

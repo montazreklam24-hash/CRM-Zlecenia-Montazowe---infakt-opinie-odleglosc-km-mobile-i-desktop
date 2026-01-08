@@ -11,94 +11,97 @@ require_once __DIR__ . '/config.php';
 // Obsługa CORS
 handleCORS();
 
-// TEST endpoint - GET /api/gemini zwraca status
-if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $action = isset($_GET['action']) ? $_GET['action'] : 'status';
-    
-    if ($action === 'models') {
-        // Lista dostępnych modeli
-        $apiKey = GEMINI_API_KEY;
-        $url = "https://generativelanguage.googleapis.com/v1beta/models?key={$apiKey}";
+// Sprawdź czy plik jest wywoływany bezpośrednio (nie includowany)
+if (basename($_SERVER['PHP_SELF']) === 'gemini.php') {
+    // TEST endpoint - GET /api/gemini zwraca status
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        $action = isset($_GET['action']) ? $_GET['action'] : 'status';
         
-        $ch = curl_init($url);
-        curl_setopt_array($ch, array(
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_SSL_VERIFYPEER => false
-        ));
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        
-        $data = json_decode($response, true);
-        $models = array();
-        if (isset($data['models'])) {
-            foreach ($data['models'] as $m) {
-                $models[] = array(
-                    'name' => $m['name'],
-                    'displayName' => isset($m['displayName']) ? $m['displayName'] : '',
-                    'supportedMethods' => isset($m['supportedGenerationMethods']) ? $m['supportedGenerationMethods'] : array()
-                );
+        if ($action === 'models') {
+            // Lista dostępnych modeli
+            $apiKey = GEMINI_API_KEY;
+            $url = "https://generativelanguage.googleapis.com/v1beta/models?key={$apiKey}";
+            
+            $ch = curl_init($url);
+            curl_setopt_array($ch, array(
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_SSL_VERIFYPEER => false
+            ));
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            $data = json_decode($response, true);
+            $models = array();
+            if (isset($data['models'])) {
+                foreach ($data['models'] as $m) {
+                    $models[] = array(
+                        'name' => $m['name'],
+                        'displayName' => isset($m['displayName']) ? $m['displayName'] : '',
+                        'supportedMethods' => isset($m['supportedGenerationMethods']) ? $m['supportedGenerationMethods'] : array()
+                    );
+                }
             }
+            
+            jsonResponse(array(
+                'http_code' => $httpCode,
+                'models_count' => count($models),
+                'models' => $models,
+                'raw_error' => $httpCode !== 200 ? $response : null
+            ));
         }
         
+        if ($action === 'test') {
+            // Test połączenia z Gemini API
+            $apiKey = GEMINI_API_KEY;
+            $model = GEMINI_MODEL;
+            $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+            
+            $testBody = json_encode(array(
+                'contents' => array(
+                    array('parts' => array(array('text' => 'Odpowiedz jednym slowem: OK')))
+                )
+            ));
+            
+            $ch = curl_init($url);
+            curl_setopt_array($ch, array(
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $testBody,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER => array('Content-Type: application/json'),
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_SSL_VERIFYPEER => false
+            ));
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            jsonResponse(array(
+                'test' => 'gemini_connection',
+                'http_code' => $httpCode,
+                'curl_error' => $error ?: null,
+                'response_preview' => substr($response, 0, 300),
+                'success' => $httpCode === 200
+            ));
+        }
+        
+        // Default: status
         jsonResponse(array(
-            'http_code' => $httpCode,
-            'models_count' => count($models),
-            'models' => $models,
-            'raw_error' => $httpCode !== 200 ? $response : null
+            'status' => 'ok',
+            'model' => GEMINI_MODEL,
+            'key_prefix' => substr(GEMINI_API_KEY, 0, 10) . '...',
+            'php_version' => PHP_VERSION,
+            'memory_limit' => ini_get('memory_limit'),
+            'max_execution_time' => ini_get('max_execution_time'),
+            'post_max_size' => ini_get('post_max_size'),
+            'upload_max_filesize' => ini_get('upload_max_filesize'),
+            'test_url' => '/api/gemini?action=test'
         ));
     }
-    
-    if ($action === 'test') {
-        // Test połączenia z Gemini API
-        $apiKey = GEMINI_API_KEY;
-        $model = GEMINI_MODEL;
-        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
-        
-        $testBody = json_encode(array(
-            'contents' => array(
-                array('parts' => array(array('text' => 'Odpowiedz jednym slowem: OK')))
-            )
-        ));
-        
-        $ch = curl_init($url);
-        curl_setopt_array($ch, array(
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $testBody,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => array('Content-Type: application/json'),
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_SSL_VERIFYPEER => false
-        ));
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-        
-        jsonResponse(array(
-            'test' => 'gemini_connection',
-            'http_code' => $httpCode,
-            'curl_error' => $error ?: null,
-            'response_preview' => substr($response, 0, 300),
-            'success' => $httpCode === 200
-        ));
-    }
-    
-    // Default: status
-    jsonResponse(array(
-        'status' => 'ok',
-        'model' => GEMINI_MODEL,
-        'key_prefix' => substr(GEMINI_API_KEY, 0, 10) . '...',
-        'php_version' => PHP_VERSION,
-        'memory_limit' => ini_get('memory_limit'),
-        'max_execution_time' => ini_get('max_execution_time'),
-        'post_max_size' => ini_get('post_max_size'),
-        'upload_max_filesize' => ini_get('upload_max_filesize'),
-        'test_url' => '/api/gemini?action=test'
-    ));
 }
 
 /**
