@@ -30,12 +30,12 @@ function getSettings() {
     $user = requireAuth();
     $pdo = getDB();
     
-    $stmt = $pdo->query('SELECT `key`, `value` FROM settings');
+    $stmt = $pdo->query('SELECT `key_name`, `value` FROM settings');
     $rows = $stmt->fetchAll();
     
     $settings = array();
     foreach ($rows as $row) {
-        $settings[$row['key']] = $row['value'];
+        $settings[$row['key_name']] = $row['value'];
     }
     
     jsonResponse(array('success' => true, 'settings' => $settings));
@@ -54,7 +54,7 @@ function updateSettings() {
     foreach ($input as $key => $value) {
         if (in_array($key, $allowedKeys)) {
             $stmt = $pdo->prepare('
-                INSERT INTO settings (`key`, `value`) VALUES (?, ?)
+                INSERT INTO settings (`key_name`, `value`) VALUES (?, ?)
                 ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)
             ');
             $stmt->execute(array($key, $value));

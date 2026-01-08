@@ -46,6 +46,46 @@ function getInfaktClient() {
 }
 
 /**
+ * Konwertuj pozycje z formatu CRM/Gemini na format inFakt
+ * 
+ * Format wejściowy (CRM/Gemini):
+ * { name, netAmount, grossAmount, vatRate }
+ * 
+ * Format wyjściowy (inFakt):
+ * { name, quantity, unit_price_net, vat_rate }
+ */
+function convertQuoteItemsToInfaktFormat($quoteItems) {
+    $invoiceItems = array();
+    
+    if (!is_array($quoteItems)) {
+        return $invoiceItems;
+    }
+    
+    foreach ($quoteItems as $item) {
+        // Sprawdź czy to format CRM (netAmount) czy frontend (unitPriceNet)
+        if (isset($item['netAmount'])) {
+            // Format CRM/Gemini
+            $invoiceItems[] = array(
+                'name' => isset($item['name']) ? $item['name'] : 'Usługa',
+                'quantity' => isset($item['quantity']) ? floatval($item['quantity']) : 1,
+                'unit_price_net' => floatval($item['netAmount']),
+                'vat_rate' => isset($item['vatRate']) ? intval($item['vatRate']) : 23
+            );
+        } elseif (isset($item['unitPriceNet'])) {
+            // Format frontend (już gotowy)
+            $invoiceItems[] = array(
+                'name' => isset($item['name']) ? $item['name'] : 'Usługa',
+                'quantity' => isset($item['quantity']) ? floatval($item['quantity']) : 1,
+                'unit_price_net' => floatval($item['unitPriceNet']),
+                'vat_rate' => isset($item['vatRate']) ? intval($item['vatRate']) : 23
+            );
+        }
+    }
+    
+    return $invoiceItems;
+}
+
+/**
  * POST /api/invoices/proforma
  * Utwórz proformę i opcjonalnie wyślij na email
  */
@@ -102,16 +142,8 @@ function handleCreateProforma() {
             throw new Exception('Nie udało się utworzyć klienta w inFakt');
         }
         
-        // Przygotuj pozycje faktury
-        $invoiceItems = array();
-        foreach ($input['items'] as $item) {
-            $invoiceItems[] = array(
-                'name' => $item['name'],
-                'quantity' => isset($item['quantity']) ? floatval($item['quantity']) : 1,
-                'unit_price_net' => isset($item['unitPriceNet']) ? floatval($item['unitPriceNet']) : 0,
-                'vat_rate' => isset($item['vatRate']) ? intval($item['vatRate']) : 23
-            );
-        }
+        // Przygotuj pozycje faktury (użyj funkcji konwersji)
+        $invoiceItems = convertQuoteItemsToInfaktFormat($input['items']);
         
         // Opcje faktury
         $options = array(
@@ -242,16 +274,8 @@ function handleCreateInvoice() {
             throw new Exception('Nie udało się utworzyć klienta w inFakt');
         }
         
-        // Przygotuj pozycje
-        $invoiceItems = array();
-        foreach ($input['items'] as $item) {
-            $invoiceItems[] = array(
-                'name' => $item['name'],
-                'quantity' => isset($item['quantity']) ? floatval($item['quantity']) : 1,
-                'unit_price_net' => isset($item['unitPriceNet']) ? floatval($item['unitPriceNet']) : 0,
-                'vat_rate' => isset($item['vatRate']) ? intval($item['vatRate']) : 23
-            );
-        }
+        // Przygotuj pozycje (użyj funkcji konwersji)
+        $invoiceItems = convertQuoteItemsToInfaktFormat($input['items']);
         
         // Opcje faktury VAT
         $markPaid = isset($input['markAsPaid']) && $input['markAsPaid'];
@@ -847,7 +871,7 @@ function runFullSync($userId = null) {
         }
     }
     
-    $pdo->prepare("INSERT INTO settings (`key`, `value`) VALUES ('last_infakt_sync', NOW()) ON DUPLICATE KEY UPDATE `value` = NOW()")->execute();
+    $pdo->prepare("INSERT INTO settings (`key_name`, `value`) VALUES ('last_infakt_sync', NOW()) ON DUPLICATE KEY UPDATE `value` = NOW()")->execute();
     
     $results['message'] = "Zsynchronizowano statusy {$results['invoices']['updated']} faktur. " .
                          "Zaktualizowano {$results['clients']['updated']} i utworzono {$results['clients']['created']} klientów.";
