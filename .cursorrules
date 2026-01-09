@@ -6,6 +6,7 @@
 - Wiadomości commitów opisowe (po polsku lub angielsku)
 - ZAWSZE rób git push po commitach!
 - **ZAWSZE po zmianach w kodzie rób `npm run build` aby zaktualizować folder dist/**
+- **PO KAŻDYM BUILDZIE zaktualizuj folder `dist_ehost` kopiując do niego zawartość `dist/` (zachowując specyficzne pliki config w api/) oraz zsynchronizuj dist w dockerze.**
 
 ## Backup
 - npm run build automatycznie robi backup ZIP przed buildem
@@ -16,6 +17,7 @@
 ## Deploy
 - **Build ZAWSZE: npm run build**
 - Folder dist/ wgrywać na FTP
+- Folder dist_ehost/ utrzymywać jako lokalne odzwierciedlenie wersji online (ehost)
 - NIE nadpisywać uploads/ na serwerze (zdjęcia klientów)
 
 ## Stack
@@ -46,7 +48,8 @@
 3. git commit -m "typ: opis zmiany"
 4. git push
 5. **npm run build** (ZAWSZE!)
-6. Folder dist/ jest gotowy do wgrania na serwer
+6. **Aktualizacja dist_ehost**: Skopiuj zawartość `dist/` do `dist_ehost/`.
+7. Folder dist/ jest gotowy do wgrania na serwer oraz do użycia w dockerze.
 
 ## Zasady dla agenta (Terminal & CWD)
 - **ABSOLUTNY ZAKAZ pracy na dysku C:** Projekt znajduje się na dysku D. Przed każdą komendą `npm` lub `git` upewnij się, że jesteś na dysku D w poprawnym folderze.

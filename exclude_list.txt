@@ -1,0 +1,6 @@
+api/config.php
+api/config_db.php
+api/uploads/
+uploads/
+.git
+node_modules

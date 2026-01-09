@@ -2,7 +2,8 @@ import React, { useState, useRef } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import ThemeSwitcher from './ThemeSwitcher';
-import { Menu, X, ChevronDown, ChevronUp } from 'lucide-react';
+import ChangePasswordModal from './ChangePasswordModal';
+import { Menu, X, ChevronDown, ChevronUp, Lock } from 'lucide-react';
 import { useDeviceType } from '../hooks/useDeviceType';
 import { User, UserRole } from '../types';
 
@@ -10,8 +11,6 @@ interface LayoutProps {
   onLogout?: () => void;
   onLogoClick?: () => void;
   user?: User;
-  dashVariant?: 'legacy' | 'omega';
-  onDashVariantChange?: (v: 'legacy' | 'omega') => void;
 }
 
 const ROLE_NAMES: Record<UserRole, string> = {
@@ -23,11 +22,10 @@ const ROLE_NAMES: Record<UserRole, string> = {
 const Layout: React.FC<LayoutProps> = ({ 
   onLogout, 
   onLogoClick, 
-  user,
-  dashVariant = 'legacy',
-  onDashVariantChange 
+  user
 }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const navigate = useNavigate();
   const { isMobile } = useDeviceType();
   const urlParams = new URLSearchParams(window.location.search);
@@ -78,7 +76,7 @@ const Layout: React.FC<LayoutProps> = ({
                {/* Logo PNG wystające w dół */}
                <img 
                  src="/logo.png" 
-                 alt="Montaż24"
+                 alt="Omega"
                  className="h-[60px] w-auto object-contain absolute left-0 transition-transform hover:scale-105"
                  style={{ 
                    top: '12px', 
@@ -94,10 +92,10 @@ const Layout: React.FC<LayoutProps> = ({
                {/* Tekst obok logo - margines zależy od szerokości logo */}
                <div className="flex flex-col justify-center ml-[120px] hidden sm:flex z-50">
                   <span className="text-orange-500 font-bold text-lg leading-tight tracking-wide">
-                    CRM.MontazReklam24.pl
+                    Omega
                   </span>
                   <span className="text-gray-400 text-[10px] lowercase leading-tight ml-1">
-                    wersja gamma
+                    wersja omega
                   </span>
                </div>
             </div>
@@ -106,36 +104,6 @@ const Layout: React.FC<LayoutProps> = ({
         
         {/* Right: View Toggles + User */}
         <div className="flex items-center gap-3">
-          {/* Dashboard Variant Toggle */}
-          <div className="hidden md:flex rounded-lg p-1 border border-gray-700 bg-gray-900 mr-2">
-            <button
-              onClick={() => onDashVariantChange?.('legacy')}
-              className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
-                dashVariant === 'legacy' ? 'shadow-sm' : 'hover:opacity-80'
-              }`}
-              style={{
-                background: dashVariant === 'legacy' ? '#64748b' : 'transparent',
-                color: dashVariant === 'legacy' ? '#fff' : '#9ca3af'
-              }}
-              title="Klasyczny Dashboard"
-            >
-              Legacy
-            </button>
-            <button
-              onClick={() => onDashVariantChange?.('omega')}
-              className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
-                dashVariant === 'omega' ? 'shadow-sm' : 'hover:opacity-80'
-              }`}
-              style={{
-                background: dashVariant === 'omega' ? '#8b5cf6' : 'transparent',
-                color: dashVariant === 'omega' ? '#fff' : '#9ca3af'
-              }}
-              title="Nowy Dashboard Omega"
-            >
-              Omega
-            </button>
-          </div>
-
           {/* PC/Mobile Toggle */}
           <div className="hidden md:flex rounded-lg p-1 border border-gray-700 bg-gray-900">
             <button
@@ -205,6 +173,17 @@ const Layout: React.FC<LayoutProps> = ({
                 <button
                   onClick={() => {
                     setShowUserMenu(false);
+                    setIsPasswordModalOpen(true);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-50 flex items-center gap-2"
+                  style={{ color: 'var(--text-primary)' }}
+                >
+                  <Lock size={14} />
+                  Zmień hasło
+                </button>
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
                     if (onLogout) onLogout();
                   }}
                   className="w-full text-left px-4 py-2 text-sm transition-colors"
@@ -259,12 +238,17 @@ const Layout: React.FC<LayoutProps> = ({
         />
       </div>
 
-      {/* Main Content - Obniżony o 50px więcej */}
-      <main className="flex-1 pt-44 p-4 md:p-8 min-h-screen transition-all duration-300 w-full">
+      {/* Main Content - Startuje ok. 70px od samej góry */}
+      <main className="flex-1 pt-[70px] px-4 md:px-8 pb-4 md:pb-8 min-h-screen transition-all duration-300 w-full">
         <div className="max-w-[1800px] mx-auto w-full">
            <Outlet />
         </div>
       </main>
+
+      <ChangePasswordModal 
+        isOpen={isPasswordModalOpen} 
+        onClose={() => setIsPasswordModalOpen(false)} 
+      />
     </div>
   );
 };
