@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { User } from '../types';
 import { authService } from '../services/apiService';
 import { Loader2, LogIn, Phone, Mail, Lock, AlertCircle, Check } from 'lucide-react';
+import ForgotPasswordModal from './ForgotPasswordModal';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -14,6 +15,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loginType, setLoginType] = useState<'email' | 'phone'>('email');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,7 +149,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <span className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">Zapamiętaj mnie (30 dni)</span>
               </label>
               
-              <button type="button" className="text-sm text-orange-500 hover:text-orange-400 font-medium">
+              <button 
+                type="button" 
+                onClick={() => setShowForgotPassword(true)}
+                className="text-sm text-orange-500 hover:text-orange-400 font-medium"
+              >
                 Zapomniałeś hasła?
               </button>
             </div>
@@ -205,6 +211,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           © 2024 Wszelkie prawa zastrzeżone
         </p>
       </div>
+      
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal 
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+      />
     </div>
   );
 };

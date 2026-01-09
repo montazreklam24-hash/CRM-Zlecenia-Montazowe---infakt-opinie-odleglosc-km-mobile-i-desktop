@@ -169,6 +169,119 @@ function handleChangePassword() {
     jsonResponse(array('success' => true, 'message' => 'Hasło zmienione'));
 }
 
+/**
+ * POST /api/forgot-password
+ * Body: { "login": "email lub telefon" }
+ */
+function handleForgotPassword() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        jsonResponse(array('error' => 'Method not allowed'), 405);
+    }
+    
+    $input = getJsonInput();
+    $login = isset($input['login']) ? trim($input['login']) : '';
+    
+    if (empty($login)) {
+        jsonResponse(array('error' => 'Podaj email lub telefon'), 400);
+    }
+    
+    $pdo = getDB();
+    
+    // Szukaj użytkownika
+    $stmt = $pdo->prepare('SELECT id, email, name FROM users WHERE (email = ? OR phone = ?) AND is_active = 1');
+    $stmt->execute(array($login, $login));
+    $user = $stmt->fetch();
+    
+    if (!$user || empty($user['email'])) {
+        // Dla bezpieczeństwa nie informujemy czy user istnieje, chyba że nie ma maila
+        if ($user && empty($user['email'])) {
+             jsonResponse(array('error' => 'Użytkownik nie posiada przypisanego adresu email. Skontaktuj się z administratorem.'), 400);
+        }
+        jsonResponse(array('success' => true, 'message' => 'Jeśli użytkownik istnieje, instrukcja została wysłana.'));
+    }
+    
+    // Generuj nowe hasło
+    $newPassword = substr(str_shuffle('abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'), 0, 8);
+    $newHash = password_hash($newPassword, PASSWORD_BCRYPT, array('cost' => PASSWORD_COST));
+    
+    // Zaktualizuj w bazie
+    $stmt = $pdo->prepare('UPDATE users SET password_hash = ? WHERE id = ?');
+    $stmt->execute(array($newHash, $user['id']));
+    
+    // Wyślij email
+    $to = $user['email'];
+    $subject = "Reset hasła - CRM Montaż Reklam 24";
+    
+    error_log("Attempting password reset for: " . $to);
+    
+    $htmlContent = "
+    <div style='font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;'>
+        <h2 style='color: #f97316;'>Reset hasła w CRM</h2>
+        <p>Witaj <strong>{$user['name']}</strong>,</p>
+        <p>Twoje hasło do systemu CRM zostało zresetowane zgodnie z prośbą.</p>
+        <div style='background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #eee; text-align: center;'>
+            <p style='margin: 0; color: #666; font-size: 14px;'>Twoje nowe hasło tymczasowe:</p>
+            <p style='margin: 10px 0 0; font-size: 24px; font-weight: bold; color: #000; letter-spacing: 2px;'>$newPassword</p>
+        </div>
+        <p>Zaloguj się używając powyższego hasła, a następnie <strong>niezwłocznie zmień je w ustawieniach swojego profilu</strong>.</p>
+        <hr style='border: none; border-top: 1px solid #eee; margin: 30px 0;'>
+        <p style='font-size: 12px; color: #999; text-align: center;'>
+            To jest wiadomość automatyczna, prosimy na nią nie odpowiadać.<br>
+            Montaż Reklam 24
+        </p>
+    </div>";
+
+    // Wykorzystujemy PHPMailer jeśli jest dostępny
+    $sent = false;
+    $autoloadPath = null;
+    if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+        $autoloadPath = __DIR__ . '/../vendor/autoload.php';
+    } elseif (file_exists(__DIR__ . '/vendor/autoload.php')) {
+        $autoloadPath = __DIR__ . '/vendor/autoload.php';
+    }
+
+    if ($autoloadPath) {
+        @require_once $autoloadPath;
+        if (class_exists('PHPMailer\PHPMailer\PHPMailer')) {
+            error_log("PHPMailer class found, initializing...");
+            try {
+                $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+                $mail->isSMTP();
+                $mail->Host = SMTP_HOST;
+                $mail->SMTPAuth = true;
+                $mail->Username = SMTP_USERNAME;
+                $mail->Password = SMTP_PASSWORD;
+                $mail->SMTPSecure = SMTP_SECURE;
+                $mail->Port = SMTP_PORT;
+                $mail->CharSet = 'UTF-8';
+                $mail->setFrom(SMTP_FROM_EMAIL, SMTP_FROM_NAME);
+                $mail->addAddress($to);
+                $mail->isHTML(true);
+                $mail->Subject = $subject;
+                $mail->Body = $htmlContent;
+                $mail->AltBody = strip_tags($htmlContent);
+                $mail->send();
+                $sent = true;
+                error_log("PHPMailer: Email sent successfully to " . $to);
+            } catch (Exception $e) {
+                error_log("PHPMailer Error (forgot password): " . $e->getMessage());
+            }
+        }
+    }
+    
+    // Fallback do mail()
+    if (!$sent) {
+        error_log("PHPMailer failed, trying fallback mail()...");
+        $headers = array();
+        $headers[] = "From: " . SMTP_FROM_NAME . " <" . SMTP_FROM_EMAIL . ">";
+        $headers[] = "Content-Type: text/html; charset=UTF-8";
+        $headersStr = implode("\r\n", $headers);
+        $sent = @mail($to, "=?UTF-8?B?" . base64_encode($subject) . "?=", $htmlContent, $headersStr);
+    }
+    
+    jsonResponse(array('success' => true, 'message' => 'Jeśli użytkownik istnieje, instrukcja została wysłana.'));
+}
+
 // =========================================================================
 // FUNKCJE POMOCNICZE AUTORYZACJI
 // =========================================================================
@@ -177,6 +290,16 @@ function handleChangePassword() {
  * Sprawdź autoryzację (Token sesji lub API Secret)
  */
 function requireAuth() {
+    // 0. Sprawdź czy włączony jest BYPASS (tryb bez logowania)
+    if (defined('BYPASS_AUTH') && BYPASS_AUTH === true) {
+        return array(
+            'id' => 1,
+            'role' => 'admin',
+            'name' => 'Użytkownik',
+            'email' => 'admin@montazreklam24.pl'
+        );
+    }
+
     $token = getAuthToken();
     
     // 1. Sprawdź Secret Token (dla Extension)
@@ -220,6 +343,17 @@ function requireAuth() {
     }
     
     return $session;
+}
+
+/**
+ * Wymaga uprawnień administratora
+ */
+function requireAdmin() {
+    $user = requireAuth();
+    if ($user['role'] !== 'admin') {
+        jsonResponse(array('error' => 'Dostęp tylko dla administratora'), 403);
+    }
+    return $user;
 }
 
 /**
