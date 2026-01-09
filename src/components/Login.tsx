@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 import { authService } from '../services/apiService';
-import { Loader2, LogIn, Phone, Mail, Lock, AlertCircle, Check } from 'lucide-react';
+import { Loader2, LogIn, Phone, Mail, Lock, AlertCircle } from 'lucide-react';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -10,7 +10,6 @@ interface LoginProps {
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loginType, setLoginType] = useState<'email' | 'phone'>('email');
@@ -27,7 +26,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setIsLoading(true);
     
     try {
-      const { user } = await authService.login(login.trim(), password, rememberMe);
+      const { user } = await authService.login(login.trim(), password);
       onLogin(user);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Błąd logowania');
@@ -129,27 +128,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   autoComplete="current-password"
                 />
               </div>
-            </div>
-
-            {/* Remember Me */}
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-5 h-5 border-2 border-slate-700 rounded-md peer-checked:bg-orange-500 peer-checked:border-orange-500 transition-all" />
-                  <Check className="absolute top-0.5 left-0.5 w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity" />
-                </div>
-                <span className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">Zapamiętaj mnie (30 dni)</span>
-              </label>
-              
-              <button type="button" className="text-sm text-orange-500 hover:text-orange-400 font-medium">
-                Zapomniałeś hasła?
-              </button>
             </div>
             
             {/* Google Login Button */}
