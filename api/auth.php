@@ -45,7 +45,8 @@ function handleLogin() {
     
     // Generuj token sesji
     $token = generateToken(SESSION_TOKEN_LENGTH);
-    $expiresAt = date('Y-m-d H:i:s', time() + SESSION_LIFETIME);
+    $expiresTimestamp = time() + (isset($input['rememberMe']) && $input['rememberMe'] ? 86400 * 30 : SESSION_LIFETIME);
+    $expiresAt = date('Y-m-d H:i:s', $expiresTimestamp);
     
     // Zapisz sesję
     $stmt = $pdo->prepare('
@@ -56,6 +57,20 @@ function handleLogin() {
         $user['id'],
         $token,
         $expiresAt
+    ));
+    
+    // Ustaw HttpOnly Cookie
+    $cookiePath = '/';
+    $cookieDomain = ''; // Domyślna domena
+    $secure = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on';
+    
+    setcookie('crm_auth_token', $token, array(
+        'expires' => $expiresTimestamp,
+        'path' => $cookiePath,
+        'domain' => $cookieDomain,
+        'secure' => $secure,
+        'httponly' => true,
+        'samesite' => 'Strict'
     ));
     
     // Aktualizuj last_login (jeśli kolumna istnieje)
@@ -88,6 +103,9 @@ function handleLogout() {
         $stmt = $pdo->prepare('DELETE FROM sessions WHERE token = ?');
         $stmt->execute(array($token));
     }
+    
+    // Usuń ciasteczko
+    setcookie('crm_auth_token', '', time() - 3600, '/');
     
     jsonResponse(array('success' => true, 'message' => 'Wylogowano'));
 }
@@ -173,8 +191,8 @@ function requireAuth() {
     
     // 2. Sprawdź sesję użytkownika
     if (!$token) {
-        // Jeśli DEV_MODE to pozwól bez logowania (tylko na localhost)
-        if (defined('DEV_MODE') && DEV_MODE === true) {
+        // Jeśli ALLOW_ANONYMOUS_DEV to pozwól bez logowania (tylko na localhost w trybie dev)
+        if (defined('ALLOW_ANONYMOUS_DEV') && ALLOW_ANONYMOUS_DEV === true && defined('DEV_MODE') && DEV_MODE === true) {
              return array(
                 'id' => 1,
                 'role' => 'admin',
@@ -205,14 +223,20 @@ function requireAuth() {
 }
 
 /**
- * Pobierz token z nagłówka
+ * Pobierz token z nagłówka lub ciasteczka
  */
 function getAuthToken() {
+    // 1. Sprawdź nagłówek Authorization
     $headers = getallheaders();
     $authHeader = isset($headers['Authorization']) ? $headers['Authorization'] : '';
     
     if (preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
         return $matches[1];
+    }
+    
+    // 2. Sprawdź ciasteczko
+    if (isset($_COOKIE['crm_auth_token'])) {
+        return $_COOKIE['crm_auth_token'];
     }
     
     return null;
