@@ -67,21 +67,28 @@ Password: crm_password_secure_2025
 ═══════════════════════════════════════════════════════════
 
 ╔══════════════════════════════════════════════════════════╗
-║  1. WGRAJ FRONTEND (dist/)                               ║
+║  OPCJA A: AUTOMATYCZNY DEPLOYMENT (POLECAM!)             ║
 ╚══════════════════════════════════════════════════════════╝
 
 W PowerShell na Twoim komputerze:
 
 cd "D:\Programowanie\Cursor\CRM Zlecenia Montazowe - infakt, opinie, odleglosc km, mobile i desktop"
 
-npm run build
+.\deploy-hetzner.ps1
 
-scp -r dist/* root@46.224.89.131:/opt/crm-app/dist/
+To wgra WSZYSTKO automatycznie (build + dist + api + uploads)!
 
 
 ╔══════════════════════════════════════════════════════════╗
-║  2. WGRAJ ZDJĘCIA (uploads/)                             ║
+║  OPCJA B: RĘCZNIE (krok po kroku)                        ║
 ╚══════════════════════════════════════════════════════════╝
+
+1. WGRAJ FRONTEND (dist/):
+
+npm run build
+scp -r dist/* root@46.224.89.131:/opt/crm-app/dist/
+
+2. WGRAJ ZDJĘCIA (uploads/):
 
 scp -r uploads/* root@46.224.89.131:/opt/crm-app/uploads/
 
