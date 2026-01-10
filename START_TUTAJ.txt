@@ -1,0 +1,143 @@
+═══════════════════════════════════════════════════════════
+    🚀 INSTALACJA CRM NA HETZNER - SUPER PROSTA INSTRUKCJA
+═══════════════════════════════════════════════════════════
+
+📋 TWOJE DANE SERWERA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IP:       46.224.89.131
+User:     root
+Password: iTTCULm3ar9iEgtiNfpK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+═══════════════════════════════════════════════════════════
+  KROK 1: ZALOGUJ SIĘ NA SERWER
+═══════════════════════════════════════════════════════════
+
+1. Otwórz PowerShell (Win + X → "Windows PowerShell")
+
+2. Skopiuj i wklej:
+
+ssh root@46.224.89.131
+
+3. Wklej hasło: iTTCULm3ar9iEgtiNfpK
+   (podczas wpisywania nic się nie pokazuje - to normalne!)
+
+4. System poprosi o NOWE HASŁO - ustaw i ZAPISZ!
+
+
+═══════════════════════════════════════════════════════════
+  KROK 2: AUTOMATYCZNA INSTALACJA (1 KOMENDA!)
+═══════════════════════════════════════════════════════════
+
+Skopiuj i wklej w terminal serwera:
+
+curl -fsSL https://raw.githubusercontent.com/montazreklam24-hash/CRM-Zlecenia-Montazowe---infakt-opinie-odleglosc-km-mobile-i-desktop/omega/setup-hetzner.sh | bash
+
+
+⏱️  Poczekaj 3-5 minut...
+
+Skrypt automatycznie:
+✓ Zainstaluje Docker
+✓ Sklonuje repozytorium z GitHub
+✓ Skonfiguruje bazę danych
+✓ Uruchomi aplikację
+
+
+═══════════════════════════════════════════════════════════
+  GOTOWE! APLIKACJA DZIAŁA
+═══════════════════════════════════════════════════════════
+
+🌐 Otwórz w przeglądarce:
+
+   Aplikacja:   http://46.224.89.131
+   phpMyAdmin:  http://46.224.89.131:8081
+
+📊 Dane do bazy (w phpMyAdmin):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Host:     db
+Database: crm_db  
+User:     crm_user
+Password: crm_password_secure_2025
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+═══════════════════════════════════════════════════════════
+  ⚠️  TRZEBA JESZCZE DOKOŃCZYĆ (na Twoim komputerze)
+═══════════════════════════════════════════════════════════
+
+╔══════════════════════════════════════════════════════════╗
+║  1. WGRAJ FRONTEND (dist/)                               ║
+╚══════════════════════════════════════════════════════════╝
+
+W PowerShell na Twoim komputerze:
+
+cd "D:\Programowanie\Cursor\CRM Zlecenia Montazowe - infakt, opinie, odleglosc km, mobile i desktop"
+
+npm run build
+
+scp -r dist/* root@46.224.89.131:/opt/crm-app/dist/
+
+
+╔══════════════════════════════════════════════════════════╗
+║  2. WGRAJ ZDJĘCIA (uploads/)                             ║
+╚══════════════════════════════════════════════════════════╝
+
+scp -r uploads/* root@46.224.89.131:/opt/crm-app/uploads/
+
+
+╔══════════════════════════════════════════════════════════╗
+║  3. ZAIMPORTUJ BAZĘ DANYCH                               ║
+╚══════════════════════════════════════════════════════════╝
+
+a) Otwórz: http://46.224.89.131:8081
+b) Zaloguj się (dane powyżej)
+c) Importuj plik .sql
+
+
+═══════════════════════════════════════════════════════════
+  📦 PRZYDATNE KOMENDY (na serwerze)
+═══════════════════════════════════════════════════════════
+
+# Przejdź do projektu
+cd /opt/crm-app
+
+# Zobacz status
+docker-compose -f docker-compose.production.yml ps
+
+# Zobacz logi
+docker-compose -f docker-compose.production.yml logs -f
+
+# Restart
+docker-compose -f docker-compose.production.yml restart
+
+# Stop
+docker-compose -f docker-compose.production.yml down
+
+# Start
+docker-compose -f docker-compose.production.yml up -d
+
+
+═══════════════════════════════════════════════════════════
+  🆘 JEŚLI COŚ NIE DZIAŁA
+═══════════════════════════════════════════════════════════
+
+1. Sprawdź czy kontenery działają:
+   docker-compose -f docker-compose.production.yml ps
+
+2. Zobacz logi błędów:
+   docker-compose -f docker-compose.production.yml logs
+
+3. Najprawdopodobniej brakuje:
+   - Frontendu (dist/) - wgraj przez scp
+   - Bazy danych - zaimportuj przez phpMyAdmin
+
+
+═══════════════════════════════════════════════════════════
+
+TO JUŻ WSZYSTKO! Powodzenia! 🚀
+
+Jeśli masz pytania - sprawdź plik INSTALACJA_HETZNER.md
+w projekcie - tam jest pełna dokumentacja.
+
+═══════════════════════════════════════════════════════════
